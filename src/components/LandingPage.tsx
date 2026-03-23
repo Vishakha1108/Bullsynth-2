@@ -1,106 +1,261 @@
 import { Link } from 'react-router-dom';
-import { TrendingUp, BarChart3, ArrowUpDown, Activity } from 'lucide-react';
-import useMarketStore from '../store/useMarketStore';
+import { useEffect, useState } from 'react';
+import {
+    TrendingUp, BarChart3, ArrowUpDown, Activity, Zap, Globe,
+    Brain, Users, Shield, LineChart, ChevronRight, LayoutDashboard,
+    Sparkles, ArrowRight
+} from 'lucide-react';
+import { fetchTickers, type Ticker } from '../services/api';
 
 export default function LandingPage() {
-    const currentPrice = useMarketStore(state => state.lastPrice);
+    const [tickers, setTickers] = useState<Ticker[]>([]);
+
+    useEffect(() => {
+        fetchTickers().then(setTickers);
+    }, []);
 
     return (
-        <div className="min-h-screen bg-nb-bg text-nb-text-1 font-sans selection:bg-nb-accent/30 selection:text-white pb-20">
+        <div className="nb-landing">
+            {/* ── Navbar ─────────────────────────────────────────────────── */}
+            <nav className="nb-navbar">
+                <div className="nb-navbar-inner">
+                    <Link to="/" className="nb-logo">
+                        <TrendingUp size={22} />
+                        <span>NEXTBULL</span>
+                    </Link>
+                    <div className="nb-nav-links">
+                        <Link to="/" className="nb-nav-link">Products</Link>
+                        <Link to="/" className="nb-nav-link">Markets</Link>
+                        <Link to="/terminal" className="nb-nav-link">Terminal</Link>
+                        <Link to="/user/dashboard" className="nb-nav-link">Dashboard</Link>
+                    </div>
+                    <div className="nb-nav-actions">
+                        <Link to="/terminal" className="nb-nav-signin">Sign in</Link>
+                        <Link to="/terminal" className="nb-nav-signup">Sign up</Link>
+                    </div>
+                </div>
+            </nav>
 
-            {/* Ticker Strip */}
-            <div className="bg-nb-surface border-b border-nb-border py-2 overflow-hidden sticky top-0 z-50 shadow-md">
-                <div className="animate-marquee whitespace-nowrap font-mono text-sm inline-flex items-center w-[max-content]">
-                    {[1, 2, 3, 4].map(i => (
-                        <div key={i} className="flex items-center">
-                            <span className="mx-8 font-bold text-nb-text-1">SYNTH/USD</span>
-                            <span className="mx-4 text-nb-bull">
-                                ${currentPrice.toFixed(2)} ▲ 0.47%
+            {/* ── Ticker Marquee ──────────────────────────────────────────── */}
+            <div className="nb-marquee-bar">
+                <div className="nb-marquee-track">
+                    {[...tickers, ...tickers].map((t, i) => (
+                        <Link
+                            key={`${t.symbol}-${i}`}
+                            to={`/terminal?symbol=${encodeURIComponent(t.symbol)}`}
+                            className="nb-marquee-item"
+                        >
+                            <span className="nb-marquee-sym">{t.symbol}</span>
+                            <span className="nb-marquee-price">${t.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            <span className={`nb-marquee-change ${t.change24h >= 0 ? 'up' : 'down'}`}>
+                                {t.change24h >= 0 ? '▲' : '▼'} {Math.abs(t.change24h).toFixed(2)}%
                             </span>
-                            <span className="mx-4 text-nb-text-2">Vol: 12,450</span>
-                            <span className="mx-4 text-nb-bull">Bid: ${(currentPrice - 0.05).toFixed(2)}</span>
-                            <span className="mx-4 text-nb-bear">Ask: ${(currentPrice + 0.05).toFixed(2)}</span>
-                            <span className="mx-8 text-nb-border">|</span>
-                        </div>
+                        </Link>
                     ))}
                 </div>
             </div>
 
-            {/* Hero Section */}
-            <main className="relative pt-20 pb-32 overflow-hidden flex flex-col items-center justify-center min-h-[80vh]">
-                {/* Decorative background glow */}
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-nb-accent/5 rounded-full blur-[120px] pointer-events-none" />
-
-                <div className="relative z-10 container mx-auto px-4 text-center flex flex-col items-center justify-center">
-                    <div className="inline-flex items-center gap-3 mb-6 bg-nb-surface/80 backdrop-blur-sm border border-nb-border px-4 py-2 rounded-full shadow-lg">
-                        <TrendingUp className="text-nb-accent" size={20} />
-                        <span className="font-brand font-bold tracking-widest text-sm text-nb-text-2">NEXTBULL EXCHANGE</span>
+            {/* ── Hero ────────────────────────────────────────────────────── */}
+            <section className="nb-hero">
+                <div className="nb-hero-glow" />
+                <div className="nb-hero-glow-2" />
+                <div className="nb-hero-content">
+                    <div className="nb-hero-badge">
+                        <Sparkles size={14} />
+                        <span>AI-Powered Intelligence Terminal</span>
                     </div>
-
-                    <h1 className="text-5xl md:text-7xl lg:text-8xl font-black font-brand tracking-tight mb-8 leading-tight">
-                        Synthetic <br className="hidden md:block" />
-                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-nb-accent to-nb-bull">Markets</span> Online
+                    <h1 className="nb-hero-title">
+                        The AI Financial<br />
+                        <span className="nb-hero-gradient">Intelligence</span>
                     </h1>
-
-                    <p className="text-lg md:text-xl text-nb-text-2 max-w-2xl mx-auto mb-12 font-medium">
-                        Real-time simulated trading at your fingertips. Experience institutional-grade charting, deep liquidity order books, and bot competition.
+                    <p className="nb-hero-subtitle">
+                        Power your financial decisions with best-in-class data, research, analytics
+                        and access to global markets — all from one intelligent terminal.
                     </p>
-
-                    <Link
-                        to="/terminal"
-                        className="group relative inline-flex items-center justify-center bg-nb-accent hover:bg-nb-accent-h text-nb-bg font-extrabold text-lg md:text-xl px-10 py-5 rounded-lg transition-all duration-300 shadow-[0_0_30px_rgba(245,158,11,0.3)] hover:shadow-[0_0_50px_rgba(245,158,11,0.5)] hover:-translate-y-1"
-                    >
-                        Enter Terminal <span className="ml-2 group-hover:translate-x-1 transition-transform">→</span>
-                    </Link>
-                </div>
-            </main>
-
-            {/* Features Showcase */}
-            <section className="container mx-auto px-4 relative z-10">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 max-w-5xl mx-auto">
-
-                    <FeatureCard
-                        icon={<BarChart3 size={32} className="text-nb-accent mb-4" />}
-                        title="Live Candlestick Charts"
-                        desc="Real-time 1-second candles powered by TradingView's high-performance canvas engine."
-                    />
-
-                    <FeatureCard
-                        icon={<ArrowUpDown size={32} className="text-nb-bull mb-4" />}
-                        title="Full Order Book"
-                        desc="Bid/ask depth visualization with 50+ order-per-second throughput and sub-millisecond execution."
-                    />
-
-                    <FeatureCard
-                        icon={<Activity size={32} className="text-nb-bear mb-4" />}
-                        title="Algorithmic Trading"
-                        desc="Market maker and alpha bots competing in the synthetic market ecosystem."
-                    />
-
+                    <div className="nb-hero-actions">
+                        <Link to="/terminal" className="nb-cta-primary">
+                            Launch Terminal
+                            <ArrowRight size={18} />
+                        </Link>
+                        <Link to="/user/dashboard" className="nb-cta-secondary">
+                            View Dashboard
+                            <ChevronRight size={16} />
+                        </Link>
+                    </div>
                 </div>
             </section>
 
-            <style>{`
-        @keyframes marquee {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-        .animate-marquee {
-          animation: marquee 30s linear infinite;
-        }
-      `}</style>
+            {/* ── Live Tickers Table ──────────────────────────────────────── */}
+            <section className="nb-section">
+                <div className="nb-section-inner">
+                    <h2 className="nb-section-title">
+                        Capital Markets <span className="nb-hero-gradient">Happen Here</span>
+                    </h2>
+                    <p className="nb-section-desc">
+                        Track and trade across global asset classes. Click any instrument to launch its chart.
+                    </p>
+                    <div className="nb-ticker-table-wrap">
+                        <table className="nb-ticker-table">
+                            <thead>
+                                <tr>
+                                    <th>Symbol</th>
+                                    <th>Name</th>
+                                    <th>Price</th>
+                                    <th>24h Change</th>
+                                    <th>Volume</th>
+                                    <th>Category</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {tickers.map(t => (
+                                    <tr key={t.symbol}>
+                                        <td className="nb-ticker-sym">{t.symbol}</td>
+                                        <td className="nb-ticker-name">{t.name}</td>
+                                        <td className="nb-ticker-price">
+                                            ${t.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </td>
+                                        <td className={`nb-ticker-change ${t.change24h >= 0 ? 'up' : 'down'}`}>
+                                            {t.change24h >= 0 ? '+' : ''}{t.change24h.toFixed(2)}%
+                                        </td>
+                                        <td className="nb-ticker-vol">{t.volume.toLocaleString()}</td>
+                                        <td>
+                                            <span className="nb-ticker-cat">{t.category}</span>
+                                        </td>
+                                        <td>
+                                            <Link
+                                                to={`/terminal?symbol=${encodeURIComponent(t.symbol)}`}
+                                                className="nb-ticker-trade-btn"
+                                            >
+                                                Trade <ChevronRight size={14} />
+                                            </Link>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            {/* ── Features Grid ───────────────────────────────────────────── */}
+            <section className="nb-section">
+                <div className="nb-section-inner">
+                    <h2 className="nb-section-title">
+                        Harness the Power of <span className="nb-hero-gradient">AI</span>
+                    </h2>
+                    <p className="nb-section-desc">
+                        Make the smartest financial decisions with institutional-grade tools.
+                    </p>
+                    <div className="nb-features-grid">
+                        <FeatureCard icon={<Zap />} title="High Grade Algo Execution" desc="Deploy and optimize algorithmic strategies in real time with ultra-low-latency execution engines." />
+                        <FeatureCard icon={<Users />} title="Social Trading Grid" desc="Mirror top-performing traders in real time, with performance scoring and risk metrics." />
+                        <FeatureCard icon={<Activity />} title="Low-Latency Execution" desc="Built on high-frequency-grade architecture, ensuring your trades hit before the rest." />
+                        <FeatureCard icon={<BarChart3 />} title="Dynamic Market Heatmaps" desc="Instantly identify liquidity zones and aggressive flows across all asset classes." />
+                        <FeatureCard icon={<ArrowUpDown />} title="Depth of Market & Order Flow" desc="Full L2/L3 data with live bid-ask flow, iceberg detection, and trade imbalances." />
+                        <FeatureCard icon={<LineChart />} title="Precision Charting Engine" desc="Multi-timeframe, latency-free charts with deep indicator libraries and predictive overlays." />
+                        <FeatureCard icon={<Globe />} title="Global Market Access" desc="Seamless multi-asset execution across emerging and developed markets on one screen." />
+                        <FeatureCard icon={<Brain />} title="Sentiment Intelligence" desc="Natural language AI scans global news and social data for actionable sentiment signals." />
+                        <FeatureCard icon={<Shield />} title="Bloomberg-Level Terminal" desc="Institutional-grade data, analytics, and tools designed for millions of users." />
+                    </div>
+                </div>
+            </section>
+
+            {/* ── Go Further Section ──────────────────────────────────────── */}
+            <section className="nb-section nb-go-further">
+                <div className="nb-section-inner">
+                    <h2 className="nb-section-title">
+                        Go Further with <span className="nb-hero-gradient">NextBull Terminal</span>
+                    </h2>
+                    <div className="nb-go-further-grid">
+                        {[
+                            { icon: <BarChart3 size={24} />, title: 'Charts', desc: 'Precision charting with multi-timeframe analysis' },
+                            { icon: <Brain size={24} />, title: 'Research', desc: 'Deep fundamental and technical research tools' },
+                            { icon: <Globe size={24} />, title: 'Access', desc: 'Global markets from a single terminal' },
+                            { icon: <LayoutDashboard size={24} />, title: 'Portfolio', desc: 'Track and analyze your portfolio performance' },
+                            { icon: <Users size={24} />, title: 'Collaboration', desc: 'Share ideas and strategies with peers' },
+                            { icon: <Sparkles size={24} />, title: 'AI Engine', desc: 'Predictive analytics and smart alerts' },
+                        ].map((item, i) => (
+                            <Link to="/terminal" key={i} className="nb-gf-card">
+                                <div className="nb-gf-icon">{item.icon}</div>
+                                <div>
+                                    <div className="nb-gf-title">{item.title}</div>
+                                    <div className="nb-gf-desc">{item.desc}</div>
+                                </div>
+                                <ChevronRight size={16} className="nb-gf-arrow" />
+                            </Link>
+                        ))}
+                    </div>
+                </div>
+            </section>
+
+            {/* ── CTA Section ─────────────────────────────────────────────── */}
+            <section className="nb-cta-section">
+                <div className="nb-cta-glow" />
+                <h2 className="nb-cta-title">Dominate.</h2>
+                <p className="nb-cta-desc">
+                    Harness the power of the most powerful financial platform in the world.
+                </p>
+                <Link to="/terminal" className="nb-cta-primary">
+                    Sign Up — It's Free
+                    <ArrowRight size={18} />
+                </Link>
+            </section>
+
+            {/* ── Footer ──────────────────────────────────────────────────── */}
+            <footer className="nb-footer">
+                <div className="nb-footer-inner">
+                    <div className="nb-footer-brand">
+                        <div className="nb-logo">
+                            <TrendingUp size={20} />
+                            <span>NEXTBULL</span>
+                        </div>
+                        <p className="nb-footer-tagline">Power your financial decisions</p>
+                        <a href="mailto:contact@nextbull.in" className="nb-footer-email">contact@nextbull.in</a>
+                    </div>
+                    <div className="nb-footer-links">
+                        <div className="nb-footer-col">
+                            <h4>Products</h4>
+                            <Link to="/">Deep Research</Link>
+                            <Link to="/">AI Engine</Link>
+                            <Link to="/">Options Trading</Link>
+                            <Link to="/">Financial Analysis</Link>
+                        </div>
+                        <div className="nb-footer-col">
+                            <h4>Markets</h4>
+                            <Link to="/">All Markets</Link>
+                            <Link to="/">Tokenized Assets</Link>
+                            <Link to="/">NextBull Connect</Link>
+                        </div>
+                        <div className="nb-footer-col">
+                            <h4>Terminal</h4>
+                            <Link to="/terminal">Overview</Link>
+                            <Link to="/">Charts</Link>
+                            <Link to="/user/dashboard">Portfolio</Link>
+                            <Link to="/">Education</Link>
+                        </div>
+                        <div className="nb-footer-col">
+                            <h4>More</h4>
+                            <Link to="/">About</Link>
+                            <Link to="/">Why Us</Link>
+                            <Link to="/">FAQs</Link>
+                        </div>
+                    </div>
+                </div>
+                <div className="nb-footer-bottom">
+                    © NextBull 2025. All rights reserved.
+                </div>
+            </footer>
         </div>
     );
 }
 
-function FeatureCard({ icon, title, desc }: { icon: React.ReactNode, title: string, desc: string }) {
+function FeatureCard({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
     return (
-        <div className="bg-nb-surface/60 backdrop-blur-md border border-nb-border p-8 rounded-xl hover:bg-nb-surface transition-colors shadow-xl group">
-            <div className="transform group-hover:scale-110 transition-transform origin-left">
-                {icon}
-            </div>
-            <h3 className="text-xl font-bold mb-3 text-white font-brand">{title}</h3>
-            <p className="text-nb-text-2 leading-relaxed">{desc}</p>
+        <div className="nb-feature-card">
+            <div className="nb-feature-icon">{icon}</div>
+            <h3 className="nb-feature-title">{title}</h3>
+            <p className="nb-feature-desc">{desc}</p>
         </div>
     );
 }

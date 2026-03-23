@@ -31,10 +31,36 @@ export interface Portfolio {
     pnl: number;
 }
 
+export interface CrosshairData {
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume: number;
+    time: number;
+}
+
+export const AVAILABLE_SYMBOLS = [
+    'SYNTH/USD', 'BTC/USD', 'ETH/USD', 'SOL/USD', 'DOGE/USD',
+    'AAPL', 'META', 'TSLA', 'AMZN', 'GOOG', 'NFLX', 'MSFT',
+    'NVDA', 'AMD', 'INTC'
+];
+
+export const TIMEFRAMES = [
+    { label: '1m', seconds: 60 },
+    { label: '5m', seconds: 300 },
+    { label: '15m', seconds: 900 },
+    { label: '1H', seconds: 3600 },
+    { label: '4H', seconds: 14400 },
+    { label: '1D', seconds: 86400 },
+] as const;
+
 interface MarketState {
     candles: Candle[];
     latestCandle: Candle | null;
     timeframe: number; // in seconds
+    currentSymbol: string;
+    crosshairData: CrosshairData | null;
     orderBook: { bids: { price: number, qty: number }[], asks: { price: number, qty: number }[] };
     recentTrades: Trade[];
     lastPrice: number;
@@ -47,7 +73,10 @@ interface MarketState {
     wsConnected: boolean;
 
     setTimeframe: (seconds: number) => void;
+    setCurrentSymbol: (symbol: string) => void;
+    setCrosshairData: (data: CrosshairData | null) => void;
     setCandlesData: (candles: Candle[], latestCandle?: Candle | null) => void;
+    clearCandles: () => void;
     setOrderBook: (bids: { price: number, qty: number }[], asks: { price: number, qty: number }[]) => void;
     addTrade: (trade: Trade) => void;
     setWsConnected: (connected: boolean) => void;
@@ -59,7 +88,9 @@ interface MarketState {
 const useMarketStore = create<MarketState>((set) => ({
     candles: [],
     latestCandle: null,
-    timeframe: 1, // 1S
+    timeframe: 60, // 1 minute default
+    currentSymbol: 'SYNTH/USD',
+    crosshairData: null,
     orderBook: { bids: [], asks: [] },
     recentTrades: [],
     lastPrice: 500,
@@ -76,11 +107,15 @@ const useMarketStore = create<MarketState>((set) => ({
     wsConnected: false,
 
     setTimeframe: (seconds) => set({ timeframe: seconds }),
+    setCurrentSymbol: (symbol) => set({ currentSymbol: symbol }),
+    setCrosshairData: (data) => set({ crosshairData: data }),
 
     setCandlesData: (candles, latestCandle = null) => set((state) => ({
         candles: candles || state.candles,
         latestCandle: latestCandle || state.latestCandle
     })),
+
+    clearCandles: () => set({ candles: [], latestCandle: null }),
 
     setOrderBook: (bids, asks) => set({ orderBook: { bids, asks } }),
 

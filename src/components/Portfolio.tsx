@@ -8,40 +8,41 @@ export default function Portfolio() {
     const isPnlPositive = portfolio.pnl > 0;
 
     return (
-        <div className="bg-bg-panel border border-border-subtle rounded flex flex-col p-4 w-full">
-            <div className="flex justify-between items-center mb-4">
-                <h3 className="uppercase tracking-widest text-xs text-text-secondary border-l-2 border-accent pl-2 font-semibold">PORTFOLIO</h3>
-                <span className={`text-xs font-bold font-mono ${isPnlPositive ? 'text-bull' : portfolio.pnl < 0 ? 'text-bear' : 'text-text-secondary'}`}>
+        <div className="tv-portfolio">
+            <div className="tv-portfolio-header">
+                <span className="tv-portfolio-title">Portfolio</span>
+                <span className={`tv-portfolio-pnl ${isPnlPositive ? 'up' : portfolio.pnl < 0 ? 'down' : ''}`}>
                     {isPnlPositive ? '▲' : portfolio.pnl < 0 ? '▼' : ''} ${Math.abs(portfolio.pnl).toFixed(2)}
                 </span>
             </div>
 
-            <div className="mb-4">
-                <div className="text-text-secondary text-xs uppercase font-medium">Cash Balance</div>
-                <div className="text-2xl font-bold font-mono mt-1 text-text-primary">
-                    ${portfolio.cash.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            <div className="tv-portfolio-stats">
+                <div className="tv-portfolio-stat">
+                    <span className="tv-portfolio-stat-label">Cash</span>
+                    <span className="tv-portfolio-stat-val">
+                        ${portfolio.cash.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
                 </div>
-            </div>
-
-            <div className="mb-4">
-                <div className="text-text-secondary text-xs uppercase font-medium">Total Value</div>
-                <div className="text-lg font-bold font-mono mt-1 text-text-primary">
-                    ${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <div className="tv-portfolio-stat">
+                    <span className="tv-portfolio-stat-label">Total</span>
+                    <span className="tv-portfolio-stat-val">
+                        ${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
                 </div>
             </div>
 
             {portfolio.holdings.length > 0 && (
-                <div className="mt-2 text-xs">
-                    <div className="flex text-text-secondary mb-2 uppercase font-medium border-b border-border-subtle pb-1">
-                        <span className="w-1/3 text-left">Asset</span>
-                        <span className="w-1/3 text-right">Qty</span>
-                        <span className="w-1/3 text-right">Avg</span>
+                <div className="tv-portfolio-holdings">
+                    <div className="tv-portfolio-holdings-header">
+                        <span>Asset</span>
+                        <span>Qty</span>
+                        <span>Avg</span>
                     </div>
                     {portfolio.holdings.map((h, i) => (
-                        <div key={i} className="flex font-mono py-1">
-                            <span className="w-1/3 text-left text-text-primary font-bold">{h.asset}</span>
-                            <span className="w-1/3 text-right text-text-secondary">{h.qty}</span>
-                            <span className="w-1/3 text-right text-text-secondary">${h.avgPrice.toFixed(2)}</span>
+                        <div key={i} className="tv-portfolio-holding-row">
+                            <span className="tv-portfolio-holding-asset">{h.asset}</span>
+                            <span>{h.qty}</span>
+                            <span>${h.avgPrice.toFixed(2)}</span>
                         </div>
                     ))}
                 </div>

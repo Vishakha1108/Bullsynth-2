@@ -1,38 +1,99 @@
 import { Link } from 'react-router-dom';
-import useMarketStore from '../store/useMarketStore';
-import { TrendingUp } from 'lucide-react';
+import useMarketStore, { TIMEFRAMES } from '../store/useMarketStore';
+import { changeTimeframe } from '../services/websocket';
+import {
+    Menu, Plus, BarChart3, Layers, Bell, RotateCcw,
+    Search, Settings, ChevronDown, Maximize2
+} from 'lucide-react';
 
 export default function Header() {
     const currentPrice = useMarketStore(state => state.lastPrice);
     const connected = useMarketStore(state => state.wsConnected);
+    const currentSymbol = useMarketStore(state => state.currentSymbol);
+    const timeframe = useMarketStore(state => state.timeframe);
+    const priceChange24h = useMarketStore(state => state.priceChange24h);
+    const high24h = useMarketStore(state => state.high24h);
+    const low24h = useMarketStore(state => state.low24h);
+
+    const currentTf = TIMEFRAMES.find(t => t.seconds === timeframe);
 
     return (
-        <header className="h-14 bg-nb-surface border-b border-nb-border flex items-center justify-between px-4 lg:px-6 sticky top-0 z-50">
-            <div className="flex items-center gap-6">
-                <Link to="/" className="flex items-center gap-2 group">
-                    <TrendingUp className="text-nb-accent group-hover:text-nb-accent-h transition-colors" size={24} />
-                    <span className="font-brand font-bold text-lg tracking-wider text-nb-text-1 group-hover:text-white transition-colors">
-                        NEXTBULL
-                    </span>
+        <header className="tv-header">
+            {/* Left section */}
+            <div className="tv-header-left">
+                {/* Menu / Logo */}
+                <button className="tv-header-btn" title="Menu">
+                    <Menu size={18} />
+                </button>
+
+                <div className="tv-header-separator" />
+
+                {/* Symbol selector */}
+                <Link to="/" className="tv-symbol-link">
+                    <span className="tv-symbol-text">{currentSymbol}</span>
+                    <ChevronDown size={12} className="text-[#787b86]" />
                 </Link>
 
-                <div className="hidden sm:flex items-center bg-nb-bg px-3 py-1.5 rounded border border-nb-border/50">
-                    <span className="text-nb-text-2 text-sm font-semibold mr-3">SYNTH/USD</span>
-                    <span className="font-mono text-nb-text-1 font-bold">${currentPrice.toFixed(2)}</span>
+                <div className="tv-header-separator" />
+
+                {/* Timeframe selector */}
+                <div className="tv-header-timeframes">
+                    {TIMEFRAMES.map(tf => (
+                        <button
+                            key={tf.seconds}
+                            className={`tv-header-tf-btn ${timeframe === tf.seconds ? 'active' : ''}`}
+                            onClick={() => changeTimeframe(tf.seconds)}
+                        >
+                            {tf.label}
+                        </button>
+                    ))}
+                    <button className="tv-header-tf-btn">
+                        <ChevronDown size={12} />
+                    </button>
                 </div>
+
+                <div className="tv-header-separator" />
+
+                {/* Chart type / Indicators / Alerts */}
+                <button className="tv-header-btn icon-text">
+                    <BarChart3 size={16} />
+                    <span>Indicators</span>
+                </button>
+
+                <div className="tv-header-separator" />
+
+                <button className="tv-header-btn icon-text">
+                    <Bell size={16} />
+                    <span>Alert</span>
+                </button>
+
+                <button className="tv-header-btn icon-text">
+                    <RotateCcw size={16} />
+                    <span>Replay</span>
+                </button>
             </div>
 
-            <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${connected ? 'bg-nb-bull shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-nb-bear shadow-[0_0_8px_rgba(239,68,68,0.6)]'}`} />
-                    <span className="text-xs text-nb-text-3 hidden md:inline-block">
-                        {connected ? 'Connected' : 'Disconnected'}
+            {/* Right section */}
+            <div className="tv-header-right">
+                {/* Price info strip */}
+                <div className="tv-price-strip">
+                    <span className="tv-price-value">${currentPrice.toFixed(2)}</span>
+                    <span className={`tv-price-change ${priceChange24h >= 0 ? 'up' : 'down'}`}>
+                        {priceChange24h >= 0 ? '+' : ''}{priceChange24h.toFixed(2)}%
                     </span>
                 </div>
 
-                <div className="w-8 h-8 rounded bg-gradient-to-br from-nb-elevated to-nb-bg border border-nb-border flex items-center justify-center text-xs font-bold text-nb-text-2">
-                    U1
-                </div>
+                <div className="tv-header-separator" />
+
+                <button className="tv-header-btn" title="Search">
+                    <Search size={16} />
+                </button>
+                <button className="tv-header-btn" title="Settings">
+                    <Settings size={16} />
+                </button>
+                <button className="tv-header-btn" title="Fullscreen">
+                    <Maximize2 size={16} />
+                </button>
             </div>
         </header>
     );

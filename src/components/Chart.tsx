@@ -1,61 +1,243 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { createChart, CandlestickSeries, HistogramSeries, ColorType, CrosshairMode } from 'lightweight-charts';
-import type { ISeriesApi } from 'lightweight-charts';
-import useMarketStore from '../store/useMarketStore';
+import type { ISeriesApi, IChartApi } from 'lightweight-charts';
+import useMarketStore, { AVAILABLE_SYMBOLS, TIMEFRAMES } from '../store/useMarketStore';
+import { changeTimeframe } from '../services/websocket';
+import {
+    Search, Crosshair, TrendingUp, Minus, Type, Ruler,
+    ChevronDown, X, Pencil, MousePointer2, Hash,
+    MoveHorizontal, Move, ZoomIn, Undo2, Redo2
+} from 'lucide-react';
 
+// ─── Ticker Search Component ────────────────────────────────────────────────
+function TickerSearch() {
+    const [isOpen, setIsOpen] = useState(false);
+    const [query, setQuery] = useState('');
+    const currentSymbol = useMarketStore(s => s.currentSymbol);
+    const setCurrentSymbol = useMarketStore(s => s.setCurrentSymbol);
+    const inputRef = useRef<HTMLInputElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    const filtered = useMemo(() => {
+        if (!query.trim()) return AVAILABLE_SYMBOLS;
+        return AVAILABLE_SYMBOLS.filter(s =>
+            s.toLowerCase().includes(query.toLowerCase())
+        );
+    }, [query]);
+
+    const handleSelect = useCallback((symbol: string) => {
+        setCurrentSymbol(symbol);
+        setIsOpen(false);
+        setQuery('');
+    }, [setCurrentSymbol]);
+
+    // Close on click outside
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    return (
+        <div ref={containerRef} className="ticker-search-container">
+            <button
+                className="ticker-search-trigger"
+                onClick={() => {
+                    setIsOpen(!isOpen);
+                    setTimeout(() => inputRef.current?.focus(), 50);
+                }}
+            >
+                <span className="ticker-symbol">{currentSymbol}</span>
+                <ChevronDown size={14} className="ticker-chevron" />
+            </button>
+
+            {isOpen && (
+                <div className="ticker-dropdown">
+                    <div className="ticker-search-input-wrap">
+                        <Search size={14} className="ticker-search-icon" />
+                        <input
+                            ref={inputRef}
+                            type="text"
+                            placeholder="Search symbol..."
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            className="ticker-search-input"
+                            autoFocus
+                        />
+                        {query && (
+                            <button className="ticker-clear-btn" onClick={() => setQuery('')}>
+                                <X size={12} />
+                            </button>
+                        )}
+                    </div>
+                    <div className="ticker-results">
+                        {filtered.length === 0 && (
+                            <div className="ticker-no-results">No symbols found</div>
+                        )}
+                        {filtered.map(symbol => (
+                            <button
+                                key={symbol}
+                                className={`ticker-result-item ${symbol === currentSymbol ? 'active' : ''}`}
+                                onClick={() => handleSelect(symbol)}
+                            >
+                                <span className="ticker-result-name">{symbol}</span>
+                                {symbol === currentSymbol && (
+                                    <span className="ticker-result-check">✓</span>
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ─── OHLCV Info Overlay ─────────────────────────────────────────────────────
+function OHLCVOverlay() {
+    const crosshairData = useMarketStore(s => s.crosshairData);
+    const currentSymbol = useMarketStore(s => s.currentSymbol);
+    const timeframe = useMarketStore(s => s.timeframe);
+    const latestCandle = useMarketStore(s => s.latestCandle);
+
+    const tf = TIMEFRAMES.find(t => t.seconds === timeframe);
+    const data = crosshairData || latestCandle;
+
+    if (!data) return null;
+
+    const isUp = data.close >= data.open;
+    const color = isUp ? '#26a69a' : '#ef5350';
+
+    return (
+        <div className="ohlcv-overlay">
+            <span className="ohlcv-symbol">{currentSymbol}</span>
+            <span className="ohlcv-timeframe">{tf?.label || '1m'}</span>
+            <span className="ohlcv-label">O</span>
+            <span className="ohlcv-value" style={{ color }}>{data.open.toFixed(2)}</span>
+            <span className="ohlcv-label">H</span>
+            <span className="ohlcv-value" style={{ color }}>{data.high.toFixed(2)}</span>
+            <span className="ohlcv-label">L</span>
+            <span className="ohlcv-value" style={{ color }}>{data.low.toFixed(2)}</span>
+            <span className="ohlcv-label">C</span>
+            <span className="ohlcv-value" style={{ color }}>{data.close.toFixed(2)}</span>
+            <span className="ohlcv-label">Vol</span>
+            <span className="ohlcv-value ohlcv-vol">{data.volume.toLocaleString()}</span>
+        </div>
+    );
+}
+
+// ─── Chart Toolbar (Left side, TradingView drawing tools) ───────────────────
+function ChartToolbar() {
+    const [activeTool, setActiveTool] = useState('crosshair');
+
+    const tools = [
+        { id: 'crosshair', icon: Crosshair, label: 'Crosshair' },
+        { id: 'pointer', icon: MousePointer2, label: 'Pointer' },
+        null, // separator
+        { id: 'trendline', icon: TrendingUp, label: 'Trend Line' },
+        { id: 'horzline', icon: Minus, label: 'Horizontal Line' },
+        { id: 'ray', icon: MoveHorizontal, label: 'Ray' },
+        null, // separator
+        { id: 'text', icon: Type, label: 'Text' },
+        { id: 'pencil', icon: Pencil, label: 'Draw' },
+        null, // separator
+        { id: 'fibonacci', icon: Hash, label: 'Fibonacci' },
+        { id: 'measure', icon: Ruler, label: 'Measure' },
+        { id: 'zoom', icon: ZoomIn, label: 'Zoom In' },
+    ];
+
+    return (
+        <div className="chart-toolbar">
+            {tools.map((tool, idx) => {
+                if (!tool) return <div key={`sep-${idx}`} className="chart-toolbar-sep" />;
+                return (
+                    <button
+                        key={tool.id}
+                        className={`chart-toolbar-btn ${activeTool === tool.id ? 'active' : ''}`}
+                        onClick={() => setActiveTool(tool.id)}
+                        title={tool.label}
+                    >
+                        <tool.icon size={16} />
+                    </button>
+                );
+            })}
+        </div>
+    );
+}
+
+// ─── Main Chart Component ───────────────────────────────────────────────────
 export default function Chart() {
     const chartContainerRef = useRef<HTMLDivElement>(null);
-    const chartRef = useRef<any>(null);
-    const seriesRef = useRef<{ candle: ISeriesApi<"Candlestick">, volume: ISeriesApi<"Histogram"> } | null>(null);
+    const chartRef = useRef<IChartApi | null>(null);
+    const seriesRef = useRef<{
+        candle: ISeriesApi<"Candlestick">;
+        volume: ISeriesApi<"Histogram">;
+    } | null>(null);
 
-    const candles = useMarketStore(state => state.candles);
-    const latestCandle = useMarketStore(state => state.latestCandle);
-    const timeframe = useMarketStore(state => state.timeframe);
-    const setTimeframe = useMarketStore(state => state.setTimeframe);
-    const lastPrice = useMarketStore(state => state.lastPrice);
+    const candles = useMarketStore(s => s.candles);
+    const latestCandle = useMarketStore(s => s.latestCandle);
+    const timeframe = useMarketStore(s => s.timeframe);
+    const setCrosshairData = useMarketStore(s => s.setCrosshairData);
 
+    // Initialize chart
     useEffect(() => {
         if (!chartContainerRef.current) return;
 
         const chart = createChart(chartContainerRef.current, {
             layout: {
-                background: { type: ColorType.Solid, color: '#0a0e17' },
-                textColor: '#94a3b8',
+                background: { type: ColorType.Solid, color: '#131722' },
+                textColor: '#787b86',
+                fontSize: 11,
             },
             grid: {
-                vertLines: { color: '#1f2937', style: 2 },
-                horzLines: { color: '#1f2937', style: 2 },
+                vertLines: { color: '#1e222d', style: 0 },
+                horzLines: { color: '#1e222d', style: 0 },
             },
             crosshair: {
                 mode: CrosshairMode.Normal,
-                vertLine: { color: '#f59e0b', style: 3, width: 1, labelBackgroundColor: '#f59e0b' },
-                horzLine: { color: '#f59e0b', style: 3, width: 1, labelBackgroundColor: '#f59e0b' },
+                vertLine: {
+                    color: '#758696',
+                    style: 0,
+                    width: 1,
+                    labelBackgroundColor: '#2a2e39',
+                },
+                horzLine: {
+                    color: '#758696',
+                    style: 0,
+                    width: 1,
+                    labelBackgroundColor: '#2a2e39',
+                },
             },
             rightPriceScale: {
-                borderColor: '#1f2937',
+                borderColor: '#2a2e39',
                 scaleMargins: { top: 0.1, bottom: 0.2 },
             },
             timeScale: {
-                borderColor: '#1f2937',
+                borderColor: '#2a2e39',
                 timeVisible: true,
-                secondsVisible: true,
+                secondsVisible: false,
+                rightOffset: 5,
+                barSpacing: 8,
             },
         });
 
         const candleSeries = chart.addSeries(CandlestickSeries, {
-            upColor: '#22c55e',
-            downColor: '#ef4444',
-            borderUpColor: '#22c55e',
-            borderDownColor: '#ef4444',
-            wickUpColor: '#22c55e',
-            wickDownColor: '#ef4444',
+            upColor: '#26a69a',
+            downColor: '#ef5350',
+            borderUpColor: '#26a69a',
+            borderDownColor: '#ef5350',
+            wickUpColor: '#26a69a',
+            wickDownColor: '#ef5350',
             priceLineColor: '#f59e0b',
-            priceLineStyle: 3,
+            priceLineStyle: 2,
             priceLineWidth: 1,
         });
 
         const volumeSeries = chart.addSeries(HistogramSeries, {
-            color: '#64748b',
             priceFormat: { type: 'volume' },
             priceScaleId: 'volume',
         });
@@ -64,12 +246,35 @@ export default function Chart() {
             scaleMargins: { top: 0.8, bottom: 0 },
         });
 
+        // Subscribe to crosshair move for OHLCV overlay
+        chart.subscribeCrosshairMove((param) => {
+            if (!param || !param.time || !param.seriesData) {
+                setCrosshairData(null);
+                return;
+            }
+            const candleData = param.seriesData.get(candleSeries) as any;
+            if (candleData) {
+                const volData = param.seriesData.get(volumeSeries) as any;
+                setCrosshairData({
+                    open: candleData.open,
+                    high: candleData.high,
+                    low: candleData.low,
+                    close: candleData.close,
+                    volume: volData?.value ?? 0,
+                    time: param.time as number,
+                });
+            }
+        });
+
         chartRef.current = chart;
         seriesRef.current = { candle: candleSeries, volume: volumeSeries };
 
         const handleResize = () => {
             if (chartContainerRef.current) {
-                chart.applyOptions({ width: chartContainerRef.current.clientWidth, height: chartContainerRef.current.clientHeight });
+                chart.applyOptions({
+                    width: chartContainerRef.current.clientWidth,
+                    height: chartContainerRef.current.clientHeight,
+                });
             }
         };
 
@@ -79,18 +284,20 @@ export default function Chart() {
         return () => {
             resizeObserver.disconnect();
             chart.remove();
+            chartRef.current = null;
+            seriesRef.current = null;
         };
     }, []);
 
-    // Update real-time or historical candles
+    // When candles array is cleared (timeframe change), reset chart data
     useEffect(() => {
-        if (seriesRef.current && candles.length > 0) {
-            // Very basic batch load if we ever pull history, 
-            // Lightweight charts requires setData for multiple items at once ideally
-            // For this spec, we update the candle worker's updates incrementally.
+        if (seriesRef.current && candles.length === 0) {
+            seriesRef.current.candle.setData([]);
+            seriesRef.current.volume.setData([]);
         }
-    }, [candles]);
+    }, [candles.length === 0]);
 
+    // Update candle on latest update
     useEffect(() => {
         if (seriesRef.current && latestCandle) {
             // @ts-ignore
@@ -100,46 +307,23 @@ export default function Chart() {
                 time: latestCandle.time as any,
                 value: latestCandle.volume,
                 color: latestCandle.close >= latestCandle.open
-                    ? 'rgba(34,197,94,0.3)'
-                    : 'rgba(239,68,68,0.3)',
+                    ? 'rgba(38,166,154,0.35)'
+                    : 'rgba(239,83,80,0.35)',
             });
         }
     }, [latestCandle]);
 
     return (
-        <div className="flex flex-col h-full bg-bg-terminal w-full">
-            <div className="flex items-center px-4 py-2 border-b border-border-subtle gap-4">
-                <h3 className="font-bold text-text-primary uppercase tracking-wider">SYNTH/USD</h3>
-
-                <div className="flex h-7 bg-bg-panel rounded border border-border-subtle p-0.5 text-xs text-text-secondary">
-                    {[
-                        { label: '1S', val: 1 },
-                        { label: '5S', val: 5 },
-                        { label: '1M', val: 60 },
-                        { label: '5M', val: 300 }
-                    ].map(tf => (
-                        <button
-                            key={tf.val}
-                            className={`px-3 rounded transition-colors ${timeframe === tf.val ? 'bg-accent text-bg-terminal font-bold' : 'hover:text-text-primary'}`}
-                            onClick={() => {
-                                setTimeframe(tf.val);
-                                // Also need to push INIT to candleWorker
-                                // we import candleWorker in websocket.ts, but can also trigger it from there if we listen to state changes,
-                                // or just import the instance. To avoid circular deps, a robust way is to dispatch an event or expose a method.
-                                // We'll rely on the re-connect or manual re-init if needed.
-                            }}
-                        >
-                            {tf.label}
-                        </button>
-                    ))}
+        <div className="chart-root">
+            {/* Main chart area */}
+            <div className="chart-body">
+                <ChartToolbar />
+                <div className="chart-canvas-wrap">
+                    {/* OHLCV overlay floats on top of chart */}
+                    <OHLCVOverlay />
+                    <div ref={chartContainerRef} className="chart-canvas" />
                 </div>
-
-                <button className="h-7 px-3 text-xs bg-bg-panel rounded border border-border-subtle hover:bg-bg-elevated text-text-secondary transition-colors ml-auto">
-                    VOL
-                </button>
             </div>
-
-            <div ref={chartContainerRef} className="flex-1 w-full min-h-0" />
         </div>
     );
 }

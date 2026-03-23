@@ -6,12 +6,29 @@ export const candleWorker = new Worker(new URL('../workers/candleWorker.ts', imp
 
 candleWorker.onmessage = (e) => {
     const { type, candle, isNew } = e.data;
+
     if (type === 'CANDLE_UPDATE') {
         const state = useMarketStore.getState();
-        const newCandles = isNew ? [...state.candles, candle].slice(-1000) : state.candles;
+        const newCandles = isNew ? [...state.candles, candle].slice(-2000) : state.candles;
         useMarketStore.getState().setCandlesData(newCandles, candle);
     }
+    else if (type === 'CLEAR') {
+        // Worker reset — clear all chart data
+        useMarketStore.getState().clearCandles();
+    }
 };
+
+/**
+ * Change the candle timeframe. Call this when the user clicks a timeframe button.
+ * It re-initializes the worker which clears history and starts fresh aggregation.
+ */
+export function changeTimeframe(seconds: number) {
+    useMarketStore.getState().setTimeframe(seconds);
+    candleWorker.postMessage({
+        type: 'INIT',
+        payload: { timeframeSec: seconds }
+    });
+}
 
 class WSManager {
     private url: string;
@@ -31,9 +48,10 @@ class WSManager {
             this.reconnectDelay = 1000;
             useMarketStore.getState().setWsConnected(true);
 
+            // Initialize the candle worker with current timeframe
             candleWorker.postMessage({
                 type: 'INIT',
-                payload: { timeframeMs: useMarketStore.getState().timeframe * 1000 }
+                payload: { timeframeSec: useMarketStore.getState().timeframe }
             });
         };
 
@@ -41,9 +59,7 @@ class WSManager {
             try {
                 const msg = JSON.parse(event.data);
 
-                // Translating backend TRADE and TOB to the frontend spec:
                 if (msg.event === 'TOB') {
-                    // Mock 5 levels of bids and asks using the single TOB from the backend
                     const bids = Array.from({ length: 5 }).map((_, i) => ({
                         price: Number((msg.best_bid - (i * 0.05)).toFixed(2)),
                         qty: msg.bid_qty + (i * 15)
@@ -55,18 +71,16 @@ class WSManager {
                     useMarketStore.getState().setOrderBook(bids, asks);
                 }
                 else if (msg.event === 'TRADE') {
-                    // Trade implies a tick update
                     const trade = {
                         price: msg.price,
                         qty: msg.qty,
-                        side: (Math.random() > 0.5 ? 'BUY' : 'SELL') as 'BUY' | 'SELL', // server.py doesn't emit side directly
+                        side: (Math.random() > 0.5 ? 'BUY' : 'SELL') as 'BUY' | 'SELL',
                         timestamp: Date.now()
                     };
                     useMarketStore.getState().addTrade(trade);
                     candleWorker.postMessage({ type: 'TICK', payload: trade });
                 }
                 else if (msg.event === 'ACK') {
-                    // Provide a mock portfolio update on order ACK for testing
                     const currentPortfolio = useMarketStore.getState().portfolio;
                     useMarketStore.getState().setPortfolio({
                         ...currentPortfolio,
@@ -95,5 +109,4 @@ class WSManager {
     }
 }
 
-// Reverted WS string back to /ws/trade
 export const wsManager = new WSManager('ws://localhost:8000/ws/trade');

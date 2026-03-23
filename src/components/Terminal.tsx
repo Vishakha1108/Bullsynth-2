@@ -1,52 +1,65 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { wsManager } from '../services/websocket';
 import Header from './Header';
 import Chart from './Chart';
 import OrderBook from './OrderBook';
 import RightPanel from './RightPanel';
 import RecentTrades from './RecentTrades';
+import BottomBar from './BottomBar.tsx';
 
 export default function Terminal() {
+    const [activeBottomTab, setActiveBottomTab] = useState<string | null>(null);
+
     useEffect(() => {
         wsManager.connect();
-        // In a real app we might disconnect on unmount, but here we want to keep it alive
     }, []);
 
     return (
-        <div className="h-screen w-screen bg-terminal text-text-primary flex flex-col font-sans overflow-hidden">
-            {/* Container with CSS Grid: Row 1 = 56px, Row 2 = remaining viewport */}
-            <div
-                className="h-full w-full grid"
-                style={{
-                    gridTemplateRows: '56px minmax(0, 1fr)',
-                    gridTemplateColumns: '280px minmax(0, 1fr) 320px',
-                }}
-            >
-                {/* Row 1: Header spans all columns */}
-                <div className="col-span-3 border-b border-border-subtle bg-bg-panel">
-                    <Header />
-                </div>
+        <div className="h-screen w-screen bg-[#131722] text-[#d1d4dc] flex flex-col font-sans overflow-hidden">
+            {/* Top Header Bar (TradingView style) */}
+            <Header />
 
-                {/* Column 1: Order Book */}
-                <div className="border-r border-border-subtle bg-bg-panel flex flex-col overflow-hidden h-full min-h-0">
-                    <OrderBook />
-                </div>
-
-                {/* Column 2: Chart + Recent Trades */}
-                <div className="flex flex-col border-r border-border-subtle bg-bg-terminal h-full min-h-0 overflow-hidden">
-                    <div className="flex-1 min-h-0 relative flex flex-col">
+            {/* Main Content Area */}
+            <div className="flex-1 flex min-h-0">
+                {/* Chart area takes full width minus right panel */}
+                <div className="flex-1 flex flex-col min-w-0 min-h-0">
+                    {/* Chart (takes remaining space) */}
+                    <div className="flex-1 min-h-0 relative">
                         <Chart />
                     </div>
-                    <div className="h-[160px] border-t border-border-subtle bg-bg-panel flex flex-col min-h-0">
-                        <RecentTrades />
-                    </div>
+
+                    {/* Bottom panel (expandable like TradingView) */}
+                    {activeBottomTab && (
+                        <div className="h-[200px] border-t border-[#2a2e39] bg-[#131722] flex flex-col min-h-0">
+                            {activeBottomTab === 'orderbook' && <OrderBook />}
+                            {activeBottomTab === 'trades' && <RecentTrades />}
+                            {activeBottomTab === 'trading' && <RightPanel />}
+                        </div>
+                    )}
                 </div>
 
-                {/* Column 3: Right Panel (independently scrollable) */}
-                <div className="bg-bg-panel overflow-y-auto styling-scrollbar h-full">
-                    <RightPanel />
+                {/* Right Panel: Order Book + Trade Panel (like TradingView's right sidebar) */}
+                <div className="w-[300px] min-w-[300px] border-l border-[#2a2e39] bg-[#131722] flex flex-col overflow-hidden">
+                    {/* Tab switcher */}
+                    <div className="flex border-b border-[#2a2e39]">
+                        <button className="tv-right-tab active">Order Book</button>
+                        <button className="tv-right-tab">Trades</button>
+                    </div>
+
+                    {/* Split: Top = OrderBook, Bottom = Trade Panel */}
+                    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                        <div className="flex-1 min-h-0 overflow-hidden border-b border-[#2a2e39]">
+                            <OrderBook />
+                        </div>
+                        <div className="overflow-y-auto styling-scrollbar">
+                            <RightPanel />
+                        </div>
+                    </div>
                 </div>
             </div>
+
+            {/* Bottom Status Bar (like TradingView) */}
+            <BottomBar activeTab={activeBottomTab} setActiveTab={setActiveBottomTab} />
         </div>
     );
 }
