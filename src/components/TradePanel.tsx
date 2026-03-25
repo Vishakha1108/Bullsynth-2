@@ -33,9 +33,9 @@ export default function TradePanel() {
         wsManager.send({
             type: 'place_order',
             symbol: currentSymbol,
-            order_type: type, // 'limit' or 'market'
-            side: side === 'BUY' ? 'buy' : 'sell',
-            price: type === 'limit' ? parseFloat(price) : 0,
+            order_type: type,
+            side: side.toLowerCase(),
+            price: type === 'limit' ? parseFloat(price) : undefined,
             qty: parseFloat(qty)
         });
 
@@ -107,7 +107,7 @@ export default function TradePanel() {
                             placeholder="0"
                             required
                         />
-                        <span className="tv-trade-unit">{currentSymbol.split('/')[0] || currentSymbol}</span>
+                        <span className="tv-trade-unit">{currentSymbol}</span>
                     </div>
                 </div>
 
@@ -120,7 +120,7 @@ export default function TradePanel() {
                     type="submit"
                     className={`tv-trade-submit ${side === 'BUY' ? 'buy' : 'sell'}`}
                 >
-                    {side} {currentSymbol.split('/')[0] || currentSymbol}
+                    {side} {currentSymbol}
                 </button>
             </form>
         </div>

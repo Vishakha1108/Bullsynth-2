@@ -17,8 +17,8 @@ export default function Dashboard() {
         fetchTickers().then(setTickers);
     }, []);
 
-    const totalValue = portfolio.total_value;
-    const isPnlPositive = portfolio.unrealized_pnl > 0;
+    const totalValue = portfolio.totalValue;
+    const isPnlPositive = portfolio.unrealizedPnl > 0;
 
     return (
         <div className="nb-landing">
@@ -77,8 +77,8 @@ export default function Dashboard() {
                         </div>
                         <div>
                             <div className="db-stat-label">Unrealized P&L</div>
-                            <div className={`db-stat-value ${isPnlPositive ? 'up' : portfolio.unrealized_pnl < 0 ? 'down' : ''}`}>
-                                {isPnlPositive ? '+' : ''}{portfolio.unrealized_pnl.toFixed(2)}
+                            <div className={`db-stat-value ${isPnlPositive ? 'up' : portfolio.unrealizedPnl < 0 ? 'down' : ''}`}>
+                                {isPnlPositive ? '+' : ''}{portfolio.unrealizedPnl.toFixed(2)}
                             </div>
                         </div>
                     </div>
@@ -94,7 +94,7 @@ export default function Dashboard() {
                 </div>
 
                 {/* ── Holdings ─────────────────────────────────────────────── */}
-                {Object.keys(portfolio.positions).length > 0 && (
+                {portfolio.holdings.length > 0 && (
                     <div className="db-section">
                         <h2 className="db-section-title">Holdings</h2>
                         <div className="db-table-wrap">
@@ -109,15 +109,14 @@ export default function Dashboard() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {Object.entries(portfolio.positions).map(([asset, pos]) => {
-                                        const currentPrice = pos.holdings > 0 ? pos.market_value / pos.holdings : 0;
+                                    {portfolio.holdings.map((h, i) => {
                                         return (
-                                            <tr key={asset}>
-                                                <td className="nb-ticker-sym">{asset}</td>
-                                                <td>{pos.holdings.toLocaleString()}</td>
-                                                <td>${pos.avg_cost.toFixed(2)}</td>
-                                                <td>${currentPrice.toFixed(2)}</td>
-                                                <td className="nb-ticker-price">${pos.market_value.toFixed(2)}</td>
+                                            <tr key={i}>
+                                                <td className="nb-ticker-sym">{h.asset}</td>
+                                                <td>{h.qty}</td>
+                                                <td>${h.avgPrice.toFixed(2)}</td>
+                                                <td>${h.currentPrice.toFixed(2)}</td>
+                                                <td className="nb-ticker-price">${h.marketValue.toFixed(2)}</td>
                                             </tr>
                                         );
                                     })}
@@ -192,15 +191,15 @@ export default function Dashboard() {
                                 </thead>
                                 <tbody>
                                     {openOrders.map(o => (
-                                        <tr key={o.id}>
+                                        <tr key={o.order_id}>
                                             <td className={o.side === 'BUY' ? 'nb-text-bull' : 'nb-text-bear'}>
                                                 {o.side}
                                             </td>
                                             <td className="nb-ticker-name">{o.type}</td>
                                             <td className="nb-ticker-price">
-                                                {o.price ? `$${o.price.toFixed(2)}` : 'Market'}
+                                                ${o.price.toFixed(2)}
                                             </td>
-                                            <td>{o.qty}</td>
+                                            <td>{o.remainingQty}</td>
                                             <td className="nb-ticker-cat-inline">{o.status || 'Open'}</td>
                                         </tr>
                                     ))}

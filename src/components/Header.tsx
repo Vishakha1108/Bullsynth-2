@@ -1,61 +1,72 @@
-import useMarketStore, { TIMEFRAMES } from '../store/useMarketStore';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import useMarketStore, { INDICATOR_LIBRARY, TIMEFRAMES } from '../store/useMarketStore';
 import { changeTimeframe } from '../services/websocket';
+import { TickerSearch } from './Chart';
+import { useTheme } from '../store/ThemeContext';
 import {
     Menu, BarChart3, Bell, RotateCcw,
     Search, Settings, ChevronDown, Maximize2, Sun, Moon
 } from 'lucide-react';
-import { useTheme } from '../store/ThemeContext';
 
 export default function Header() {
     const { theme, toggleTheme } = useTheme();
-    const currentPrice = useMarketStore(state => state.lastPrice);
+    const currentPrice = useMarketStore((state) => state.lastPrice);
+    const timeframe = useMarketStore((state) => state.timeframe);
+    const priceChange24h = useMarketStore((state) => state.priceChange24h);
+    const enabledIndicators = useMarketStore((state) => state.enabledIndicators);
+    const setIndicatorEnabled = useMarketStore((state) => state.setIndicatorEnabled);
+    const clearIndicators = useMarketStore((state) => state.clearIndicators);
 
-    // Use the dynamic symbols and current symbol from the store
-    const currentSymbol = useMarketStore(state => state.currentSymbol);
-    const availableSymbols = useMarketStore(state => state.availableSymbols);
-    const setCurrentSymbol = useMarketStore(state => state.setCurrentSymbol);
+    const [isIndicatorsOpen, setIsIndicatorsOpen] = useState(false);
+    const [indicatorQuery, setIndicatorQuery] = useState('');
+    const indicatorsRef = useRef<HTMLDivElement>(null);
 
-    const timeframe = useMarketStore(state => state.timeframe);
-    const priceChange24h = useMarketStore(state => state.priceChange24h);
+    const filteredIndicators = useMemo(() => {
+        const query = indicatorQuery.trim().toLowerCase();
+        if (!query) return INDICATOR_LIBRARY;
+
+        return INDICATOR_LIBRARY.filter((indicator) => (
+            indicator.label.toLowerCase().includes(query)
+            || indicator.description.toLowerCase().includes(query)
+            || indicator.category.toLowerCase().includes(query)
+        ));
+    }, [indicatorQuery]);
+
+    useEffect(() => {
+        const onOutsideClick = (event: MouseEvent) => {
+            if (!indicatorsRef.current?.contains(event.target as Node)) {
+                setIsIndicatorsOpen(false);
+            }
+        };
+
+        const onEscape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setIsIndicatorsOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', onOutsideClick);
+        document.addEventListener('keydown', onEscape);
+
+        return () => {
+            document.removeEventListener('mousedown', onOutsideClick);
+            document.removeEventListener('keydown', onEscape);
+        };
+    }, []);
 
     return (
         <header className="tv-header">
             {/* Left section */}
             <div className="tv-header-left">
                 {/* Menu / Logo */}
-                <button className="tv-header-btn" title="Menu">
+                <button type="button" className="tv-header-btn" title="Menu">
                     <Menu size={18} />
                 </button>
 
                 <div className="tv-header-separator" />
 
-                {/* Symbol selector */}
-                <div className="tv-symbol-dropdown-wrapper" style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                    <select
-                        value={currentSymbol}
-                        onChange={(e) => setCurrentSymbol(e.target.value)}
-                        className="tv-symbol-link"
-                        style={{
-                            appearance: 'none',
-                            background: 'transparent',
-                            border: 'none',
-                            color: 'inherit',
-                            fontFamily: 'inherit',
-                            fontSize: 'inherit',
-                            fontWeight: 'inherit',
-                            cursor: 'pointer',
-                            outline: 'none',
-                            paddingRight: '16px'
-                        }}
-                    >
-                        {availableSymbols.map(sym => (
-                            <option key={sym} value={sym} style={{ background: theme === 'dark' ? '#131722' : '#ffffff', color: theme === 'dark' ? '#c8cdd6' : '#131722' }}>
-                                {sym}
-                            </option>
-                        ))}
-                    </select>
-                    <ChevronDown size={12} className="text-[#787b86]" style={{ position: 'absolute', right: 0, pointerEvents: 'none' }} />
-                </div>
+                {/* Symbol selector — full TickerSearch modal */}
+                <TickerSearch />
 
                 <div className="tv-header-separator" />
 
@@ -63,6 +74,7 @@ export default function Header() {
                 <div className="tv-header-timeframes">
                     {TIMEFRAMES.map(tf => (
                         <button
+                            type="button"
                             key={tf.seconds}
                             className={`tv-header-tf-btn ${timeframe === tf.seconds ? 'active' : ''}`}
                             onClick={() => changeTimeframe(tf.seconds)}
@@ -70,27 +82,88 @@ export default function Header() {
                             {tf.label}
                         </button>
                     ))}
-                    <button className="tv-header-tf-btn">
+                    <button type="button" className="tv-header-tf-btn">
                         <ChevronDown size={12} />
                     </button>
                 </div>
 
                 <div className="tv-header-separator" />
 
-                {/* Chart type / Indicators / Alerts */}
-                <button className="tv-header-btn icon-text">
-                    <BarChart3 size={16} />
-                    <span>Indicators</span>
-                </button>
+                {/* Indicators panel */}
+                <div className="tv-indicators-wrap" ref={indicatorsRef}>
+                    <button
+                        type="button"
+                        className={`tv-header-btn icon-text ${isIndicatorsOpen ? 'active' : ''}`}
+                        onClick={() => setIsIndicatorsOpen((prev) => !prev)}
+                    >
+                        <BarChart3 size={16} />
+                        <span>Indicators</span>
+                        {enabledIndicators.length > 0 && (
+                            <span className="tv-indicators-count">{enabledIndicators.length}</span>
+                        )}
+                    </button>
+
+                    {isIndicatorsOpen && (
+                        <div className="tv-indicators-modal">
+                            <div className="tv-indicators-modal-head">
+                                <div>
+                                    <h3>Indicators</h3>
+                                    <p>{enabledIndicators.length} active</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    className="tv-indicators-clear"
+                                    onClick={() => clearIndicators()}
+                                    disabled={enabledIndicators.length === 0}
+                                >
+                                    Clear All
+                                </button>
+                            </div>
+
+                            <div className="tv-indicators-search-wrap">
+                                <Search size={14} />
+                                <input
+                                    className="tv-indicators-search"
+                                    type="text"
+                                    value={indicatorQuery}
+                                    onChange={(event) => setIndicatorQuery(event.target.value)}
+                                    placeholder="Search indicators"
+                                />
+                            </div>
+
+                            <div className="tv-indicators-list styling-scrollbar">
+                                {filteredIndicators.map((indicator) => {
+                                    const checked = enabledIndicators.includes(indicator.id);
+                                    return (
+                                        <label key={indicator.id} className={`tv-indicator-item ${checked ? 'active' : ''}`}>
+                                            <div>
+                                                <span className="tv-indicator-item-label">{indicator.label}</span>
+                                                <span className="tv-indicator-item-desc">{indicator.description}</span>
+                                            </div>
+                                            <div className="tv-indicator-item-right">
+                                                <span className="tv-indicator-category">{indicator.category}</span>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={checked}
+                                                    onChange={(event) => setIndicatorEnabled(indicator.id, event.target.checked)}
+                                                />
+                                            </div>
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+                </div>
 
                 <div className="tv-header-separator" />
 
-                <button className="tv-header-btn icon-text">
+                <button type="button" className="tv-header-btn icon-text">
                     <Bell size={16} />
                     <span>Alert</span>
                 </button>
 
-                <button className="tv-header-btn icon-text">
+                <button type="button" className="tv-header-btn icon-text">
                     <RotateCcw size={16} />
                     <span>Replay</span>
                 </button>
@@ -108,13 +181,13 @@ export default function Header() {
 
                 <div className="tv-header-separator" />
 
-                <button className="tv-header-btn" title="Search">
+                <button type="button" className="tv-header-btn" title="Search">
                     <Search size={16} />
                 </button>
-                <button className="tv-header-btn" title="Settings">
+                <button type="button" className="tv-header-btn" title="Settings">
                     <Settings size={16} />
                 </button>
-                <button className="tv-header-btn" title="Fullscreen">
+                <button type="button" className="tv-header-btn" title="Fullscreen">
                     <Maximize2 size={16} />
                 </button>
 
