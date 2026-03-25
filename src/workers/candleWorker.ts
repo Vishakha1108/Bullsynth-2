@@ -75,4 +75,31 @@ self.onmessage = (e) => {
             self.postMessage({ type: 'CANDLE_UPDATE', candle: { ...lastCandle }, isNew: false });
         }
     }
+    else if (type === 'CANDLE_1S') {
+        const c = payload;
+        const candleTime = Math.floor(c.time / timeframeSec) * timeframeSec;
+        const lastCandle = history.length > 0 ? history[history.length - 1] : null;
+
+        if (!lastCandle || lastCandle.time !== candleTime) {
+            // New candle boundary
+            const newCandle: Candle = {
+                time: candleTime,
+                open: c.open,
+                high: c.high,
+                low: c.low,
+                close: c.close,
+                volume: c.volume,
+            };
+            history.push(newCandle);
+            if (history.length > 2000) history = history.slice(-2000);
+            self.postMessage({ type: 'CANDLE_UPDATE', candle: newCandle, isNew: true });
+        } else {
+            // Update existing candle
+            lastCandle.high = Math.max(lastCandle.high, c.high);
+            lastCandle.low = Math.min(lastCandle.low, c.low);
+            lastCandle.close = c.close;
+            lastCandle.volume += c.volume;
+            self.postMessage({ type: 'CANDLE_UPDATE', candle: { ...lastCandle }, isNew: false });
+        }
+    }
 };
