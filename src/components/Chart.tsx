@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { createChart, CandlestickSeries, HistogramSeries, ColorType, CrosshairMode } from 'lightweight-charts';
 import type { ISeriesApi, IChartApi } from 'lightweight-charts';
-import useMarketStore, { AVAILABLE_SYMBOLS, TIMEFRAMES } from '../store/useMarketStore';
-import { changeTimeframe } from '../services/websocket';
+import useMarketStore, { TIMEFRAMES } from '../store/useMarketStore';
+import { changeTimeframe, candleWorker } from '../services/websocket';
+import { fetchTickers, type Ticker } from '../services/api';
 import {
     Search, Crosshair, TrendingUp, Minus, Type, Ruler,
     ChevronDown, X, Pencil, MousePointer2, Hash,
@@ -10,86 +11,132 @@ import {
 } from 'lucide-react';
 
 // ─── Ticker Search Component ────────────────────────────────────────────────
-function TickerSearch() {
+export function TickerSearch() {
     const [isOpen, setIsOpen] = useState(false);
     const [query, setQuery] = useState('');
+    const [tab, setTab] = useState('All');
+    const [tickers, setTickers] = useState<Ticker[]>([]);
+
     const currentSymbol = useMarketStore(s => s.currentSymbol);
     const setCurrentSymbol = useMarketStore(s => s.setCurrentSymbol);
     const inputRef = useRef<HTMLInputElement>(null);
-    const containerRef = useRef<HTMLDivElement>(null);
+
+    // Fetch rich ticker data when modal opens
+    useEffect(() => {
+        if (isOpen) {
+            fetchTickers().then(setTickers);
+            setTimeout(() => inputRef.current?.focus(), 50);
+        } else {
+            setQuery(''); // reset search on close
+        }
+    }, [isOpen]);
 
     const filtered = useMemo(() => {
-        if (!query.trim()) return AVAILABLE_SYMBOLS;
-        return AVAILABLE_SYMBOLS.filter(s =>
-            s.toLowerCase().includes(query.toLowerCase())
-        );
-    }, [query]);
+        return tickers.filter(t => {
+            const matchesQuery = t.symbol.toLowerCase().includes(query.toLowerCase()) ||
+                t.name.toLowerCase().includes(query.toLowerCase());
+            const matchesTab = tab === 'All' || t.category === tab;
+            return matchesQuery && matchesTab;
+        });
+    }, [query, tab, tickers]);
 
     const handleSelect = useCallback((symbol: string) => {
         setCurrentSymbol(symbol);
         setIsOpen(false);
         setQuery('');
+
+        // Reset worker history to avoid mixing symbols
+        const timeframeSec = useMarketStore.getState().timeframe;
+        candleWorker.postMessage({
+            type: 'INIT',
+            payload: { timeframeSec }
+        });
     }, [setCurrentSymbol]);
 
-    // Close on click outside
+    // Close on Escape key
     useEffect(() => {
-        const handler = (e: MouseEvent) => {
-            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-                setIsOpen(false);
-            }
+        const handler = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setIsOpen(false);
         };
-        document.addEventListener('mousedown', handler);
-        return () => document.removeEventListener('mousedown', handler);
-    }, []);
+        if (isOpen) window.addEventListener('keydown', handler);
+        return () => window.removeEventListener('keydown', handler);
+    }, [isOpen]);
 
     return (
-        <div ref={containerRef} className="ticker-search-container">
+        <div className="ticker-search-container">
             <button
                 className="ticker-search-trigger"
-                onClick={() => {
-                    setIsOpen(!isOpen);
-                    setTimeout(() => inputRef.current?.focus(), 50);
-                }}
+                onClick={() => setIsOpen(true)}
             >
                 <span className="ticker-symbol">{currentSymbol}</span>
                 <ChevronDown size={14} className="ticker-chevron" />
             </button>
 
             {isOpen && (
-                <div className="ticker-dropdown">
-                    <div className="ticker-search-input-wrap">
-                        <Search size={14} className="ticker-search-icon" />
-                        <input
-                            ref={inputRef}
-                            type="text"
-                            placeholder="Search symbol..."
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
-                            className="ticker-search-input"
-                            autoFocus
-                        />
-                        {query && (
-                            <button className="ticker-clear-btn" onClick={() => setQuery('')}>
-                                <X size={12} />
-                            </button>
-                        )}
-                    </div>
-                    <div className="ticker-results">
-                        {filtered.length === 0 && (
-                            <div className="ticker-no-results">No symbols found</div>
-                        )}
-                        {filtered.map(symbol => (
-                            <button
-                                key={symbol}
-                                className={`ticker-result-item ${symbol === currentSymbol ? 'active' : ''}`}
-                                onClick={() => handleSelect(symbol)}
-                            >
-                                <span className="ticker-result-name">{symbol}</span>
-                                {symbol === currentSymbol && (
-                                    <span className="ticker-result-check">✓</span>
+                <div className="tv-modal-overlay" onClick={() => setIsOpen(false)}>
+                    <div className="tv-modal-content" onClick={e => e.stopPropagation()}>
+                        <div className="tv-modal-header">
+                            <div className="tv-modal-title-row">
+                                <span className="tv-modal-title">Symbol Search</span>
+                                <button className="tv-modal-close" onClick={() => setIsOpen(false)}>
+                                    <X size={18} />
+                                </button>
+                            </div>
+                            <div className="tv-modal-search">
+                                <Search size={16} className="ticker-search-icon" />
+                                <input
+                                    ref={inputRef}
+                                    type="text"
+                                    placeholder="Search symbol or name..."
+                                    value={query}
+                                    onChange={(e) => setQuery(e.target.value)}
+                                />
+                                {query && (
+                                    <button className="ticker-clear-btn" onClick={() => setQuery('')}>
+                                        <X size={12} />
+                                    </button>
                                 )}
-                            </button>
-                        ))}
+                            </div>
+                        </div>
+
+                        <div className="tv-modal-tabs">
+                            {['All', 'Stocks', 'Crypto', 'Synthetic'].map(t => (
+                                <button
+                                    key={t}
+                                    className={`tv-modal-tab ${tab === t ? 'active' : ''}`}
+                                    onClick={() => setTab(t)}
+                                >
+                                    {t}
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="tv-modal-list styling-scrollbar">
+                            {filtered.length === 0 && (
+                                <div className="tv-modal-empty">No symbols match your criteria</div>
+                            )}
+                            {filtered.map(t => (
+                                <button
+                                    key={t.symbol}
+                                    className="tv-modal-item"
+                                    onClick={() => handleSelect(t.symbol)}
+                                >
+                                    <div className="tv-modal-item-left">
+                                        <div className="tv-modal-item-symbol">
+                                            {t.symbol}
+                                            {t.symbol === currentSymbol && (
+                                                <span className="tv-modal-item-check">✓</span>
+                                            )}
+                                        </div>
+                                        <div className="tv-modal-item-name">{t.name}</div>
+                                    </div>
+                                    <div className="tv-modal-item-right">
+                                        <span className="tv-modal-item-category">{t.category}</span>
+                                        <span className="tv-modal-item-exchange">SIMULATOR</span>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </div>
             )}

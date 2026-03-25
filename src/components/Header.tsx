@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import useMarketStore, { TIMEFRAMES } from '../store/useMarketStore';
 import { changeTimeframe } from '../services/websocket';
+import { TickerSearch } from './Chart';
 import {
     Menu, Plus, BarChart3, Layers, Bell, RotateCcw,
     Search, Settings, ChevronDown, Maximize2
@@ -9,7 +10,6 @@ import {
 export default function Header() {
     const currentPrice = useMarketStore(state => state.lastPrice);
     const connected = useMarketStore(state => state.wsConnected);
-    const currentSymbol = useMarketStore(state => state.currentSymbol);
     const timeframe = useMarketStore(state => state.timeframe);
     const priceChange24h = useMarketStore(state => state.priceChange24h);
     const high24h = useMarketStore(state => state.high24h);
@@ -29,10 +29,7 @@ export default function Header() {
                 <div className="tv-header-separator" />
 
                 {/* Symbol selector */}
-                <Link to="/" className="tv-symbol-link">
-                    <span className="tv-symbol-text">{currentSymbol}</span>
-                    <ChevronDown size={12} className="text-[#787b86]" />
-                </Link>
+                <TickerSearch />
 
                 <div className="tv-header-separator" />
 

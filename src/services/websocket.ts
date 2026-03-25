@@ -59,34 +59,59 @@ class WSManager {
             try {
                 const msg = JSON.parse(event.data);
 
-                if (msg.event === 'TOB') {
-                    const bids = Array.from({ length: 5 }).map((_, i) => ({
-                        price: Number((msg.best_bid - (i * 0.05)).toFixed(2)),
-                        qty: msg.bid_qty + (i * 15)
-                    }));
-                    const asks = Array.from({ length: 5 }).map((_, i) => ({
-                        price: Number((msg.best_ask + (i * 0.05)).toFixed(2)),
-                        qty: msg.ask_qty + (i * 15)
-                    }));
-                    useMarketStore.getState().setOrderBook(bids, asks);
+                if (msg.type === 'orderbook') {
+                    // New C++ backend sends 'orderbook' with multiple levels
+                    if (msg.bids && Array.isArray(msg.bids)) {
+                        const bids = msg.bids.map((b: any) => ({
+                            price: Array.isArray(b) ? b[0] : b.price,
+                            qty: Array.isArray(b) ? b[1] : b.qty
+                        }));
+                        const asks = msg.asks.map((a: any) => ({
+                            price: Array.isArray(a) ? a[0] : a.price,
+                            qty: Array.isArray(a) ? a[1] : a.qty
+                        }));
+                        useMarketStore.getState().setOrderBook(bids, asks);
+                    }
                 }
-                else if (msg.event === 'TRADE') {
+                else if (msg.type === 'trade') {
                     const trade = {
                         price: msg.price,
                         qty: msg.qty,
-                        side: (Math.random() > 0.5 ? 'BUY' : 'SELL') as 'BUY' | 'SELL',
-                        timestamp: Date.now()
+                        side: (msg.side || (Math.random() > 0.5 ? 'buy' : 'sell')).toUpperCase() as 'BUY' | 'SELL',
+                        timestamp: msg.ts || Date.now()
                     };
                     useMarketStore.getState().addTrade(trade);
-                    candleWorker.postMessage({ type: 'TICK', payload: trade });
+                    // Do NOT post to candleWorker here to avoid duplicate updates.
+                    // We will use the 'candle' messages for the chart.
                 }
-                else if (msg.event === 'ACK') {
-                    const currentPortfolio = useMarketStore.getState().portfolio;
+                else if (msg.type === 'candle') {
+                    const currentSymbol = useMarketStore.getState().currentSymbol;
+                    if (msg.symbol === currentSymbol) {
+                        const t = Math.floor(msg.t / 1000);
+                        const c = { time: t, open: msg.o, high: msg.h, low: msg.l, close: msg.c, volume: msg.v };
+                        candleWorker.postMessage({ type: 'CANDLE_1S', payload: c });
+                    }
+                }
+                else if (msg.type === 'portfolio') {
+                    // New C++ backend sends full portfolio
+                    const holdings = Object.entries(msg.positions || {}).map(([symbol, pos]: [string, any]) => ({
+                        asset: symbol,
+                        qty: pos.holdings,
+                        avgPrice: pos.avg_cost,
+                        currentPrice: pos.avg_cost + (pos.unrealized_pnl / (pos.holdings || 1)),
+                        pnl: pos.realized_pnl + pos.unrealized_pnl
+                    }));
                     useMarketStore.getState().setPortfolio({
-                        ...currentPortfolio,
-                        cash: currentPortfolio.cash - (msg.price !== 'Market' ? msg.price * msg.qty : 0),
-                        pnl: currentPortfolio.pnl + (Math.random() * 100 - 50)
+                        cash: msg.cash,
+                        holdings,
+                        pnl: msg.realized_pnl + msg.unrealized_pnl
                     });
+                }
+                else if (msg.type === 'symbols' || msg.type === 'welcome') {
+                    // Ignore for now, handled in dashboard
+                }
+                else if (msg.type === 'ack') {
+                    console.log('Order Ack:', msg);
                 }
             } catch (err) {
                 // ignore JSON errors
@@ -109,4 +134,4 @@ class WSManager {
     }
 }
 
-export const wsManager = new WSManager('ws://localhost:8000/ws/trade');
+export const wsManager = new WSManager('ws://localhost:9001/ws/trade');

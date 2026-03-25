@@ -29,10 +29,12 @@ export default function TradePanel() {
         if (!qty || parseFloat(qty) <= 0) return;
         if (type === 'limit' && (!price || parseFloat(price) <= 0)) return;
 
+        const currentSymbol = useMarketStore.getState().currentSymbol;
         const orderId = Math.random().toString(36).substring(7);
 
         useMarketStore.getState().addOrder({
             id: orderId,
+            symbol: currentSymbol,
             side,
             type,
             price: type === 'limit' ? parseFloat(price) : undefined,
@@ -41,9 +43,11 @@ export default function TradePanel() {
         });
 
         wsManager.send({
-            action: type,
-            side: side === 'BUY' ? 'B' : 'S',
-            price: type === 'limit' ? parseFloat(price) : undefined,
+            type: "place_order",
+            symbol: currentSymbol,
+            order_type: type, // 'limit' or 'market'
+            side: side === 'BUY' ? 'buy' : 'sell',
+            price: type === 'limit' ? parseFloat(price) : 0,
             qty: parseFloat(qty)
         });
 

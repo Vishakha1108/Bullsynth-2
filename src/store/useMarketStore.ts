@@ -9,6 +9,7 @@ export interface Trade {
 
 export interface Order {
     id: string;
+    symbol: string;
     side: 'BUY' | 'SELL';
     type: 'limit' | 'market';
     price?: number;
@@ -41,10 +42,9 @@ export interface CrosshairData {
 }
 
 export const AVAILABLE_SYMBOLS = [
-    'SYNTH/USD', 'BTC/USD', 'ETH/USD', 'SOL/USD', 'DOGE/USD',
-    'AAPL', 'META', 'TSLA', 'AMZN', 'GOOG', 'NFLX', 'MSFT',
-    'NVDA', 'AMD', 'INTC'
+    'AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'META', 'NVDA', 'JPM', 'BTC', 'ETH'
 ];
+
 
 export const TIMEFRAMES = [
     { label: '1m', seconds: 60 },
@@ -89,7 +89,7 @@ const useMarketStore = create<MarketState>((set) => ({
     candles: [],
     latestCandle: null,
     timeframe: 60, // 1 minute default
-    currentSymbol: 'SYNTH/USD',
+    currentSymbol: 'BTC',
     crosshairData: null,
     orderBook: { bids: [], asks: [] },
     recentTrades: [],
@@ -107,7 +107,12 @@ const useMarketStore = create<MarketState>((set) => ({
     wsConnected: false,
 
     setTimeframe: (seconds) => set({ timeframe: seconds }),
-    setCurrentSymbol: (symbol) => set({ currentSymbol: symbol }),
+    setCurrentSymbol: (symbol) => set({
+        currentSymbol: symbol,
+        candles: [],
+        latestCandle: null,
+        recentTrades: []
+    }),
     setCrosshairData: (data) => set({ crosshairData: data }),
 
     setCandlesData: (candles, latestCandle = null) => set((state) => ({
