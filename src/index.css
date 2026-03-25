@@ -922,10 +922,11 @@
   padding: 1px 5px;
 }
 
+.light .chart-indicator-tag {
+  color: #131722;
+  background: rgba(240, 243, 250, 0.9);
+}
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   TICKER SEARCH (TradingView-style dropdown)
-   ═══════════════════════════════════════════════════════════════════════════ */
 
 /* ═══════════════════════════════════════════════════════════════════════════
    TICKER SEARCH (TradingView-style Modal)
@@ -2808,36 +2809,66 @@
   color: #787b86;
 }
 
-/* ── Ticker search dropdown ──────────────────────────────────────────────── */
+/* ── Ticker search trigger ───────────────────────────────────────────────── */
 .light .ticker-search-trigger {
   color: #131722;
 }
 
 .light .ticker-search-trigger:hover {
   background: #e0e3eb;
-  border-color: #d1d4dc;
 }
 
-.light .ticker-dropdown {
+.light .ticker-chevron {
+  color: #5d606b;
+}
+
+/* ── TickerSearch modal (tv-modal) ───────────────────────────────────────── */
+.light .tv-modal-overlay {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.light .tv-modal-content {
   background: #ffffff;
   border-color: #d1d4dc;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.12);
 }
 
-.light .ticker-search-input-wrap {
-  border-bottom-color: #d1d4dc;
+.light .tv-modal-header {
+  border-bottom-color: #e0e3eb;
+}
+
+.light .tv-modal-title {
+  color: #131722;
+}
+
+.light .tv-modal-close {
+  color: #787b86;
+}
+
+.light .tv-modal-close:hover {
+  background: #e0e3eb;
+  color: #131722;
+}
+
+.light .tv-modal-search {
+  background: #f0f3fa;
+  border-color: #d1d4dc;
+}
+
+.light .tv-modal-search:focus-within {
+  border-color: #2962ff;
+}
+
+.light .tv-modal-search input {
+  color: #131722;
+}
+
+.light .tv-modal-search input::placeholder {
+  color: #b2b5be;
 }
 
 .light .ticker-search-icon {
   color: #5d606b;
-}
-
-.light .ticker-search-input {
-  color: #131722;
-}
-
-.light .ticker-search-input::placeholder {
-  color: #b2b5be;
 }
 
 .light .ticker-clear-btn {
@@ -2845,16 +2876,97 @@
   color: #5d606b;
 }
 
-.light .ticker-result-item {
+.light .tv-modal-tabs {
+  border-bottom-color: #e0e3eb;
+}
+
+.light .tv-modal-tab {
+  color: #787b86;
+}
+
+.light .tv-modal-tab:hover {
   color: #131722;
 }
 
-.light .ticker-result-item:hover {
-  background: #e0e3eb;
+.light .tv-modal-item {
+  color: #131722;
 }
 
-.light .ticker-no-results {
+.light .tv-modal-item:hover {
+  background: #f0f3fa;
+}
+
+.light .tv-modal-item-symbol {
+  color: #131722;
+}
+
+.light .tv-modal-item-name {
   color: #787b86;
+}
+
+.light .tv-modal-item-category {
+  background: #e0e3eb;
+  color: #5d606b;
+}
+
+.light .tv-modal-item-exchange {
+  color: #9598a1;
+}
+
+.light .tv-modal-empty {
+  color: #787b86;
+}
+
+/* ── Indicators panel (light mode) ──────────────────────────────────────── */
+.light .tv-indicators-modal {
+  background: #ffffff;
+  border-color: #d1d4dc;
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.1);
+}
+
+.light .tv-indicators-modal-head {
+  border-bottom-color: #e0e3eb;
+}
+
+.light .tv-indicators-modal-head h3 {
+  color: #131722;
+}
+
+.light .tv-indicators-modal-head p {
+  color: #787b86;
+}
+
+.light .tv-indicators-search-wrap {
+  border-bottom-color: #e0e3eb;
+  color: #9598a1;
+}
+
+.light .tv-indicators-search {
+  color: #131722;
+}
+
+.light .tv-indicators-search::placeholder {
+  color: #b2b5be;
+}
+
+.light .tv-indicator-item:hover {
+  background: #f0f3fa;
+}
+
+.light .tv-indicator-item.active {
+  background: rgba(41, 98, 255, 0.06);
+}
+
+.light .tv-indicator-item-label {
+  color: #131722;
+}
+
+.light .tv-indicator-item-desc {
+  color: #787b86;
+}
+
+.light .tv-indicator-category {
+  color: #9598a1;
 }
 
 /* ── Bottom bar ──────────────────────────────────────────────────────────── */
