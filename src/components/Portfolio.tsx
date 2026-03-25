@@ -2,17 +2,15 @@ import useMarketStore from '../store/useMarketStore';
 
 export default function Portfolio() {
     const portfolio = useMarketStore(state => state.portfolio);
-    const lastPrice = useMarketStore(state => state.lastPrice);
-
-    const totalValue = portfolio.cash + portfolio.holdings.reduce((acc, h) => acc + (h.qty * lastPrice), 0);
-    const isPnlPositive = portfolio.pnl > 0;
+    const totalValue = portfolio.totalValue;
+    const isPnlPositive = portfolio.unrealizedPnl > 0;
 
     return (
         <div className="tv-portfolio">
             <div className="tv-portfolio-header">
                 <span className="tv-portfolio-title">Portfolio</span>
-                <span className={`tv-portfolio-pnl ${isPnlPositive ? 'up' : portfolio.pnl < 0 ? 'down' : ''}`}>
-                    {isPnlPositive ? '▲' : portfolio.pnl < 0 ? '▼' : ''} ${Math.abs(portfolio.pnl).toFixed(2)}
+                <span className={`tv-portfolio-pnl ${isPnlPositive ? 'up' : portfolio.unrealizedPnl < 0 ? 'down' : ''}`}>
+                    {isPnlPositive ? '▲' : portfolio.unrealizedPnl < 0 ? '▼' : ''} ${Math.abs(portfolio.unrealizedPnl).toFixed(2)}
                 </span>
             </div>
 

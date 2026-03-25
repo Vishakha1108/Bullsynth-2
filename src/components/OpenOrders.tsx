@@ -3,22 +3,24 @@ import { wsManager } from '../services/websocket';
 
 export default function OpenOrders() {
     const orders = useMarketStore(state => state.openOrders);
+    const currentSymbol = useMarketStore(state => state.currentSymbol);
 
-    const handleCancel = (id: string) => {
-        wsManager.send({ action: 'cancel', order_id: id });
-        useMarketStore.getState().removeOrder(id);
+    const handleCancel = (symbol: string, orderId: number) => {
+        wsManager.send({ type: 'cancel_order', symbol, order_id: orderId });
     };
+
+    const visibleOrders = orders.filter((o) => o.symbol === currentSymbol);
 
     return (
         <div className="tv-open-orders">
             <div className="tv-open-orders-header">
-                Open Orders ({orders.length})
+                Open Orders ({visibleOrders.length})
             </div>
 
             <div className="tv-open-orders-list styling-scrollbar">
-                {orders.length === 0 ? (
+                {visibleOrders.length === 0 ? (
                     <div className="tv-open-orders-empty">
-                        No open orders
+                        No open orders for {currentSymbol}
                     </div>
                 ) : (
                     <>
@@ -28,8 +30,8 @@ export default function OpenOrders() {
                             <span>Qty</span>
                             <span></span>
                         </div>
-                        {orders.map((o) => (
-                            <div key={o.id} className="tv-open-order-row">
+                        {visibleOrders.map((o) => (
+                            <div key={o.order_id} className="tv-open-order-row">
                                 <span>
                                     <span className={o.side === 'BUY' ? 'tv-text-bull' : 'tv-text-bear'}>
                                         {o.side}
@@ -37,11 +39,11 @@ export default function OpenOrders() {
                                     {' '}
                                     <span className="tv-text-dim">{o.type}</span>
                                 </span>
-                                <span>{o.price ? o.price.toFixed(2) : 'MKT'}</span>
-                                <span>{o.qty}</span>
+                                <span>{o.price.toFixed(2)}</span>
+                                <span>{o.remainingQty}</span>
                                 <span>
                                     <button
-                                        onClick={() => handleCancel(o.id)}
+                                        onClick={() => handleCancel(o.symbol, o.order_id)}
                                         className="tv-cancel-btn"
                                     >
                                         ✕

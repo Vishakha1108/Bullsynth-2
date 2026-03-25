@@ -33,6 +33,24 @@ self.onmessage = (e) => {
         const lastCandle = history.length > 0 ? history[history.length - 1] : null;
 
         if (!lastCandle || lastCandle.time !== candleTime) {
+            if (lastCandle && candleTime > lastCandle.time + timeframeSec) {
+                // Fill time gaps with flat candles so chart time is continuous.
+                let fillTime = lastCandle.time + timeframeSec;
+                while (fillTime < candleTime) {
+                    const fillerCandle: Candle = {
+                        time: fillTime,
+                        open: lastCandle.close,
+                        high: lastCandle.close,
+                        low: lastCandle.close,
+                        close: lastCandle.close,
+                        volume: 0,
+                    };
+                    history.push(fillerCandle);
+                    self.postMessage({ type: 'CANDLE_UPDATE', candle: fillerCandle, isNew: true });
+                    fillTime += timeframeSec;
+                }
+            }
+
             // New candle boundary reached
             const newCandle: Candle = {
                 time: candleTime,

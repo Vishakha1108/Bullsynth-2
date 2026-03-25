@@ -9,7 +9,14 @@ candleWorker.onmessage = (e) => {
 
     if (type === 'CANDLE_UPDATE') {
         const state = useMarketStore.getState();
-        const newCandles = isNew ? [...state.candles, candle].slice(-2000) : state.candles;
+        const newCandles = isNew
+            ? [...state.candles, candle].slice(-2000)
+            : state.candles.map((existing, index, arr) => (
+                index === arr.length - 1 && existing.time === candle.time
+                    ? candle
+                    : existing
+            ));
+
         useMarketStore.getState().setCandlesData(newCandles, candle);
     }
     else if (type === 'CLEAR') {
@@ -23,6 +30,10 @@ candleWorker.onmessage = (e) => {
  * It re-initializes the worker which clears history and starts fresh aggregation.
  */
 export function changeTimeframe(seconds: number) {
+    if (useMarketStore.getState().timeframe === seconds) {
+        return;
+    }
+
     useMarketStore.getState().setTimeframe(seconds);
     candleWorker.postMessage({
         type: 'INIT',
@@ -53,40 +64,179 @@ class WSManager {
                 type: 'INIT',
                 payload: { timeframeSec: useMarketStore.getState().timeframe }
             });
+
+            // Ask for symbol list in case welcome arrives before UI is ready.
+            this.send({ type: 'get_symbols' });
         };
 
         this.ws.onmessage = (event) => {
             try {
                 const msg = JSON.parse(event.data);
 
-                if (msg.event === 'TOB') {
-                    const bids = Array.from({ length: 5 }).map((_, i) => ({
-                        price: Number((msg.best_bid - (i * 0.05)).toFixed(2)),
-                        qty: msg.bid_qty + (i * 15)
-                    }));
-                    const asks = Array.from({ length: 5 }).map((_, i) => ({
-                        price: Number((msg.best_ask + (i * 0.05)).toFixed(2)),
-                        qty: msg.ask_qty + (i * 15)
-                    }));
-                    useMarketStore.getState().setOrderBook(bids, asks);
+                const state = useMarketStore.getState();
+                const msgType = msg?.type;
+
+                if (msgType === 'welcome') {
+                    const symbols = Array.isArray(msg.symbols)
+                        ? msg.symbols.map((item: { symbol: string }) => item.symbol).filter(Boolean)
+                        : [];
+
+                    if (symbols.length > 0) {
+                        state.setSymbols(symbols);
+                        if (!symbols.includes(state.currentSymbol)) {
+                            state.setCurrentSymbol(symbols[0]);
+                        }
+                    }
+
+                    if (typeof msg.user_id === 'string') {
+                        state.setUserId(msg.user_id);
+                    }
+                    return;
                 }
-                else if (msg.event === 'TRADE') {
+
+                if (msgType === 'symbols') {
+                    const symbols = Array.isArray(msg.symbols)
+                        ? msg.symbols.map((item: { symbol: string }) => item.symbol).filter(Boolean)
+                        : [];
+
+                    if (symbols.length > 0) {
+                        state.setSymbols(symbols);
+                        if (!symbols.includes(state.currentSymbol)) {
+                            state.setCurrentSymbol(symbols[0]);
+                        }
+                    }
+                    return;
+                }
+
+                if (msgType === 'orderbook') {
+                    if (msg.symbol !== state.currentSymbol) return;
+
+                    const bids = Array.isArray(msg.bids)
+                        ? msg.bids.map((level: [number, number]) => ({ price: level[0], qty: level[1] }))
+                        : [];
+                    const asks = Array.isArray(msg.asks)
+                        ? msg.asks.map((level: [number, number]) => ({ price: level[0], qty: level[1] }))
+                        : [];
+                    state.setOrderBook(bids, asks);
+                    return;
+                }
+
+                if (msgType === 'trade') {
+                    if (msg.symbol !== state.currentSymbol) return;
+
+                    const ts = normalizeToMs(msg.ts);
+                    const inferredSide: 'BUY' | 'SELL' =
+                        msg.buyer === state.userId
+                            ? 'BUY'
+                            : msg.seller === state.userId
+                                ? 'SELL'
+                                : msg.price >= state.lastPrice
+                                    ? 'BUY'
+                                    : 'SELL';
+
                     const trade = {
-                        price: msg.price,
-                        qty: msg.qty,
-                        side: (Math.random() > 0.5 ? 'BUY' : 'SELL') as 'BUY' | 'SELL',
-                        timestamp: Date.now()
+                        id: Number(msg.id || 0),
+                        symbol: String(msg.symbol || state.currentSymbol),
+                        price: Number(msg.price || 0),
+                        qty: Number(msg.qty || 0),
+                        side: inferredSide,
+                        timestamp: ts,
+                        buyer: msg.buyer,
+                        seller: msg.seller,
                     };
-                    useMarketStore.getState().addTrade(trade);
-                    candleWorker.postMessage({ type: 'TICK', payload: trade });
-                }
-                else if (msg.event === 'ACK') {
-                    const currentPortfolio = useMarketStore.getState().portfolio;
-                    useMarketStore.getState().setPortfolio({
-                        ...currentPortfolio,
-                        cash: currentPortfolio.cash - (msg.price !== 'Market' ? msg.price * msg.qty : 0),
-                        pnl: currentPortfolio.pnl + (Math.random() * 100 - 50)
+
+                    state.addTrade(trade);
+                    candleWorker.postMessage({
+                        type: 'TICK',
+                        payload: { price: trade.price, qty: trade.qty, timestamp: ts }
                     });
+                    return;
+                }
+
+                if (msgType === 'candle') {
+                    if (msg.symbol !== state.currentSymbol) return;
+
+                    const next = {
+                        time: normalizeToSec(msg.t),
+                        open: Number(msg.o || 0),
+                        high: Number(msg.h || 0),
+                        low: Number(msg.l || 0),
+                        close: Number(msg.c || 0),
+                        volume: Number(msg.v || 0),
+                    };
+
+                    const candles = state.candles;
+                    if (candles.length === 0 || candles[candles.length - 1].time < next.time) {
+                        state.setCandlesData([...candles, next].slice(-2000), next);
+                    } else if (candles[candles.length - 1].time === next.time) {
+                        const updated = [...candles];
+                        updated[updated.length - 1] = next;
+                        state.setCandlesData(updated, next);
+                    }
+                    return;
+                }
+
+                if (msgType === 'portfolio') {
+                    const positions = msg.positions && typeof msg.positions === 'object' ? msg.positions : {};
+                    const holdings = Object.entries(positions).map(([asset, raw]) => {
+                        const value = raw as {
+                            holdings?: number;
+                            avg_cost?: number;
+                            market_value?: number;
+                            realized_pnl?: number;
+                            unrealized_pnl?: number;
+                        };
+
+                        const qty = Number(value.holdings || 0);
+                        const marketValue = Number(value.market_value || 0);
+                        return {
+                            asset,
+                            qty,
+                            avgPrice: Number(value.avg_cost || 0),
+                            currentPrice: Math.abs(qty) > 1e-12 ? marketValue / qty : 0,
+                            marketValue,
+                            realizedPnl: Number(value.realized_pnl || 0),
+                            unrealizedPnl: Number(value.unrealized_pnl || 0),
+                        };
+                    });
+
+                    state.setPortfolio({
+                        cash: Number(msg.cash || 0),
+                        holdings,
+                        realizedPnl: Number(msg.realized_pnl || 0),
+                        unrealizedPnl: Number(msg.unrealized_pnl || 0),
+                        totalValue: Number(msg.total_value || 0),
+                    });
+                    return;
+                }
+
+                if (msgType === 'open_orders') {
+                    const orders = Array.isArray(msg.orders)
+                        ? msg.orders.map((order: {
+                            order_id: number;
+                            symbol: string;
+                            side: 'buy' | 'sell';
+                            price: number;
+                            orig_qty: number;
+                            remaining_qty: number;
+                        }) => ({
+                            order_id: Number(order.order_id),
+                            symbol: String(order.symbol),
+                            side: order.side === 'buy' ? 'BUY' : 'SELL' as const,
+                            type: 'limit' as const,
+                            price: Number(order.price || 0),
+                            qty: Number(order.orig_qty || 0),
+                            remainingQty: Number(order.remaining_qty || 0),
+                            status: 'Open',
+                        }))
+                        : [];
+                    state.setOpenOrders(orders);
+                    return;
+                }
+
+                if (msgType === 'error') {
+                    console.warn('Server error:', msg.message);
+                    return;
                 }
             } catch (err) {
                 // ignore JSON errors
@@ -109,4 +259,16 @@ class WSManager {
     }
 }
 
-export const wsManager = new WSManager('ws://localhost:8000/ws/trade');
+function normalizeToMs(ts: unknown): number {
+    const value = Number(ts || 0);
+    if (value <= 0) return Date.now();
+    return value < 1e12 ? value * 1000 : value;
+}
+
+function normalizeToSec(ts: unknown): number {
+    const value = Number(ts || 0);
+    if (value <= 0) return Math.floor(Date.now() / 1000);
+    return Math.floor(value < 1e12 ? value : value / 1000);
+}
+
+export const wsManager = new WSManager('ws://localhost:9001');

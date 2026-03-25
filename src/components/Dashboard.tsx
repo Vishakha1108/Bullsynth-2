@@ -10,7 +10,6 @@ import { fetchTickers, type Ticker } from '../services/api';
 export default function Dashboard() {
     const [tickers, setTickers] = useState<Ticker[]>([]);
     const portfolio = useMarketStore(state => state.portfolio);
-    const lastPrice = useMarketStore(state => state.lastPrice);
     const openOrders = useMarketStore(state => state.openOrders);
     const recentTrades = useMarketStore(state => state.recentTrades);
 
@@ -18,8 +17,8 @@ export default function Dashboard() {
         fetchTickers().then(setTickers);
     }, []);
 
-    const totalValue = portfolio.cash + portfolio.holdings.reduce((acc, h) => acc + (h.qty * lastPrice), 0);
-    const isPnlPositive = portfolio.pnl > 0;
+    const totalValue = portfolio.totalValue;
+    const isPnlPositive = portfolio.unrealizedPnl > 0;
 
     return (
         <div className="nb-landing">
@@ -78,8 +77,8 @@ export default function Dashboard() {
                         </div>
                         <div>
                             <div className="db-stat-label">Unrealized P&L</div>
-                            <div className={`db-stat-value ${isPnlPositive ? 'up' : portfolio.pnl < 0 ? 'down' : ''}`}>
-                                {isPnlPositive ? '+' : ''}{portfolio.pnl.toFixed(2)}
+                            <div className={`db-stat-value ${isPnlPositive ? 'up' : portfolio.unrealizedPnl < 0 ? 'down' : ''}`}>
+                                {isPnlPositive ? '+' : ''}{portfolio.unrealizedPnl.toFixed(2)}
                             </div>
                         </div>
                     </div>
@@ -111,14 +110,13 @@ export default function Dashboard() {
                                 </thead>
                                 <tbody>
                                     {portfolio.holdings.map((h, i) => {
-                                        const value = h.qty * lastPrice;
                                         return (
                                             <tr key={i}>
                                                 <td className="nb-ticker-sym">{h.asset}</td>
                                                 <td>{h.qty}</td>
                                                 <td>${h.avgPrice.toFixed(2)}</td>
-                                                <td>${lastPrice.toFixed(2)}</td>
-                                                <td className="nb-ticker-price">${value.toFixed(2)}</td>
+                                                <td>${h.currentPrice.toFixed(2)}</td>
+                                                <td className="nb-ticker-price">${h.marketValue.toFixed(2)}</td>
                                             </tr>
                                         );
                                     })}
@@ -193,15 +191,15 @@ export default function Dashboard() {
                                 </thead>
                                 <tbody>
                                     {openOrders.map(o => (
-                                        <tr key={o.id}>
+                                        <tr key={o.order_id}>
                                             <td className={o.side === 'BUY' ? 'nb-text-bull' : 'nb-text-bear'}>
                                                 {o.side}
                                             </td>
                                             <td className="nb-ticker-name">{o.type}</td>
                                             <td className="nb-ticker-price">
-                                                {o.price ? `$${o.price.toFixed(2)}` : 'Market'}
+                                                ${o.price.toFixed(2)}
                                             </td>
-                                            <td>{o.qty}</td>
+                                            <td>{o.remainingQty}</td>
                                             <td className="nb-ticker-cat-inline">{o.status || 'Open'}</td>
                                         </tr>
                                     ))}

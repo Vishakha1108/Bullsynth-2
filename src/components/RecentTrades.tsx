@@ -19,7 +19,7 @@ export default function RecentTrades() {
                     const timeStr = `${tDate.getHours().toString().padStart(2, '0')}:${tDate.getMinutes().toString().padStart(2, '0')}:${tDate.getSeconds().toString().padStart(2, '0')}`;
 
                     return (
-                        <div key={i} className="tv-trade-row">
+                        <div key={`${trade.id}-${trade.timestamp}-${i}`} className="tv-trade-row">
                             <span className="tv-trade-time">{timeStr}</span>
                             <span className={`tv-trade-price ${isBuy ? 'up' : 'down'}`}>
                                 {trade.price.toFixed(2)}

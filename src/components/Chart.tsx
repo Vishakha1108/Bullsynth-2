@@ -1,101 +1,38 @@
-import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
-import { createChart, CandlestickSeries, HistogramSeries, ColorType, CrosshairMode } from 'lightweight-charts';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { createChart, CandlestickSeries, HistogramSeries, LineSeries, ColorType, CrosshairMode } from 'lightweight-charts';
 import type { ISeriesApi, IChartApi } from 'lightweight-charts';
-import useMarketStore, { AVAILABLE_SYMBOLS, TIMEFRAMES } from '../store/useMarketStore';
-import { changeTimeframe } from '../services/websocket';
+import useMarketStore, { INDICATOR_LIBRARY, TIMEFRAMES, type IndicatorId } from '../store/useMarketStore';
 import {
-    Search, Crosshair, TrendingUp, Minus, Type, Ruler,
-    ChevronDown, X, Pencil, MousePointer2, Hash,
-    MoveHorizontal, Move, ZoomIn, Undo2, Redo2
+    Crosshair, TrendingUp, Minus, Type, Ruler,
+    Pencil, MousePointer2, Hash,
+    MoveHorizontal, ZoomIn
 } from 'lucide-react';
+import {
+    calculateBollingerBands,
+    calculateEMA,
+    calculateMACD,
+    calculateRSI,
+    calculateSMA,
+    calculateVWAP,
+} from '../lib/indicators';
 
-// ─── Ticker Search Component ────────────────────────────────────────────────
-function TickerSearch() {
-    const [isOpen, setIsOpen] = useState(false);
-    const [query, setQuery] = useState('');
-    const currentSymbol = useMarketStore(s => s.currentSymbol);
-    const setCurrentSymbol = useMarketStore(s => s.setCurrentSymbol);
-    const inputRef = useRef<HTMLInputElement>(null);
-    const containerRef = useRef<HTMLDivElement>(null);
+type IndicatorSeriesBucket = {
+    line: ISeriesApi<'Line'>[];
+    histogram: ISeriesApi<'Histogram'>[];
+};
 
-    const filtered = useMemo(() => {
-        if (!query.trim()) return AVAILABLE_SYMBOLS;
-        return AVAILABLE_SYMBOLS.filter(s =>
-            s.toLowerCase().includes(query.toLowerCase())
-        );
-    }, [query]);
-
-    const handleSelect = useCallback((symbol: string) => {
-        setCurrentSymbol(symbol);
-        setIsOpen(false);
-        setQuery('');
-    }, [setCurrentSymbol]);
-
-    // Close on click outside
-    useEffect(() => {
-        const handler = (e: MouseEvent) => {
-            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-                setIsOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handler);
-        return () => document.removeEventListener('mousedown', handler);
-    }, []);
-
-    return (
-        <div ref={containerRef} className="ticker-search-container">
-            <button
-                className="ticker-search-trigger"
-                onClick={() => {
-                    setIsOpen(!isOpen);
-                    setTimeout(() => inputRef.current?.focus(), 50);
-                }}
-            >
-                <span className="ticker-symbol">{currentSymbol}</span>
-                <ChevronDown size={14} className="ticker-chevron" />
-            </button>
-
-            {isOpen && (
-                <div className="ticker-dropdown">
-                    <div className="ticker-search-input-wrap">
-                        <Search size={14} className="ticker-search-icon" />
-                        <input
-                            ref={inputRef}
-                            type="text"
-                            placeholder="Search symbol..."
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
-                            className="ticker-search-input"
-                            autoFocus
-                        />
-                        {query && (
-                            <button className="ticker-clear-btn" onClick={() => setQuery('')}>
-                                <X size={12} />
-                            </button>
-                        )}
-                    </div>
-                    <div className="ticker-results">
-                        {filtered.length === 0 && (
-                            <div className="ticker-no-results">No symbols found</div>
-                        )}
-                        {filtered.map(symbol => (
-                            <button
-                                key={symbol}
-                                className={`ticker-result-item ${symbol === currentSymbol ? 'active' : ''}`}
-                                onClick={() => handleSelect(symbol)}
-                            >
-                                <span className="ticker-result-name">{symbol}</span>
-                                {symbol === currentSymbol && (
-                                    <span className="ticker-result-check">✓</span>
-                                )}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-}
+const INDICATOR_COLORS: Record<IndicatorId, string> = {
+    sma20: '#f59e0b',
+    sma50: '#fb7185',
+    sma100: '#60a5fa',
+    ema20: '#22d3ee',
+    ema50: '#a78bfa',
+    ema100: '#4ade80',
+    vwap: '#fde047',
+    bb20: '#9ca3af',
+    rsi14: '#818cf8',
+    macd: '#34d399',
+};
 
 // ─── OHLCV Info Overlay ─────────────────────────────────────────────────────
 function OHLCVOverlay() {
@@ -126,6 +63,26 @@ function OHLCVOverlay() {
             <span className="ohlcv-value" style={{ color }}>{data.close.toFixed(2)}</span>
             <span className="ohlcv-label">Vol</span>
             <span className="ohlcv-value ohlcv-vol">{data.volume.toLocaleString()}</span>
+        </div>
+    );
+}
+
+function IndicatorsOverlay() {
+    const enabledIndicators = useMarketStore((s) => s.enabledIndicators);
+    if (!enabledIndicators.length) return null;
+
+    const labels = INDICATOR_LIBRARY.reduce<Record<string, string>>((acc, item) => {
+        acc[item.id] = item.label;
+        return acc;
+    }, {});
+
+    return (
+        <div className="chart-indicators-overlay">
+            {enabledIndicators.map((id) => (
+                <span key={id} className="chart-indicator-tag" style={{ borderColor: INDICATOR_COLORS[id] }}>
+                    {labels[id] || id.toUpperCase()}
+                </span>
+            ))}
         </div>
     );
 }
@@ -179,9 +136,26 @@ export default function Chart() {
     } | null>(null);
 
     const candles = useMarketStore(s => s.candles);
-    const latestCandle = useMarketStore(s => s.latestCandle);
-    const timeframe = useMarketStore(s => s.timeframe);
+    const enabledIndicators = useMarketStore((s) => s.enabledIndicators);
     const setCrosshairData = useMarketStore(s => s.setCrosshairData);
+
+    const indicatorSeriesRef = useRef<IndicatorSeriesBucket>({ line: [], histogram: [] });
+
+    const removeAllIndicatorSeries = useCallback(() => {
+        if (!chartRef.current) return;
+
+        indicatorSeriesRef.current.line.forEach((series) => chartRef.current?.removeSeries(series));
+        indicatorSeriesRef.current.histogram.forEach((series) => chartRef.current?.removeSeries(series));
+        indicatorSeriesRef.current = { line: [], histogram: [] };
+    }, []);
+
+    const addLineIndicator = useCallback((series: ISeriesApi<'Line'>) => {
+        indicatorSeriesRef.current.line.push(series);
+    }, []);
+
+    const addHistogramIndicator = useCallback((series: ISeriesApi<'Histogram'>) => {
+        indicatorSeriesRef.current.histogram.push(series);
+    }, []);
 
     // Initialize chart
     useEffect(() => {
@@ -214,7 +188,7 @@ export default function Chart() {
             },
             rightPriceScale: {
                 borderColor: '#2a2e39',
-                scaleMargins: { top: 0.1, bottom: 0.2 },
+                scaleMargins: { top: 0.08, bottom: 0.32 },
             },
             timeScale: {
                 borderColor: '#2a2e39',
@@ -283,11 +257,12 @@ export default function Chart() {
 
         return () => {
             resizeObserver.disconnect();
+            removeAllIndicatorSeries();
             chart.remove();
             chartRef.current = null;
             seriesRef.current = null;
         };
-    }, []);
+    }, [removeAllIndicatorSeries, setCrosshairData]);
 
     // When candles array is cleared (timeframe change), reset chart data
     useEffect(() => {
@@ -297,21 +272,172 @@ export default function Chart() {
         }
     }, [candles.length === 0]);
 
-    // Update candle on latest update
+    // Keep base candle + volume data in sync.
     useEffect(() => {
-        if (seriesRef.current && latestCandle) {
-            // @ts-ignore
-            seriesRef.current.candle.update(latestCandle);
+        if (!seriesRef.current) return;
 
-            seriesRef.current.volume.update({
-                time: latestCandle.time as any,
-                value: latestCandle.volume,
-                color: latestCandle.close >= latestCandle.open
+        seriesRef.current.candle.setData(
+            candles.map((candle) => ({
+                time: candle.time as any,
+                open: candle.open,
+                high: candle.high,
+                low: candle.low,
+                close: candle.close,
+            }))
+        );
+        seriesRef.current.volume.setData(
+            candles.map((candle) => ({
+                time: candle.time as any,
+                value: candle.volume,
+                color: candle.close >= candle.open
                     ? 'rgba(38,166,154,0.35)'
                     : 'rgba(239,83,80,0.35)',
-            });
+            }))
+        );
+    }, [candles]);
+
+    useEffect(() => {
+        if (!chartRef.current) return;
+
+        removeAllIndicatorSeries();
+        if (!candles.length || enabledIndicators.length === 0) return;
+
+        const chart = chartRef.current;
+        const closeValues = candles.map((candle) => candle.close);
+
+        const lineDataFromValues = (values: Array<number | null>) => (
+            values
+            .map((value, idx) => (value == null ? null : { time: candles[idx].time as any, value }))
+                .filter((point): point is { time: any; value: number } => point !== null)
+        );
+
+        if (enabledIndicators.includes('sma20')) {
+            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.sma20, lineWidth: 1, priceLineVisible: false, lastValueVisible: true });
+            series.setData(lineDataFromValues(calculateSMA(closeValues, 20)));
+            addLineIndicator(series);
         }
-    }, [latestCandle]);
+
+        if (enabledIndicators.includes('sma50')) {
+            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.sma50, lineWidth: 1, priceLineVisible: false, lastValueVisible: true });
+            series.setData(lineDataFromValues(calculateSMA(closeValues, 50)));
+            addLineIndicator(series);
+        }
+
+        if (enabledIndicators.includes('sma100')) {
+            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.sma100, lineWidth: 1, priceLineVisible: false, lastValueVisible: true });
+            series.setData(lineDataFromValues(calculateSMA(closeValues, 100)));
+            addLineIndicator(series);
+        }
+
+        if (enabledIndicators.includes('ema20')) {
+            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.ema20, lineWidth: 1, priceLineVisible: false, lastValueVisible: true });
+            series.setData(lineDataFromValues(calculateEMA(closeValues, 20)));
+            addLineIndicator(series);
+        }
+
+        if (enabledIndicators.includes('ema50')) {
+            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.ema50, lineWidth: 1, priceLineVisible: false, lastValueVisible: true });
+            series.setData(lineDataFromValues(calculateEMA(closeValues, 50)));
+            addLineIndicator(series);
+        }
+
+        if (enabledIndicators.includes('ema100')) {
+            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.ema100, lineWidth: 1, priceLineVisible: false, lastValueVisible: true });
+            series.setData(lineDataFromValues(calculateEMA(closeValues, 100)));
+            addLineIndicator(series);
+        }
+
+        if (enabledIndicators.includes('vwap')) {
+            const series = chart.addSeries(LineSeries, {
+                color: INDICATOR_COLORS.vwap,
+                lineWidth: 1,
+                lineStyle: 2,
+                priceLineVisible: false,
+                lastValueVisible: true,
+            });
+            series.setData(lineDataFromValues(calculateVWAP(candles)));
+            addLineIndicator(series);
+        }
+
+        if (enabledIndicators.includes('bb20')) {
+            const bands = calculateBollingerBands(closeValues, 20, 2);
+            const middle = chart.addSeries(LineSeries, { color: '#94a3b8', lineWidth: 1, lineStyle: 1, priceLineVisible: false, lastValueVisible: false });
+            const upper = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.bb20, lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false });
+            const lower = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.bb20, lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false });
+
+            middle.setData(lineDataFromValues(bands.middle));
+            upper.setData(lineDataFromValues(bands.upper));
+            lower.setData(lineDataFromValues(bands.lower));
+
+            addLineIndicator(middle);
+            addLineIndicator(upper);
+            addLineIndicator(lower);
+        }
+
+        if (enabledIndicators.includes('rsi14')) {
+            const series = chart.addSeries(LineSeries, {
+                color: INDICATOR_COLORS.rsi14,
+                lineWidth: 1,
+                priceScaleId: 'rsi',
+                priceLineVisible: false,
+                lastValueVisible: true,
+            });
+            chart.priceScale('rsi').applyOptions({
+                borderColor: '#2a2e39',
+                scaleMargins: { top: 0.78, bottom: 0.1 },
+            });
+            series.setData(lineDataFromValues(calculateRSI(closeValues, 14)));
+            addLineIndicator(series);
+        }
+
+        if (enabledIndicators.includes('macd')) {
+            const macdValues = calculateMACD(closeValues, 12, 26, 9);
+            const macdLine = chart.addSeries(LineSeries, {
+                color: INDICATOR_COLORS.macd,
+                lineWidth: 1,
+                priceScaleId: 'macd',
+                priceLineVisible: false,
+                lastValueVisible: false,
+            });
+            const signalLine = chart.addSeries(LineSeries, {
+                color: '#fb7185',
+                lineWidth: 1,
+                priceScaleId: 'macd',
+                priceLineVisible: false,
+                lastValueVisible: false,
+            });
+            const histogram = chart.addSeries(HistogramSeries, {
+                priceScaleId: 'macd',
+                priceLineVisible: false,
+                lastValueVisible: false,
+            });
+
+            chart.priceScale('macd').applyOptions({
+                borderColor: '#2a2e39',
+                scaleMargins: { top: 0.84, bottom: 0.02 },
+            });
+
+            macdLine.setData(lineDataFromValues(macdValues.macd));
+            signalLine.setData(lineDataFromValues(macdValues.signal));
+            histogram.setData(
+                macdValues.histogram
+                    .map((value, idx) => (
+                        value == null
+                            ? null
+                            : {
+                                time: candles[idx].time as any,
+                                value,
+                                color: value >= 0 ? 'rgba(38,166,154,0.5)' : 'rgba(239,83,80,0.5)',
+                            }
+                    ))
+                    .filter((point): point is { time: any; value: number; color: string } => point !== null)
+            );
+
+            addLineIndicator(macdLine);
+            addLineIndicator(signalLine);
+            addHistogramIndicator(histogram);
+        }
+    }, [addHistogramIndicator, addLineIndicator, candles, enabledIndicators, removeAllIndicatorSeries]);
 
     return (
         <div className="chart-root">
@@ -321,6 +447,7 @@ export default function Chart() {
                 <div className="chart-canvas-wrap">
                     {/* OHLCV overlay floats on top of chart */}
                     <OHLCVOverlay />
+                    <IndicatorsOverlay />
                     <div ref={chartContainerRef} className="chart-canvas" />
                 </div>
             </div>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { wsManager } from '../services/websocket';
 import Header from './Header';
 import Chart from './Chart';
@@ -6,13 +7,25 @@ import OrderBook from './OrderBook';
 import RightPanel from './RightPanel';
 import RecentTrades from './RecentTrades';
 import BottomBar from './BottomBar.tsx';
+import useMarketStore from '../store/useMarketStore';
 
 export default function Terminal() {
     const [activeBottomTab, setActiveBottomTab] = useState<string | null>(null);
+    const [searchParams] = useSearchParams();
+    const setCurrentSymbol = useMarketStore((state) => state.setCurrentSymbol);
+    const resetSymbolData = useMarketStore((state) => state.resetSymbolData);
 
     useEffect(() => {
         wsManager.connect();
     }, []);
+
+    useEffect(() => {
+        const symbol = searchParams.get('symbol');
+        if (symbol) {
+            setCurrentSymbol(symbol.toUpperCase());
+            resetSymbolData();
+        }
+    }, [searchParams, setCurrentSymbol, resetSymbolData]);
 
     return (
         <div className="h-screen w-screen bg-[#131722] text-[#d1d4dc] flex flex-col font-sans overflow-hidden">
