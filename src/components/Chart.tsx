@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { createChart, CandlestickSeries, HistogramSeries, LineSeries, ColorType, CrosshairMode } from 'lightweight-charts';
 import type { ISeriesApi, IChartApi } from 'lightweight-charts';
-import useMarketStore, { INDICATOR_LIBRARY, TIMEFRAMES, type IndicatorId } from '../store/useMarketStore';
+import useMarketStore, { INDICATOR_COLORS, INDICATOR_LIBRARY, TIMEFRAMES, type IndicatorId } from '../store/useMarketStore';
 import { changeTimeframe, candleWorker } from '../services/websocket';
 import { fetchTickers, type Ticker } from '../services/api';
 import { useTheme } from '../store/ThemeContext';
@@ -22,19 +22,6 @@ import {
 type IndicatorSeriesBucket = {
     line: ISeriesApi<'Line'>[];
     histogram: ISeriesApi<'Histogram'>[];
-};
-
-const INDICATOR_COLORS: Record<IndicatorId, string> = {
-    sma20: '#f59e0b',
-    sma50: '#fb7185',
-    sma100: '#60a5fa',
-    ema20: '#22d3ee',
-    ema50: '#a78bfa',
-    ema100: '#4ade80',
-    vwap: '#fde047',
-    bb20: '#9ca3af',
-    rsi14: '#818cf8',
-    macd: '#34d399',
 };
 
 // ─── Chart colour palettes ──────────────────────────────────────────────────

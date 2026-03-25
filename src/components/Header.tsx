@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import useMarketStore, { INDICATOR_LIBRARY, TIMEFRAMES } from '../store/useMarketStore';
+import useMarketStore, { INDICATOR_COLORS, INDICATOR_LIBRARY, TIMEFRAMES } from '../store/useMarketStore';
 import { changeTimeframe } from '../services/websocket';
 import { TickerSearch } from './Chart';
 import { useTheme } from '../store/ThemeContext';
@@ -31,6 +31,16 @@ export default function Header() {
             || indicator.category.toLowerCase().includes(query)
         ));
     }, [indicatorQuery]);
+
+    // Group filtered indicators by category for better visual hierarchy
+    const groupedIndicators = useMemo(() => {
+        const groups: Record<string, typeof INDICATOR_LIBRARY> = {};
+        for (const ind of filteredIndicators) {
+            if (!groups[ind.category]) groups[ind.category] = [];
+            groups[ind.category].push(ind);
+        }
+        return groups;
+    }, [filteredIndicators]);
 
     useEffect(() => {
         const onOutsideClick = (event: MouseEvent) => {
@@ -132,25 +142,35 @@ export default function Header() {
                             </div>
 
                             <div className="tv-indicators-list styling-scrollbar">
-                                {filteredIndicators.map((indicator) => {
-                                    const checked = enabledIndicators.includes(indicator.id);
-                                    return (
-                                        <label key={indicator.id} className={`tv-indicator-item ${checked ? 'active' : ''}`}>
-                                            <div>
-                                                <span className="tv-indicator-item-label">{indicator.label}</span>
-                                                <span className="tv-indicator-item-desc">{indicator.description}</span>
-                                            </div>
-                                            <div className="tv-indicator-item-right">
-                                                <span className="tv-indicator-category">{indicator.category}</span>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={checked}
-                                                    onChange={(event) => setIndicatorEnabled(indicator.id, event.target.checked)}
-                                                />
-                                            </div>
-                                        </label>
-                                    );
-                                })}
+                                {Object.entries(groupedIndicators).map(([category, indicators]) => (
+                                    <div key={category}>
+                                        <div className="tv-indicator-category-header">{category}</div>
+                                        {indicators.map((indicator) => {
+                                            const checked = enabledIndicators.includes(indicator.id);
+                                            return (
+                                                <label key={indicator.id} className={`tv-indicator-item ${checked ? 'active' : ''}`}>
+                                                    <div className="tv-indicator-item-left">
+                                                        <span
+                                                            className="tv-indicator-color-dot"
+                                                            style={{ background: INDICATOR_COLORS[indicator.id] }}
+                                                        />
+                                                        <div>
+                                                            <span className="tv-indicator-item-label">{indicator.label}</span>
+                                                            <span className="tv-indicator-item-desc">{indicator.description}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="tv-indicator-item-right">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={checked}
+                                                            onChange={(event) => setIndicatorEnabled(indicator.id, event.target.checked)}
+                                                        />
+                                                    </div>
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     )}

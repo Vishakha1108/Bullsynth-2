@@ -75,6 +75,19 @@ export interface IndicatorDefinition {
     description: string;
 }
 
+export const INDICATOR_COLORS: Record<IndicatorId, string> = {
+    sma20: '#f59e0b',
+    sma50: '#fb7185',
+    sma100: '#60a5fa',
+    ema20: '#22d3ee',
+    ema50: '#a78bfa',
+    ema100: '#4ade80',
+    vwap: '#fde047',
+    bb20: '#9ca3af',
+    rsi14: '#818cf8',
+    macd: '#34d399',
+};
+
 export const INDICATOR_LIBRARY: IndicatorDefinition[] = [
     { id: 'sma20', label: 'Simple Moving Average (20)', category: 'Trend', description: '20-period simple moving average' },
     { id: 'sma50', label: 'Simple Moving Average (50)', category: 'Trend', description: '50-period simple moving average' },
