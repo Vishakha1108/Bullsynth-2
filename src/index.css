@@ -2174,3 +2174,456 @@
   color: #4c525e;
   font-size: 13px;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THEME TOGGLE BUTTON
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.tv-theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #787b86;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin: 0 2px;
+  flex-shrink: 0;
+}
+
+.tv-theme-toggle:hover {
+  background: #2a2e39;
+  color: #f59e0b;
+  transform: rotate(15deg);
+}
+
+.light .tv-theme-toggle:hover {
+  background: #e0e3eb;
+  color: #6366f1;
+  transform: rotate(-15deg);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LIGHT MODE OVERRIDES  (.light on <html>)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Design tokens ───────────────────────────────────────────────────────── */
+.light body {
+  background: #f0f3fa;
+  color: #131722;
+}
+
+/* ── Structural panels / wrappers ────────────────────────────────────────── */
+.light .h-screen.bg-\[\#131722\],
+.light .bg-\[\#131722\] {
+  background-color: #f0f3fa !important;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+.light .tv-header {
+  background: #ffffff;
+  border-bottom-color: #d1d4dc;
+}
+
+.light .tv-header-btn {
+  color: #5d606b;
+}
+
+.light .tv-header-btn:hover {
+  background: #e0e3eb;
+  color: #131722;
+}
+
+.light .tv-header-separator {
+  background: #d1d4dc;
+}
+
+.light .tv-symbol-link:hover {
+  background: #e0e3eb;
+}
+
+.light .tv-symbol-text {
+  color: #131722;
+}
+
+.light .tv-header-tf-btn {
+  color: #5d606b;
+}
+
+.light .tv-header-tf-btn:hover {
+  background: #e0e3eb;
+  color: #131722;
+}
+
+.light .tv-header-tf-btn.active {
+  background: #2962ff;
+  color: #ffffff;
+}
+
+.light .tv-price-value {
+  color: #131722;
+}
+
+/* ── Right panel ─────────────────────────────────────────────────────────── */
+.light .border-l,
+.light .border-t,
+.light .border-b {
+  border-color: #d1d4dc !important;
+}
+
+.light .tv-right-tab {
+  color: #787b86;
+  background: #ffffff;
+}
+
+.light .tv-right-tab:hover {
+  color: #131722;
+}
+
+.light .tv-right-tab.active {
+  color: #131722;
+}
+
+/* ── Order Book ──────────────────────────────────────────────────────────── */
+.light .tv-orderbook {
+  background: #ffffff;
+}
+
+.light .tv-ob-header {
+  background: #ffffff;
+  border-bottom-color: #d1d4dc;
+}
+
+.light .tv-ob-cols {
+  color: #787b86;
+  border-bottom-color: #e0e3eb;
+}
+
+.light .tv-ob-row:hover {
+  background: rgba(209, 212, 220, 0.4);
+}
+
+.light .tv-ob-bar.ask {
+  background: rgba(239, 83, 80, 0.08);
+}
+
+.light .tv-ob-bar.bid {
+  background: rgba(38, 166, 154, 0.08);
+}
+
+.light .tv-ob-amount,
+.light .tv-ob-total {
+  color: #5d606b;
+}
+
+.light .tv-ob-spread {
+  background: rgba(209, 212, 220, 0.3);
+  border-color: #e0e3eb;
+}
+
+.light .tv-ob-last-price {
+  color: #131722;
+}
+
+.light .tv-ob-spread-val {
+  color: #787b86;
+}
+
+.light .tv-ob-mode-btn:hover {
+  background: #e0e3eb;
+}
+
+.light .tv-ob-mode-btn.active {
+  background: #e0e3eb;
+}
+
+.light .tv-ob-empty {
+  color: #787b86;
+}
+
+/* ── Recent Trades ───────────────────────────────────────────────────────── */
+.light .tv-trades {
+  background: #ffffff;
+}
+
+.light .tv-trades-header {
+  color: #787b86;
+  border-bottom-color: #e0e3eb;
+}
+
+.light .tv-trade-row:hover {
+  background: rgba(209, 212, 220, 0.4);
+}
+
+.light .tv-trade-time {
+  color: #787b86;
+}
+
+.light .tv-trade-amount {
+  color: #5d606b;
+}
+
+.light .tv-trades-empty {
+  color: #787b86;
+}
+
+/* ── Trade Panel ─────────────────────────────────────────────────────────── */
+.light .tv-trade-panel {
+  background: #ffffff;
+  border-bottom-color: #d1d4dc;
+}
+
+.light .tv-trade-title {
+  color: #131722;
+}
+
+.light .tv-trade-side-toggle {
+  border-color: #d1d4dc;
+}
+
+.light .tv-trade-side-btn {
+  background: #f0f3fa;
+  color: #5d606b;
+}
+
+.light .tv-trade-type-toggle {
+  background: #e0e3eb;
+}
+
+.light .tv-trade-type-btn {
+  color: #5d606b;
+}
+
+.light .tv-trade-type-btn.active {
+  background: #ffffff;
+  color: #131722;
+}
+
+.light .tv-trade-field label {
+  color: #787b86;
+}
+
+.light .tv-trade-input-wrap {
+  background: #f0f3fa;
+  border-color: #d1d4dc;
+}
+
+.light .tv-trade-input-wrap input {
+  color: #131722;
+}
+
+.light .tv-trade-input-wrap input::placeholder {
+  color: #b2b5be;
+}
+
+.light .tv-trade-last-btn {
+  color: #787b86;
+}
+
+.light .tv-trade-unit {
+  color: #787b86;
+}
+
+.light .tv-trade-total {
+  border-top-color: #e0e3eb;
+  color: #5d606b;
+}
+
+.light .tv-trade-total-val {
+  color: #131722;
+}
+
+/* ── Portfolio ───────────────────────────────────────────────────────────── */
+.light .tv-portfolio {
+  background: #ffffff;
+  border-bottom-color: #d1d4dc;
+}
+
+.light .tv-portfolio-title {
+  color: #131722;
+}
+
+.light .tv-portfolio-stat-label {
+  color: #787b86;
+}
+
+.light .tv-portfolio-stat-val {
+  color: #131722;
+}
+
+.light .tv-portfolio-holdings-header {
+  color: #787b86;
+  border-bottom-color: #e0e3eb;
+}
+
+.light .tv-portfolio-holding-row {
+  color: #5d606b;
+}
+
+.light .tv-portfolio-holding-asset {
+  color: #131722 !important;
+}
+
+/* ── Open Orders ─────────────────────────────────────────────────────────── */
+.light .tv-open-orders-header {
+  color: #131722;
+  border-bottom-color: #d1d4dc;
+}
+
+.light .tv-open-orders-cols {
+  color: #787b86;
+  border-bottom-color: #e0e3eb;
+}
+
+.light .tv-open-order-row {
+  color: #131722;
+}
+
+.light .tv-open-order-row:hover {
+  background: rgba(209, 212, 220, 0.4);
+}
+
+.light .tv-open-orders-empty {
+  color: #787b86;
+}
+
+.light .tv-cancel-btn {
+  color: #787b86;
+}
+
+/* ── Chart area ──────────────────────────────────────────────────────────── */
+.light .chart-root {
+  background: #f8f9fc;
+}
+
+.light .chart-toolbar {
+  background: #ffffff;
+  border-right-color: #d1d4dc;
+}
+
+.light .chart-toolbar-btn {
+  color: #5d606b;
+}
+
+.light .chart-toolbar-btn:hover {
+  background: #e0e3eb;
+  color: #131722;
+}
+
+.light .chart-toolbar-sep {
+  background: #d1d4dc;
+}
+
+.light .ohlcv-symbol {
+  color: #131722;
+}
+
+.light .ohlcv-timeframe {
+  background: #e0e3eb;
+  color: #5d606b;
+}
+
+.light .ohlcv-label {
+  color: #787b86;
+}
+
+/* ── Ticker search dropdown ──────────────────────────────────────────────── */
+.light .ticker-search-trigger {
+  color: #131722;
+}
+
+.light .ticker-search-trigger:hover {
+  background: #e0e3eb;
+  border-color: #d1d4dc;
+}
+
+.light .ticker-dropdown {
+  background: #ffffff;
+  border-color: #d1d4dc;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.light .ticker-search-input-wrap {
+  border-bottom-color: #d1d4dc;
+}
+
+.light .ticker-search-icon {
+  color: #5d606b;
+}
+
+.light .ticker-search-input {
+  color: #131722;
+}
+
+.light .ticker-search-input::placeholder {
+  color: #b2b5be;
+}
+
+.light .ticker-clear-btn {
+  background: #e0e3eb;
+  color: #5d606b;
+}
+
+.light .ticker-result-item {
+  color: #131722;
+}
+
+.light .ticker-result-item:hover {
+  background: #e0e3eb;
+}
+
+.light .ticker-no-results {
+  color: #787b86;
+}
+
+/* ── Bottom bar ──────────────────────────────────────────────────────────── */
+.light .tv-bottom-bar {
+  background: #ffffff;
+  border-top-color: #d1d4dc;
+}
+
+.light .tv-bottom-tab {
+  color: #787b86;
+}
+
+.light .tv-bottom-tab:hover {
+  color: #131722;
+}
+
+.light .tv-bottom-tab.active {
+  color: #2962ff;
+}
+
+.light .tv-bottom-connection {
+  color: #5d606b;
+}
+
+.light .tv-bottom-separator {
+  background: #d1d4dc;
+}
+
+.light .tv-bottom-time {
+  color: #5d606b;
+}
+
+/* ── Scrollbars in light mode ────────────────────────────────────────────── */
+.light .styling-scrollbar::-webkit-scrollbar-thumb {
+  background: #c8cad0;
+}
+
+.light .styling-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #b2b5be;
+}
+
+/* ── Inline Tailwind bg overrides for the right-panel wrapper ────────────── */
+.light .bg-\[\#131722\] {
+  background-color: #ffffff !important;
+}
+
+.light .border-\[\#2a2e39\] {
+  border-color: #d1d4dc !important;
+}

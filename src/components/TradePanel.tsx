@@ -9,6 +9,7 @@ export default function TradePanel() {
     const [qty, setQty] = useState('');
 
     const lastPrice = useMarketStore(state => state.lastPrice);
+    const currentSymbol = useMarketStore(state => state.currentSymbol);
 
     const bestBid = useMarketStore(state => state.orderBook.bids[0]?.price || 0);
     const bestAsk = useMarketStore(state => state.orderBook.asks[0]?.price || 0);
@@ -29,21 +30,12 @@ export default function TradePanel() {
         if (!qty || parseFloat(qty) <= 0) return;
         if (type === 'limit' && (!price || parseFloat(price) <= 0)) return;
 
-        const orderId = Math.random().toString(36).substring(7);
-
-        useMarketStore.getState().addOrder({
-            id: orderId,
-            side,
-            type,
-            price: type === 'limit' ? parseFloat(price) : undefined,
-            qty: parseFloat(qty),
-            status: 'Open'
-        });
-
         wsManager.send({
-            action: type,
-            side: side === 'BUY' ? 'B' : 'S',
-            price: type === 'limit' ? parseFloat(price) : undefined,
+            type: 'place_order',
+            symbol: currentSymbol,
+            order_type: type, // 'limit' or 'market'
+            side: side === 'BUY' ? 'buy' : 'sell',
+            price: type === 'limit' ? parseFloat(price) : 0,
             qty: parseFloat(qty)
         });
 
@@ -115,7 +107,7 @@ export default function TradePanel() {
                             placeholder="0"
                             required
                         />
-                        <span className="tv-trade-unit">SYNTH</span>
+                        <span className="tv-trade-unit">{currentSymbol.split('/')[0] || currentSymbol}</span>
                     </div>
                 </div>
 
@@ -128,7 +120,7 @@ export default function TradePanel() {
                     type="submit"
                     className={`tv-trade-submit ${side === 'BUY' ? 'buy' : 'sell'}`}
                 >
-                    {side} SYNTH
+                    {side} {currentSymbol.split('/')[0] || currentSymbol}
                 </button>
             </form>
         </div>

@@ -1,12 +1,18 @@
 import useMarketStore from '../store/useMarketStore';
+import type { Order } from '../store/useMarketStore';
 import { wsManager } from '../services/websocket';
 
 export default function OpenOrders() {
     const orders = useMarketStore(state => state.openOrders);
+    const currentSymbol = useMarketStore(state => state.currentSymbol);
 
-    const handleCancel = (id: string) => {
-        wsManager.send({ action: 'cancel', order_id: id });
-        useMarketStore.getState().removeOrder(id);
+    const handleCancel = (order: Order) => {
+        wsManager.send({
+            type: 'cancel_order',
+            order_id: parseInt(order.id, 10),
+            symbol: order.symbol || currentSymbol,
+        });
+        useMarketStore.getState().removeOrder(order.id);
     };
 
     return (
@@ -41,7 +47,7 @@ export default function OpenOrders() {
                                 <span>{o.qty}</span>
                                 <span>
                                     <button
-                                        onClick={() => handleCancel(o.id)}
+                                        onClick={() => handleCancel(o)}
                                         className="tv-cancel-btn"
                                     >
                                         ✕

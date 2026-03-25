@@ -1,103 +1,16 @@
-import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createChart, CandlestickSeries, HistogramSeries, ColorType, CrosshairMode } from 'lightweight-charts';
 import type { ISeriesApi, IChartApi } from 'lightweight-charts';
-import useMarketStore, { AVAILABLE_SYMBOLS, TIMEFRAMES } from '../store/useMarketStore';
-import { changeTimeframe } from '../services/websocket';
+import useMarketStore, { TIMEFRAMES } from '../store/useMarketStore';
+import { useTheme } from '../store/ThemeContext';
 import {
-    Search, Crosshair, TrendingUp, Minus, Type, Ruler,
-    ChevronDown, X, Pencil, MousePointer2, Hash,
-    MoveHorizontal, Move, ZoomIn, Undo2, Redo2
+    Crosshair, TrendingUp, Minus, Type, Ruler,
+    Pencil, MousePointer2, Hash, MoveHorizontal, ZoomIn
 } from 'lucide-react';
 
-// ─── Ticker Search Component ────────────────────────────────────────────────
-function TickerSearch() {
-    const [isOpen, setIsOpen] = useState(false);
-    const [query, setQuery] = useState('');
-    const currentSymbol = useMarketStore(s => s.currentSymbol);
-    const setCurrentSymbol = useMarketStore(s => s.setCurrentSymbol);
-    const inputRef = useRef<HTMLInputElement>(null);
-    const containerRef = useRef<HTMLDivElement>(null);
-
-    const filtered = useMemo(() => {
-        if (!query.trim()) return AVAILABLE_SYMBOLS;
-        return AVAILABLE_SYMBOLS.filter(s =>
-            s.toLowerCase().includes(query.toLowerCase())
-        );
-    }, [query]);
-
-    const handleSelect = useCallback((symbol: string) => {
-        setCurrentSymbol(symbol);
-        setIsOpen(false);
-        setQuery('');
-    }, [setCurrentSymbol]);
-
-    // Close on click outside
-    useEffect(() => {
-        const handler = (e: MouseEvent) => {
-            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-                setIsOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handler);
-        return () => document.removeEventListener('mousedown', handler);
-    }, []);
-
-    return (
-        <div ref={containerRef} className="ticker-search-container">
-            <button
-                className="ticker-search-trigger"
-                onClick={() => {
-                    setIsOpen(!isOpen);
-                    setTimeout(() => inputRef.current?.focus(), 50);
-                }}
-            >
-                <span className="ticker-symbol">{currentSymbol}</span>
-                <ChevronDown size={14} className="ticker-chevron" />
-            </button>
-
-            {isOpen && (
-                <div className="ticker-dropdown">
-                    <div className="ticker-search-input-wrap">
-                        <Search size={14} className="ticker-search-icon" />
-                        <input
-                            ref={inputRef}
-                            type="text"
-                            placeholder="Search symbol..."
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
-                            className="ticker-search-input"
-                            autoFocus
-                        />
-                        {query && (
-                            <button className="ticker-clear-btn" onClick={() => setQuery('')}>
-                                <X size={12} />
-                            </button>
-                        )}
-                    </div>
-                    <div className="ticker-results">
-                        {filtered.length === 0 && (
-                            <div className="ticker-no-results">No symbols found</div>
-                        )}
-                        {filtered.map(symbol => (
-                            <button
-                                key={symbol}
-                                className={`ticker-result-item ${symbol === currentSymbol ? 'active' : ''}`}
-                                onClick={() => handleSelect(symbol)}
-                            >
-                                <span className="ticker-result-name">{symbol}</span>
-                                {symbol === currentSymbol && (
-                                    <span className="ticker-result-check">✓</span>
-                                )}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-}
-
 // ─── OHLCV Info Overlay ─────────────────────────────────────────────────────
+
+
 function OHLCVOverlay() {
     const crosshairData = useMarketStore(s => s.crosshairData);
     const currentSymbol = useMarketStore(s => s.currentSymbol);
@@ -169,8 +82,28 @@ function ChartToolbar() {
     );
 }
 
+// ─── Chart colour palettes ──────────────────────────────────────────────────
+const DARK_CHART = {
+    bg: '#131722',
+    text: '#787b86',
+    gridLine: '#1e222d',
+    crosshair: '#758696',
+    crosshairLabel: '#2a2e39',
+    border: '#2a2e39',
+};
+
+const LIGHT_CHART = {
+    bg: '#f8f9fc',
+    text: '#5d606b',
+    gridLine: '#e0e3eb',
+    crosshair: '#9598a1',
+    crosshairLabel: '#d1d4dc',
+    border: '#d1d4dc',
+};
+
 // ─── Main Chart Component ───────────────────────────────────────────────────
 export default function Chart() {
+    const { theme } = useTheme();
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<IChartApi | null>(null);
     const seriesRef = useRef<{
@@ -180,44 +113,67 @@ export default function Chart() {
 
     const candles = useMarketStore(s => s.candles);
     const latestCandle = useMarketStore(s => s.latestCandle);
-    const timeframe = useMarketStore(s => s.timeframe);
+    const currentSymbol = useMarketStore(s => s.currentSymbol);
     const setCrosshairData = useMarketStore(s => s.setCrosshairData);
+
+    // Apply chart colours based on theme
+    useEffect(() => {
+        if (!chartRef.current) return;
+        const p = theme === 'dark' ? DARK_CHART : LIGHT_CHART;
+        chartRef.current.applyOptions({
+            layout: {
+                background: { type: ColorType.Solid, color: p.bg },
+                textColor: p.text,
+            },
+            grid: {
+                vertLines: { color: p.gridLine },
+                horzLines: { color: p.gridLine },
+            },
+            crosshair: {
+                vertLine: { color: p.crosshair, labelBackgroundColor: p.crosshairLabel },
+                horzLine: { color: p.crosshair, labelBackgroundColor: p.crosshairLabel },
+            },
+            rightPriceScale: { borderColor: p.border },
+            timeScale: { borderColor: p.border },
+        });
+    }, [theme]);
 
     // Initialize chart
     useEffect(() => {
         if (!chartContainerRef.current) return;
+        const p = DARK_CHART; // start dark; theme effect will override if needed
 
         const chart = createChart(chartContainerRef.current, {
             layout: {
-                background: { type: ColorType.Solid, color: '#131722' },
-                textColor: '#787b86',
+                background: { type: ColorType.Solid, color: p.bg },
+                textColor: p.text,
                 fontSize: 11,
             },
             grid: {
-                vertLines: { color: '#1e222d', style: 0 },
-                horzLines: { color: '#1e222d', style: 0 },
+                vertLines: { color: p.gridLine, style: 0 },
+                horzLines: { color: p.gridLine, style: 0 },
             },
             crosshair: {
                 mode: CrosshairMode.Normal,
                 vertLine: {
-                    color: '#758696',
+                    color: p.crosshair,
                     style: 0,
                     width: 1,
-                    labelBackgroundColor: '#2a2e39',
+                    labelBackgroundColor: p.crosshairLabel,
                 },
                 horzLine: {
-                    color: '#758696',
+                    color: p.crosshair,
                     style: 0,
                     width: 1,
-                    labelBackgroundColor: '#2a2e39',
+                    labelBackgroundColor: p.crosshairLabel,
                 },
             },
             rightPriceScale: {
-                borderColor: '#2a2e39',
+                borderColor: p.border,
                 scaleMargins: { top: 0.1, bottom: 0.2 },
             },
             timeScale: {
-                borderColor: '#2a2e39',
+                borderColor: p.border,
                 timeVisible: true,
                 secondsVisible: false,
                 rightOffset: 5,
@@ -269,6 +225,17 @@ export default function Chart() {
         chartRef.current = chart;
         seriesRef.current = { candle: candleSeries, volume: volumeSeries };
 
+        // Init with existing candles if component mounts after websocket already received them
+        const existingCandles = useMarketStore.getState().candles;
+        if (existingCandles.length > 0) {
+            candleSeries.setData(existingCandles as any[]);
+            volumeSeries.setData(existingCandles.map(c => ({
+                time: c.time as any,
+                value: c.volume,
+                color: c.close >= c.open ? 'rgba(38,166,154,0.35)' : 'rgba(239,83,80,0.35)'
+            })));
+        }
+
         const handleResize = () => {
             if (chartContainerRef.current) {
                 chart.applyOptions({
@@ -289,20 +256,32 @@ export default function Chart() {
         };
     }, []);
 
-    // When candles array is cleared (timeframe change), reset chart data
+    // Full chart reload when the selected symbol changes
+    useEffect(() => {
+        if (!seriesRef.current) return;
+        const symbolCandles = useMarketStore.getState().candles;
+        seriesRef.current.candle.setData(symbolCandles as any[]);
+        seriesRef.current.volume.setData(symbolCandles.map(c => ({
+            time: c.time as any,
+            value: c.volume,
+            color: c.close >= c.open ? 'rgba(38,166,154,0.35)' : 'rgba(239,83,80,0.35)',
+        })));
+    }, [currentSymbol]);
+
+    // When candles array is cleared, reset chart data
     useEffect(() => {
         if (seriesRef.current && candles.length === 0) {
             seriesRef.current.candle.setData([]);
             seriesRef.current.volume.setData([]);
         }
-    }, [candles.length === 0]);
+    }, [candles.length]);
 
-    // Update candle on latest update
+    // Incremental update for the forming (latest) candle
     useEffect(() => {
-        if (seriesRef.current && latestCandle) {
+        if (!seriesRef.current || !latestCandle) return;
+        try {
             // @ts-ignore
             seriesRef.current.candle.update(latestCandle);
-
             seriesRef.current.volume.update({
                 time: latestCandle.time as any,
                 value: latestCandle.volume,
@@ -310,6 +289,15 @@ export default function Chart() {
                     ? 'rgba(38,166,154,0.35)'
                     : 'rgba(239,83,80,0.35)',
             });
+        } catch {
+            // Time regression after symbol switch – fall back to full reload
+            const symbolCandles = useMarketStore.getState().candles;
+            seriesRef.current.candle.setData(symbolCandles as any[]);
+            seriesRef.current.volume.setData(symbolCandles.map(c => ({
+                time: c.time as any,
+                value: c.volume,
+                color: c.close >= c.open ? 'rgba(38,166,154,0.35)' : 'rgba(239,83,80,0.35)',
+            })));
         }
     }, [latestCandle]);
 

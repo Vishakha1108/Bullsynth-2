@@ -10,7 +10,6 @@ import { fetchTickers, type Ticker } from '../services/api';
 export default function Dashboard() {
     const [tickers, setTickers] = useState<Ticker[]>([]);
     const portfolio = useMarketStore(state => state.portfolio);
-    const lastPrice = useMarketStore(state => state.lastPrice);
     const openOrders = useMarketStore(state => state.openOrders);
     const recentTrades = useMarketStore(state => state.recentTrades);
 
@@ -18,8 +17,8 @@ export default function Dashboard() {
         fetchTickers().then(setTickers);
     }, []);
 
-    const totalValue = portfolio.cash + portfolio.holdings.reduce((acc, h) => acc + (h.qty * lastPrice), 0);
-    const isPnlPositive = portfolio.pnl > 0;
+    const totalValue = portfolio.total_value;
+    const isPnlPositive = portfolio.unrealized_pnl > 0;
 
     return (
         <div className="nb-landing">
@@ -78,8 +77,8 @@ export default function Dashboard() {
                         </div>
                         <div>
                             <div className="db-stat-label">Unrealized P&L</div>
-                            <div className={`db-stat-value ${isPnlPositive ? 'up' : portfolio.pnl < 0 ? 'down' : ''}`}>
-                                {isPnlPositive ? '+' : ''}{portfolio.pnl.toFixed(2)}
+                            <div className={`db-stat-value ${isPnlPositive ? 'up' : portfolio.unrealized_pnl < 0 ? 'down' : ''}`}>
+                                {isPnlPositive ? '+' : ''}{portfolio.unrealized_pnl.toFixed(2)}
                             </div>
                         </div>
                     </div>
@@ -95,7 +94,7 @@ export default function Dashboard() {
                 </div>
 
                 {/* ── Holdings ─────────────────────────────────────────────── */}
-                {portfolio.holdings.length > 0 && (
+                {Object.keys(portfolio.positions).length > 0 && (
                     <div className="db-section">
                         <h2 className="db-section-title">Holdings</h2>
                         <div className="db-table-wrap">
@@ -110,15 +109,15 @@ export default function Dashboard() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {portfolio.holdings.map((h, i) => {
-                                        const value = h.qty * lastPrice;
+                                    {Object.entries(portfolio.positions).map(([asset, pos]) => {
+                                        const currentPrice = pos.holdings > 0 ? pos.market_value / pos.holdings : 0;
                                         return (
-                                            <tr key={i}>
-                                                <td className="nb-ticker-sym">{h.asset}</td>
-                                                <td>{h.qty}</td>
-                                                <td>${h.avgPrice.toFixed(2)}</td>
-                                                <td>${lastPrice.toFixed(2)}</td>
-                                                <td className="nb-ticker-price">${value.toFixed(2)}</td>
+                                            <tr key={asset}>
+                                                <td className="nb-ticker-sym">{asset}</td>
+                                                <td>{pos.holdings.toLocaleString()}</td>
+                                                <td>${pos.avg_cost.toFixed(2)}</td>
+                                                <td>${currentPrice.toFixed(2)}</td>
+                                                <td className="nb-ticker-price">${pos.market_value.toFixed(2)}</td>
                                             </tr>
                                         );
                                     })}

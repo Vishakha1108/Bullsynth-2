@@ -1,21 +1,22 @@
-import { Link } from 'react-router-dom';
 import useMarketStore, { TIMEFRAMES } from '../store/useMarketStore';
 import { changeTimeframe } from '../services/websocket';
 import {
-    Menu, Plus, BarChart3, Layers, Bell, RotateCcw,
-    Search, Settings, ChevronDown, Maximize2
+    Menu, BarChart3, Bell, RotateCcw,
+    Search, Settings, ChevronDown, Maximize2, Sun, Moon
 } from 'lucide-react';
+import { useTheme } from '../store/ThemeContext';
 
 export default function Header() {
+    const { theme, toggleTheme } = useTheme();
     const currentPrice = useMarketStore(state => state.lastPrice);
-    const connected = useMarketStore(state => state.wsConnected);
+
+    // Use the dynamic symbols and current symbol from the store
     const currentSymbol = useMarketStore(state => state.currentSymbol);
+    const availableSymbols = useMarketStore(state => state.availableSymbols);
+    const setCurrentSymbol = useMarketStore(state => state.setCurrentSymbol);
+
     const timeframe = useMarketStore(state => state.timeframe);
     const priceChange24h = useMarketStore(state => state.priceChange24h);
-    const high24h = useMarketStore(state => state.high24h);
-    const low24h = useMarketStore(state => state.low24h);
-
-    const currentTf = TIMEFRAMES.find(t => t.seconds === timeframe);
 
     return (
         <header className="tv-header">
@@ -29,10 +30,32 @@ export default function Header() {
                 <div className="tv-header-separator" />
 
                 {/* Symbol selector */}
-                <Link to="/" className="tv-symbol-link">
-                    <span className="tv-symbol-text">{currentSymbol}</span>
-                    <ChevronDown size={12} className="text-[#787b86]" />
-                </Link>
+                <div className="tv-symbol-dropdown-wrapper" style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <select
+                        value={currentSymbol}
+                        onChange={(e) => setCurrentSymbol(e.target.value)}
+                        className="tv-symbol-link"
+                        style={{
+                            appearance: 'none',
+                            background: 'transparent',
+                            border: 'none',
+                            color: 'inherit',
+                            fontFamily: 'inherit',
+                            fontSize: 'inherit',
+                            fontWeight: 'inherit',
+                            cursor: 'pointer',
+                            outline: 'none',
+                            paddingRight: '16px'
+                        }}
+                    >
+                        {availableSymbols.map(sym => (
+                            <option key={sym} value={sym} style={{ background: theme === 'dark' ? '#131722' : '#ffffff', color: theme === 'dark' ? '#c8cdd6' : '#131722' }}>
+                                {sym}
+                            </option>
+                        ))}
+                    </select>
+                    <ChevronDown size={12} className="text-[#787b86]" style={{ position: 'absolute', right: 0, pointerEvents: 'none' }} />
+                </div>
 
                 <div className="tv-header-separator" />
 
@@ -93,6 +116,17 @@ export default function Header() {
                 </button>
                 <button className="tv-header-btn" title="Fullscreen">
                     <Maximize2 size={16} />
+                </button>
+
+                <div className="tv-header-separator" />
+
+                <button
+                    className="tv-theme-toggle"
+                    onClick={toggleTheme}
+                    title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                    aria-label="Toggle theme"
+                >
+                    {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
                 </button>
             </div>
         </header>
