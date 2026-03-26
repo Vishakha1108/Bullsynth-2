@@ -1,111 +1,100 @@
-import reactLogo from "./assets/react.svg";
-import viteLogo from "./assets/vite.svg";
-import heroImg from "./assets/hero.png";
-import "./App.css";
+import { useState, useEffect } from 'react';
+import { Navbar } from './components/Navbar';
+import { WalletWidget } from './components/WalletWidget';
+import { BotsWidget } from './components/BotsWidget';
+import { AssetList } from './components/AssetList';
+import { AssetDetail } from './components/AssetDetail';
+import { MarketPerformersWidget } from './components/MarketPerformersWidget';
+import { ThemeProvider } from './components/theme-provider';
+import mockData from './Data/mockData.json';
 
 function App() {
+  const [selectedBotId, setSelectedBotId] = useState<string>(mockData.bots[0].id);
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+
+  const selectedBot = mockData.bots.find(b => b.id === selectedBotId) || mockData.bots[0];
+  const assetsForBot = selectedBot.assets;
+  
+  const selectedAsset = assetsForBot.find(a => a.id === selectedAssetId) || 
+    (assetsForBot.length > 0 ? assetsForBot[0] : null);
+
+  useEffect(() => {
+    // When bot changes, select its first asset automatically
+    if (selectedBot.assets.length > 0) {
+      setSelectedAssetId(selectedBot.assets[0].id);
+    } else {
+      setSelectedAssetId(null);
+    }
+  }, [selectedBotId]);
+
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme" attribute="class">
+      <div className="h-screen overflow-hidden bg-background text-foreground flex flex-col font-sans selection:bg-primary/30 relative">
+        {/* Abstract background elements for 'blue black theme' */}
+        <div className="fixed inset-0 pointer-events-none z-[-1]">
+           <div className="absolute top-[10%] left-[20%] w-[500px] h-[500px] bg-blue-600/10 rounded-full blur-[120px]" />
+           <div className="absolute top-[40%] right-[10%] w-[400px] h-[400px] bg-purple-600/10 rounded-full blur-[100px]" />
+           <div className="absolute bottom-[10%] left-[30%] w-[600px] h-[600px] bg-primary/5 rounded-full blur-[150px]" />
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-      </section>
 
-      <div className="ticks"></div>
+        <Navbar />
+        
+        {/* Main container */}
+        <main className="flex-1 min-h-0 p-4 lg:p-6 max-w-[2000px] w-full mx-auto flex flex-col gap-6 z-10">
+          
+          {/* Top Row: Wallet, Bots (reduced width) */}
+          <div className="flex flex-col md:flex-row gap-6 animate-in fade-in slide-in-from-bottom-4 duration-700 shrink-0">
+             
+             <div className="w-full md:w-80 md:h-[220px]">
+               <WalletWidget 
+                 balance={mockData.user.wallet.balance}
+                 pnlValue={mockData.user.wallet.pnlValue}
+                 pnlPercentage={mockData.user.wallet.pnlPercentage}
+                 isPositive={mockData.user.wallet.isPositive}
+               />
+             </div>
+             
+             <div className="w-full md:w-[550px] shrink-0 md:h-[220px]">
+               <BotsWidget 
+                 bots={mockData.bots}
+                 selectedBotId={selectedBotId}
+                 onSelectBot={setSelectedBotId}
+               />
+             </div>
+             
+             {/* Market Performers occupying remaining space */}
+             <div className="hidden md:block flex-1 min-w-0 md:h-[220px]">
+               <MarketPerformersWidget performers={mockData.marketPerformers} />
+             </div>
+          </div>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+          {/* Bottom Row: List Detail (2/3 width), List (1/3 width) - fully scrollable area */}
+          <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-6 items-stretch animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-150">
+            <div className="lg:w-2/3 h-full overflow-y-auto pr-2 custom-scrollbar">
+               <AssetDetail asset={selectedAsset} />
+            </div>
+            <div className="lg:w-1/3 h-full overflow-y-auto pr-2 custom-scrollbar">
+               <AssetList 
+                 assets={assetsForBot} 
+                 selectedAssetId={selectedAssetId}
+                 onSelectAsset={setSelectedAssetId}
+               />
+            </div>
+          </div>
+        </main>
+        
+        {/* Footer matching wireframe */}
+        <footer className="p-3 border-t border-border bg-background/50 backdrop-blur-sm z-10 shrink-0">
+          <div className="max-w-[1800px] mx-auto flex items-center justify-between">
+            <p className="text-muted-foreground text-xs tracking-widest font-semibold uppercase">&copy; 2026 NEXTBULL. All rights reserved.</p>
+            <div className="flex gap-4 text-xs tracking-widest font-semibold uppercase text-muted-foreground">
+               <button className="hover:text-primary transition-colors cursor-pointer">Privacy</button>
+               <button className="hover:text-primary transition-colors cursor-pointer">Terms</button>
+            </div>
+          </div>
+        </footer>
+      </div>
+    </ThemeProvider>
   );
 }
 
