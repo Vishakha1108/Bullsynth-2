@@ -5,19 +5,13 @@ export const candleWorker = new Worker(new URL('../workers/candleWorker.ts', imp
 });
 
 candleWorker.onmessage = (e) => {
-    const { type, candle, isNew } = e.data;
+    const { type, candle, candles } = e.data;
 
     if (type === 'CANDLE_UPDATE') {
-        const state = useMarketStore.getState();
-        const newCandles = isNew
-            ? [...state.candles, candle].slice(-2000)
-            : state.candles.map((existing, index, arr) => (
-                index === arr.length - 1 && existing.time === candle.time
-                    ? candle
-                    : existing
-            ));
-
-        useMarketStore.getState().setCandlesData(newCandles, candle);
+        useMarketStore.getState().setLatestCandle(candle);
+    }
+    else if (type === 'HISTORY_UPDATE') {
+        useMarketStore.getState().setCandlesData(candles);
     }
     else if (type === 'CLEAR') {
         // Worker reset — clear all chart data
@@ -29,6 +23,11 @@ candleWorker.onmessage = (e) => {
  * Change the candle timeframe. Call this when the user clicks a timeframe button.
  * It re-initializes the worker which clears history and starts fresh aggregation.
  */
+export function requestHistory(symbol?: string) {
+    const sym = symbol || useMarketStore.getState().currentSymbol;
+    wsManager.send({ type: 'get_history', symbol: sym });
+}
+
 export function changeTimeframe(seconds: number) {
     if (useMarketStore.getState().timeframe === seconds) {
         return;
@@ -39,6 +38,7 @@ export function changeTimeframe(seconds: number) {
         type: 'INIT',
         payload: { timeframeSec: seconds }
     });
+    requestHistory();
 }
 
 class WSManager {
@@ -67,6 +67,9 @@ class WSManager {
 
             // Ask for symbol list in case welcome arrives before UI is ready.
             this.send({ type: 'get_symbols' });
+
+            // Ask for history of current symbol
+            requestHistory();
         };
 
         this.ws.onmessage = (event) => {
@@ -153,6 +156,22 @@ class WSManager {
                     return;
                 }
 
+                if (msgType === 'history') {
+                    if (msg.symbol !== state.currentSymbol) return;
+
+                    const candles = msg.candles.map((c: any) => ({
+                        time: normalizeToSec(c.t),
+                        open: Number(c.o || 0),
+                        high: Number(c.h || 0),
+                        low: Number(c.l || 0),
+                        close: Number(c.c || 0),
+                        volume: Number(c.v || 0),
+                    }));
+
+                    candleWorker.postMessage({ type: 'HISTORY', payload: candles });
+                    return;
+                }
+
                 if (msgType === 'candle') {
                     if (msg.symbol !== state.currentSymbol) return;
 
@@ -165,14 +184,7 @@ class WSManager {
                         volume: Number(msg.v || 0),
                     };
 
-                    const candles = state.candles;
-                    if (candles.length === 0 || candles[candles.length - 1].time < next.time) {
-                        state.setCandlesData([...candles, next].slice(-2000), next);
-                    } else if (candles[candles.length - 1].time === next.time) {
-                        const updated = [...candles];
-                        updated[updated.length - 1] = next;
-                        state.setCandlesData(updated, next);
-                    }
+                    candleWorker.postMessage({ type: 'CANDLE_1S', payload: next });
                     return;
                 }
 

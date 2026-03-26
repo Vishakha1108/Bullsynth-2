@@ -156,6 +156,7 @@ interface MarketState {
     high24h: number;
     low24h: number;
     enabledIndicators: IndicatorId[];
+    chartType: string;
 
     portfolio: Portfolio;
     openOrders: Order[];
@@ -168,6 +169,7 @@ interface MarketState {
     resetSymbolData: () => void;
     setCrosshairData: (data: CrosshairData | null) => void;
     setCandlesData: (candles: Candle[], latestCandle?: Candle | null) => void;
+    setLatestCandle: (candle: Candle) => void;
     clearCandles: () => void;
     setOrderBook: (bids: { price: number, qty: number }[], asks: { price: number, qty: number }[]) => void;
     addTrade: (trade: Trade) => void;
@@ -179,6 +181,7 @@ interface MarketState {
     toggleIndicator: (indicatorId: IndicatorId) => void;
     setIndicatorEnabled: (indicatorId: IndicatorId, enabled: boolean) => void;
     clearIndicators: () => void;
+    setChartType: (type: string) => void;
 }
 
 const useMarketStore = create<MarketState>((set) => ({
@@ -196,6 +199,7 @@ const useMarketStore = create<MarketState>((set) => ({
     high24h: 500,
     low24h: 500,
     enabledIndicators: ['sma20', 'vwap'],
+    chartType: 'Candles',
 
     portfolio: {
         cash: 100000,
@@ -229,6 +233,36 @@ const useMarketStore = create<MarketState>((set) => ({
         return {
             candles: safeCandles,
             latestCandle: safeLatest,
+        };
+    }),
+
+    setLatestCandle: (candle: Candle) => set((state) => {
+        const normalizedCandle = { ...candle, time: normalizeCandleTime(candle.time) };
+        const updatedCandles = [...state.candles];
+        const lastCandle = updatedCandles.length > 0 ? updatedCandles[updatedCandles.length - 1] : null;
+
+        if (lastCandle) {
+            if (normalizedCandle.time < lastCandle.time) {
+                // Out of order old candle, ignore
+                return state;
+            } else if (normalizedCandle.time === lastCandle.time) {
+                // Duplicate timestamp, overwrite instead of pushing
+                updatedCandles[updatedCandles.length - 1] = normalizedCandle;
+            } else {
+                // Safely greater, push
+                updatedCandles.push(normalizedCandle);
+            }
+        } else {
+            updatedCandles.push(normalizedCandle);
+        }
+
+        if (updatedCandles.length > 2000) {
+            updatedCandles.shift();
+        }
+
+        return {
+            candles: updatedCandles,
+            latestCandle: normalizedCandle,
         };
     }),
 
@@ -267,7 +301,8 @@ const useMarketStore = create<MarketState>((set) => ({
             : state.enabledIndicators.filter((id) => id !== indicatorId)
     })),
 
-    clearIndicators: () => set({ enabledIndicators: [] })
+    clearIndicators: () => set({ enabledIndicators: [] }),
+    setChartType: (type) => set({ chartType: type })
 }));
 
 export default useMarketStore;

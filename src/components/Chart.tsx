@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { createChart, CandlestickSeries, HistogramSeries, LineSeries, ColorType, CrosshairMode } from 'lightweight-charts';
 import type { ISeriesApi, IChartApi } from 'lightweight-charts';
-import useMarketStore, { INDICATOR_COLORS, INDICATOR_LIBRARY, TIMEFRAMES, type IndicatorId } from '../store/useMarketStore';
-import { changeTimeframe, candleWorker } from '../services/websocket';
+import useMarketStore, { INDICATOR_COLORS, INDICATOR_LIBRARY, TIMEFRAMES } from '../store/useMarketStore';
+import { candleWorker, requestHistory } from '../services/websocket';
 import { fetchTickers, type Ticker } from '../services/api';
 import { useTheme } from '../store/ThemeContext';
 import {
@@ -82,6 +82,7 @@ export function TickerSearch() {
             type: 'INIT',
             payload: { timeframeSec }
         });
+        requestHistory(symbol);
     }, [setCurrentSymbol]);
 
     useEffect(() => {
@@ -266,8 +267,28 @@ function ChartToolbar() {
     );
 }
 
+class ChartErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: Error | null }> {
+    constructor(props: any) { super(props); this.state = { hasError: false, error: null }; }
+    static getDerivedStateFromError(error: Error) { return { hasError: true, error }; }
+    render() {
+        if (this.state.hasError) {
+            return <div className="text-red-500 p-10 font-mono text-xs whitespace-pre-wrap flex flex-col h-full bg-slate-900 border overflow-auto">
+                <h1 className="text-xl mb-4 font-bold text-white">Chart Crash</h1>
+                {this.state.error?.toString()}
+                {'\n'}
+                {this.state.error?.stack}
+            </div>;
+        }
+        return this.props.children;
+    }
+}
+
+export default function ChartContainer() {
+    return <ChartErrorBoundary><Chart /></ChartErrorBoundary>;
+}
+
 // ─── Main Chart Component ───────────────────────────────────────────────────
-export default function Chart() {
+function Chart() {
     const { theme } = useTheme();
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<IChartApi | null>(null);
