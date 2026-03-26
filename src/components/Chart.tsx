@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
-import { createChart, CandlestickSeries, HistogramSeries, LineSeries, ColorType, CrosshairMode } from 'lightweight-charts';
+import { createChart, CandlestickSeries, HistogramSeries, LineSeries, AreaSeries, BaselineSeries, ColorType, CrosshairMode } from 'lightweight-charts';
 import type { ISeriesApi, IChartApi } from 'lightweight-charts';
 import useMarketStore, { INDICATOR_COLORS, INDICATOR_LIBRARY, TIMEFRAMES } from '../store/useMarketStore';
 import { candleWorker, requestHistory } from '../services/websocket';
@@ -183,11 +183,17 @@ function OHLCVOverlay() {
     const latestCandle = useMarketStore(s => s.latestCandle);
 
     const tf = TIMEFRAMES.find(t => t.seconds === timeframe);
-    const data = crosshairData || latestCandle;
+    const rawData = (crosshairData || latestCandle) as any;
 
-    if (!data) return null;
+    if (!rawData) return null;
 
-    const isUp = data.close >= data.open;
+    const o = rawData.open ?? rawData.value ?? rawData.close ?? 0;
+    const h = rawData.high ?? rawData.value ?? rawData.close ?? 0;
+    const l = rawData.low ?? rawData.value ?? rawData.close ?? 0;
+    const c = rawData.close ?? rawData.value ?? 0;
+    const v = rawData.volume ?? 0;
+
+    const isUp = c >= o;
     const color = isUp ? '#26a69a' : '#ef5350';
 
     return (
@@ -195,15 +201,15 @@ function OHLCVOverlay() {
             <span className="ohlcv-symbol">{currentSymbol}</span>
             <span className="ohlcv-timeframe">{tf?.label || '1m'}</span>
             <span className="ohlcv-label">O</span>
-            <span className="ohlcv-value" style={{ color }}>{data.open.toFixed(2)}</span>
+            <span className="ohlcv-value" style={{ color }}>{o.toFixed(2)}</span>
             <span className="ohlcv-label">H</span>
-            <span className="ohlcv-value" style={{ color }}>{data.high.toFixed(2)}</span>
+            <span className="ohlcv-value" style={{ color }}>{h.toFixed(2)}</span>
             <span className="ohlcv-label">L</span>
-            <span className="ohlcv-value" style={{ color }}>{data.low.toFixed(2)}</span>
+            <span className="ohlcv-value" style={{ color }}>{l.toFixed(2)}</span>
             <span className="ohlcv-label">C</span>
-            <span className="ohlcv-value" style={{ color }}>{data.close.toFixed(2)}</span>
+            <span className="ohlcv-value" style={{ color }}>{c.toFixed(2)}</span>
             <span className="ohlcv-label">Vol</span>
-            <span className="ohlcv-value ohlcv-vol">{data.volume.toLocaleString()}</span>
+            <span className="ohlcv-value ohlcv-vol">{v.toLocaleString()}</span>
         </div>
     );
 }
@@ -299,6 +305,7 @@ function Chart() {
 
     const candles = useMarketStore(s => s.candles);
     const enabledIndicators = useMarketStore((s) => s.enabledIndicators);
+    const chartType = useMarketStore(s => s.chartType);
     const setCrosshairData = useMarketStore(s => s.setCrosshairData);
 
     const indicatorSeriesRef = useRef<IndicatorSeriesBucket>({ line: [], histogram: [] });
@@ -340,10 +347,27 @@ function Chart() {
         });
     }, [theme]);
 
+    const formatCandleData = useCallback((c: any) => {
+        const isUp = c.close >= c.open;
+        if (chartType.toLowerCase().includes('line') || chartType === 'Area' || chartType === 'Baseline') {
+            return { time: c.time as any, value: c.close };
+        } else if (chartType === 'Columns') {
+            return { time: c.time as any, value: c.close, color: isUp ? '#26a69a' : '#ef5350' };
+        }
+        return {
+            time: c.time as any,
+            open: c.open,
+            high: c.high,
+            low: c.low,
+            close: c.close,
+            color: chartType === 'Volume candles' ? (isUp ? '#26a69a' : '#ef5350') : undefined,
+        };
+    }, [chartType]);
+
     // Initialize chart
     useEffect(() => {
         if (!chartContainerRef.current) return;
-        const p = DARK_CHART; // start dark; theme effect will override if needed
+        const p = theme === 'dark' ? DARK_CHART : LIGHT_CHART;
 
         const chart = createChart(chartContainerRef.current, {
             layout: {
@@ -383,17 +407,83 @@ function Chart() {
             },
         });
 
-        const candleSeries = chart.addSeries(CandlestickSeries, {
-            upColor: '#26a69a',
-            downColor: '#ef5350',
-            borderUpColor: '#26a69a',
-            borderDownColor: '#ef5350',
-            wickUpColor: '#26a69a',
-            wickDownColor: '#ef5350',
-            priceLineColor: '#f59e0b',
-            priceLineStyle: 2,
-            priceLineWidth: 1,
-        });
+        let mainSeries: ISeriesApi<"Candlestick" | "Line" | "Area" | "Baseline" | "Histogram">;
+
+        switch (chartType) {
+            case 'Line':
+                mainSeries = chart.addSeries(LineSeries, {
+                    color: '#2962FF',
+                    lineWidth: 2,
+                    priceLineVisible: false,
+                    lastValueVisible: false,
+                });
+                break;
+            case 'Area':
+                mainSeries = chart.addSeries(AreaSeries, {
+                    topColor: 'rgba(41, 98, 255, 0.3)',
+                    bottomColor: 'rgba(41, 98, 255, 0)',
+                    lineColor: '#2962FF',
+                    lineWidth: 2,
+                    priceLineVisible: false,
+                    lastValueVisible: false,
+                });
+                break;
+            case 'Baseline':
+                mainSeries = chart.addSeries(BaselineSeries, {
+                    baseValue: { type: 'price', price: 0 },
+                    topFillColor1: 'rgba(38, 166, 154, 0.28)',
+                    topFillColor2: 'rgba(38, 166, 154, 0.05)',
+                    topLineColor: 'rgba(38, 166, 154, 1)',
+                    bottomFillColor1: 'rgba(239, 83, 80, 0.05)',
+                    bottomFillColor2: 'rgba(239, 83, 80, 0.28)',
+                    bottomLineColor: 'rgba(239, 83, 80, 1)',
+                    lineWidth: 2,
+                    priceLineVisible: false,
+                    lastValueVisible: false,
+                });
+                break;
+            case 'Columns':
+                mainSeries = chart.addSeries(HistogramSeries, {
+                    priceLineVisible: false,
+                    lastValueVisible: false,
+                }) as any;
+                break;
+            case 'Volume candles':
+                mainSeries = chart.addSeries(CandlestickSeries, {
+                    upColor: 'rgba(38,166,154,0.7)',
+                    downColor: 'rgba(239,83,80,0.7)',
+                    borderUpColor: '#26a69a',
+                    borderDownColor: '#ef5350',
+                    wickUpColor: '#26a69a',
+                    wickDownColor: '#ef5350',
+                }) as any;
+                break;
+            case 'Hollow candles':
+                mainSeries = chart.addSeries(CandlestickSeries, {
+                    upColor: 'transparent',
+                    downColor: '#ef5350',
+                    borderVisible: true,
+                    borderUpColor: '#26a69a',
+                    borderDownColor: '#ef5350',
+                    wickUpColor: '#26a69a',
+                    wickDownColor: '#ef5350',
+                });
+                break;
+            case 'Candles':
+            default:
+                mainSeries = chart.addSeries(CandlestickSeries, {
+                    upColor: '#26a69a',
+                    downColor: '#ef5350',
+                    borderUpColor: '#26a69a',
+                    borderDownColor: '#ef5350',
+                    wickUpColor: '#26a69a',
+                    wickDownColor: '#ef5350',
+                    priceLineColor: '#f59e0b',
+                    priceLineStyle: 2,
+                    priceLineWidth: 1,
+                });
+                break;
+        }
 
         const volumeSeries = chart.addSeries(HistogramSeries, {
             priceFormat: { type: 'volume' },
@@ -410,7 +500,7 @@ function Chart() {
                 setCrosshairData(null);
                 return;
             }
-            const candleData = param.seriesData.get(candleSeries) as any;
+            const candleData = param.seriesData.get(mainSeries) as any;
             if (candleData) {
                 const volData = param.seriesData.get(volumeSeries) as any;
                 setCrosshairData({
@@ -425,12 +515,12 @@ function Chart() {
         });
 
         chartRef.current = chart;
-        seriesRef.current = { candle: candleSeries, volume: volumeSeries };
+        seriesRef.current = { candle: mainSeries as any, volume: volumeSeries };
 
         // Init with existing candles if component mounts after websocket already received them
         const existingCandles = useMarketStore.getState().candles;
-        if (existingCandles.length > 0) {
-            candleSeries.setData(existingCandles as any[]);
+        if (existingCandles.length > 0 && Array.isArray(existingCandles)) {
+            mainSeries.setData(existingCandles.map(formatCandleData) as any[]);
             volumeSeries.setData(existingCandles.map(c => ({
                 time: c.time as any,
                 value: c.volume,
@@ -457,7 +547,7 @@ function Chart() {
             chartRef.current = null;
             seriesRef.current = null;
         };
-    }, [removeAllIndicatorSeries, setCrosshairData]);
+    }, [removeAllIndicatorSeries, setCrosshairData, theme, chartType, formatCandleData]);
 
     // When candles array is cleared (timeframe/symbol change), reset chart data
     useEffect(() => {
@@ -472,13 +562,7 @@ function Chart() {
         if (!seriesRef.current) return;
 
         seriesRef.current.candle.setData(
-            candles.map((candle) => ({
-                time: candle.time as any,
-                open: candle.open,
-                high: candle.high,
-                low: candle.low,
-                close: candle.close,
-            }))
+            candles.map(formatCandleData)
         );
         seriesRef.current.volume.setData(
             candles.map((candle) => ({
@@ -489,7 +573,7 @@ function Chart() {
                     : 'rgba(239,83,80,0.35)',
             }))
         );
-    }, [candles]);
+    }, [candles, formatCandleData]);
 
     // Recalculate and redraw indicator series whenever candles or enabled indicators change
     useEffect(() => {

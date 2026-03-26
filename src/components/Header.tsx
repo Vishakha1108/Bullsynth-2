@@ -4,7 +4,7 @@ import { changeTimeframe } from '../services/websocket';
 import { TickerSearch } from './Chart';
 import { useTheme } from '../store/ThemeContext';
 import {
-    Menu, BarChart3, Bell, RotateCcw,
+    Menu, BarChart3, BarChart2, Bell, RotateCcw,
     Search, Settings, ChevronDown, Maximize2, Sun, Moon
 } from 'lucide-react';
 
@@ -20,6 +20,11 @@ export default function Header() {
     const [isIndicatorsOpen, setIsIndicatorsOpen] = useState(false);
     const [indicatorQuery, setIndicatorQuery] = useState('');
     const indicatorsRef = useRef<HTMLDivElement>(null);
+
+    const chartType = useMarketStore((state) => state.chartType);
+    const setChartType = useMarketStore((state) => state.setChartType);
+    const [isChartTypeOpen, setIsChartTypeOpen] = useState(false);
+    const chartTypesRef = useRef<HTMLDivElement>(null);
 
     const filteredIndicators = useMemo(() => {
         const query = indicatorQuery.trim().toLowerCase();
@@ -47,11 +52,15 @@ export default function Header() {
             if (!indicatorsRef.current?.contains(event.target as Node)) {
                 setIsIndicatorsOpen(false);
             }
+            if (!chartTypesRef.current?.contains(event.target as Node)) {
+                setIsChartTypeOpen(false);
+            }
         };
 
         const onEscape = (event: KeyboardEvent) => {
             if (event.key === 'Escape') {
                 setIsIndicatorsOpen(false);
+                setIsChartTypeOpen(false);
             }
         };
 
@@ -95,6 +104,47 @@ export default function Header() {
                     <button type="button" className="tv-header-tf-btn">
                         <ChevronDown size={12} />
                     </button>
+                </div>
+
+                <div className="tv-header-separator" />
+
+                {/* Chart Type selector */}
+                <div className="tv-chart-types-wrap" ref={chartTypesRef} style={{ position: 'relative' }}>
+                    <button
+                        type="button"
+                        className={`tv-header-btn icon-text ${isChartTypeOpen ? 'active' : ''}`}
+                        onClick={() => setIsChartTypeOpen((prev) => !prev)}
+                        style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                    >
+                        <BarChart2 size={16} />
+                    </button>
+
+                    {isChartTypeOpen && (
+                        <div className="tv-chart-type-dropdown" style={{
+                            position: 'absolute', top: '100%', left: 0, marginTop: '8px',
+                            background: theme === 'dark' ? '#1e222d' : '#ffffff',
+                            border: `1px solid ${theme === 'dark' ? '#2a2e39' : '#e0e3eb'}`,
+                            borderRadius: '6px', zIndex: 100, display: 'flex', flexDirection: 'column',
+                            minWidth: '160px', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                        }}>
+                            {['Candles', 'Hollow candles', 'Columns', 'Volume candles', 'Line', 'Area', 'Baseline'].map((type) => (
+                                <button
+                                    key={type}
+                                    style={{
+                                        padding: '10px 16px', textAlign: 'left',
+                                        background: chartType === type ? (theme === 'dark' ? '#2a2e39' : '#f0f3fa') : 'transparent',
+                                        color: chartType === type ? '#2962FF' : (theme === 'dark' ? '#d1d4dc' : '#131722'),
+                                        border: 'none', cursor: 'pointer', fontSize: '13px'
+                                    }}
+                                    onClick={() => { setChartType(type); setIsChartTypeOpen(false); }}
+                                    onMouseEnter={e => e.currentTarget.style.background = theme === 'dark' ? '#2a2e39' : '#f0f3fa'}
+                                    onMouseLeave={e => e.currentTarget.style.background = chartType === type ? (theme === 'dark' ? '#2a2e39' : '#f0f3fa') : 'transparent'}
+                                >
+                                    {type}
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 <div className="tv-header-separator" />
