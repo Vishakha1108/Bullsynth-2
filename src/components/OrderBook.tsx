@@ -6,9 +6,9 @@ const OrderBook = React.memo(function OrderBook() {
     const lastPrice = useMarketStore(state => state.lastPrice);
     const [displayMode, setDisplayMode] = useState<'both' | 'bids' | 'asks'>('both');
 
-    // Top entries
-    const topBids = bids.slice(0, 8);
-    const topAsks = asks.slice(0, 8);
+    // Top entries - reduced to 4 rows for extreme compaction
+    const topBids = bids.slice(0, 4);
+    const topAsks = asks.slice(0, 4);
 
     const maxBidQty = useMemo(() => Math.max(0, ...topBids.map(b => b.qty)), [topBids]);
     const maxAskQty = useMemo(() => Math.max(0, ...topAsks.map(a => a.qty)), [topAsks]);

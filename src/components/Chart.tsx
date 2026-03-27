@@ -8,7 +8,7 @@ import { useTheme } from '../store/ThemeContext';
 import {
     Search, Crosshair, TrendingUp, Minus, Type, Ruler,
     ChevronDown, X, Pencil, MousePointer2, Hash,
-    MoveHorizontal, ZoomIn
+    MoveHorizontal, ZoomIn, Star, Loader2
 } from 'lucide-react';
 import {
     calculateBollingerBands,
@@ -52,11 +52,16 @@ export function TickerSearch() {
 
     const currentSymbol = useMarketStore(s => s.currentSymbol);
     const setCurrentSymbol = useMarketStore(s => s.setCurrentSymbol);
+    const watchlist = useMarketStore(s => s.watchlist);
+    const addToWatchlist = useMarketStore(s => s.addToWatchlist);
+    const removeFromWatchlist = useMarketStore(s => s.removeFromWatchlist);
     const inputRef = useRef<HTMLInputElement>(null);
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
-            fetchTickers().then(setTickers);
+            setLoading(true);
+            fetchTickers().then(setTickers).finally(() => setLoading(false));
             setTimeout(() => inputRef.current?.focus(), 50);
         } else {
             setQuery('');
@@ -143,30 +148,50 @@ export function TickerSearch() {
                         </div>
 
                         <div className="tv-modal-list styling-scrollbar">
-                            {filtered.length === 0 && (
+                            {loading ? (
+                                <div className="flex items-center justify-center p-12 text-[#787b86]">
+                                    <Loader2 className="animate-spin mr-2" size={24} />
+                                    <span>Loading symbols...</span>
+                                </div>
+                            ) : filtered.length === 0 ? (
                                 <div className="tv-modal-empty">No symbols match your criteria</div>
-                            )}
-                            {filtered.map(t => (
-                                <button
-                                    key={t.symbol}
-                                    className="tv-modal-item"
-                                    onClick={() => handleSelect(t.symbol)}
-                                >
-                                    <div className="tv-modal-item-left">
-                                        <div className="tv-modal-item-symbol">
-                                            {t.symbol}
-                                            {t.symbol === currentSymbol && (
-                                                <span className="tv-modal-item-check">✓</span>
-                                            )}
+                            ) : (
+                                filtered.map(t => {
+                                    const isWatched = watchlist.includes(t.symbol);
+                                    return (
+                                        <div key={t.symbol} className="tv-modal-item-wrapper flex items-center group">
+                                            <button
+                                                className="tv-modal-item flex-1"
+                                                onClick={() => handleSelect(t.symbol)}
+                                            >
+                                                <div className="tv-modal-item-left">
+                                                    <div className="tv-modal-item-symbol">
+                                                        {t.symbol}
+                                                        {t.symbol === currentSymbol && (
+                                                            <span className="tv-modal-item-check">✓</span>
+                                                        )}
+                                                    </div>
+                                                    <div className="tv-modal-item-name">{t.name}</div>
+                                                </div>
+                                                <div className="tv-modal-item-right">
+                                                    <span className="tv-modal-item-category">{t.category}</span>
+                                                    <span className="tv-modal-item-exchange">SIMULATOR</span>
+                                                </div>
+                                            </button>
+                                            <button
+                                                className={`p-2 mr-2 rounded hover:bg-[#2a2e39] transition-colors ${isWatched ? 'text-yellow-500' : 'text-[#787b86] opacity-0 group-hover:opacity-100'}`}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    isWatched ? removeFromWatchlist(t.symbol) : addToWatchlist(t.symbol);
+                                                }}
+                                                title={isWatched ? "Remove from Watchlist" : "Add to Watchlist"}
+                                            >
+                                                <Star size={16} fill={isWatched ? "currentColor" : "none"} />
+                                            </button>
                                         </div>
-                                        <div className="tv-modal-item-name">{t.name}</div>
-                                    </div>
-                                    <div className="tv-modal-item-right">
-                                        <span className="tv-modal-item-category">{t.category}</span>
-                                        <span className="tv-modal-item-exchange">SIMULATOR</span>
-                                    </div>
-                                </button>
-                            ))}
+                                    );
+                                })
+                            )}
                         </div>
                     </div>
                 </div>
@@ -348,11 +373,8 @@ function Chart() {
     }, [theme]);
 
     const formatCandleData = useCallback((c: any) => {
-        const isUp = c.close >= c.open;
         if (chartType.toLowerCase().includes('line') || chartType === 'Area' || chartType === 'Baseline') {
             return { time: c.time as any, value: c.close };
-        } else if (chartType === 'Columns') {
-            return { time: c.time as any, value: c.close, color: isUp ? '#26a69a' : '#ef5350' };
         }
         return {
             time: c.time as any,
@@ -360,7 +382,6 @@ function Chart() {
             high: c.high,
             low: c.low,
             close: c.close,
-            color: chartType === 'Volume candles' ? (isUp ? '#26a69a' : '#ef5350') : undefined,
         };
     }, [chartType]);
 
@@ -442,26 +463,10 @@ function Chart() {
                     lastValueVisible: false,
                 });
                 break;
-            case 'Columns':
-                mainSeries = chart.addSeries(HistogramSeries, {
-                    priceLineVisible: false,
-                    lastValueVisible: false,
-                }) as any;
-                break;
-            case 'Volume candles':
-                mainSeries = chart.addSeries(CandlestickSeries, {
-                    upColor: 'rgba(38,166,154,0.7)',
-                    downColor: 'rgba(239,83,80,0.7)',
-                    borderUpColor: '#26a69a',
-                    borderDownColor: '#ef5350',
-                    wickUpColor: '#26a69a',
-                    wickDownColor: '#ef5350',
-                }) as any;
-                break;
             case 'Hollow candles':
                 mainSeries = chart.addSeries(CandlestickSeries, {
                     upColor: 'transparent',
-                    downColor: '#ef5350',
+                    downColor: 'transparent',
                     borderVisible: true,
                     borderUpColor: '#26a69a',
                     borderDownColor: '#ef5350',
@@ -558,22 +563,37 @@ function Chart() {
     }, [candles.length === 0]);
 
     // Keep base candle + volume data in sync
+    // Initial candle data (History)
     useEffect(() => {
-        if (!seriesRef.current) return;
+        if (!seriesRef.current || candles.length === 0) return;
 
-        seriesRef.current.candle.setData(
-            candles.map(formatCandleData)
-        );
-        seriesRef.current.volume.setData(
-            candles.map((candle) => ({
-                time: candle.time as any,
-                value: candle.volume,
-                color: candle.close >= candle.open
-                    ? 'rgba(38,166,154,0.35)'
-                    : 'rgba(239,83,80,0.35)',
-            }))
-        );
-    }, [candles, formatCandleData]);
+        // Use setData for the initial load or large history update
+        seriesRef.current.candle.setData(candles.map(formatCandleData));
+        seriesRef.current.volume.setData(candles.map(c => ({
+            time: c.time as any,
+            value: c.volume,
+            color: c.close >= c.open ? 'rgba(38, 166, 154, 0.5)' : 'rgba(239, 83, 80, 0.5)',
+        })));
+
+        // Fix for "not appearing" - ensure chart scales to fit data if it's the first bit of data
+        if (candles.length > 0 && candles.length < 50) {
+            chartRef.current?.timeScale().fitContent();
+        }
+    }, [candles.length, formatCandleData]); // Trigger on length change or type change
+
+    // Real-time updates
+    const latestCandle = useMarketStore(s => s.latestCandle);
+    useEffect(() => {
+        if (!seriesRef.current || !latestCandle) return;
+
+        const formatted = formatCandleData(latestCandle);
+        seriesRef.current.candle.update(formatted);
+        seriesRef.current.volume.update({
+            time: latestCandle.time as any,
+            value: latestCandle.volume,
+            color: latestCandle.close >= latestCandle.open ? 'rgba(38, 166, 154, 0.5)' : 'rgba(239, 83, 80, 0.5)',
+        });
+    }, [latestCandle, formatCandleData]);
 
     // Recalculate and redraw indicator series whenever candles or enabled indicators change
     useEffect(() => {

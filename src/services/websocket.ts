@@ -70,6 +70,14 @@ class WSManager {
 
             // Ask for history of current symbol
             requestHistory();
+
+            // Subscribe to all watchlist symbols for real-time updates
+            const watchlist = useMarketStore.getState().watchlist;
+            watchlist.forEach(s => {
+                if (s !== useMarketStore.getState().currentSymbol) {
+                    this.send({ type: 'get_history', symbol: s });
+                }
+            });
         };
 
         this.ws.onmessage = (event) => {
@@ -125,7 +133,11 @@ class WSManager {
                 }
 
                 if (msgType === 'trade') {
-                    if (msg.symbol !== state.currentSymbol) return;
+                    const price = Number(msg.price || 0);
+                    const sym = String(msg.symbol || state.currentSymbol);
+                    state.setPrice(sym, price);
+
+                    if (sym !== state.currentSymbol) return;
 
                     const ts = normalizeToMs(msg.ts);
                     const inferredSide: 'BUY' | 'SELL' =
@@ -139,8 +151,8 @@ class WSManager {
 
                     const trade = {
                         id: Number(msg.id || 0),
-                        symbol: String(msg.symbol || state.currentSymbol),
-                        price: Number(msg.price || 0),
+                        symbol: sym,
+                        price: price,
                         qty: Number(msg.qty || 0),
                         side: inferredSide,
                         timestamp: ts,
@@ -157,7 +169,7 @@ class WSManager {
                 }
 
                 if (msgType === 'history') {
-                    if (msg.symbol !== state.currentSymbol) return;
+                    // if (msg.symbol !== state.currentSymbol) return; // This line moves down
 
                     const candles = msg.candles.map((c: any) => ({
                         time: normalizeToSec(c.t),
@@ -168,11 +180,19 @@ class WSManager {
                         volume: Number(c.v || 0),
                     }));
 
+                    if (candles.length > 0) {
+                        state.setPrice(msg.symbol, candles[candles.length - 1].close);
+                    }
+
+                    if (msg.symbol !== state.currentSymbol) return;
                     candleWorker.postMessage({ type: 'HISTORY', payload: candles });
                     return;
                 }
 
                 if (msgType === 'candle') {
+                    const price = Number(msg.c || 0);
+                    state.setPrice(msg.symbol, price);
+
                     if (msg.symbol !== state.currentSymbol) return;
 
                     const next = {
@@ -180,7 +200,7 @@ class WSManager {
                         open: Number(msg.o || 0),
                         high: Number(msg.h || 0),
                         low: Number(msg.l || 0),
-                        close: Number(msg.c || 0),
+                        close: price,
                         volume: Number(msg.v || 0),
                     };
 

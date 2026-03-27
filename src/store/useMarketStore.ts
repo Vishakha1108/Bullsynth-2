@@ -157,6 +157,9 @@ interface MarketState {
     low24h: number;
     enabledIndicators: IndicatorId[];
     chartType: string;
+    watchlist: string[];
+    prices: Record<string, number>;
+    priceChanges: Record<string, number>;
 
     portfolio: Portfolio;
     openOrders: Order[];
@@ -182,6 +185,9 @@ interface MarketState {
     setIndicatorEnabled: (indicatorId: IndicatorId, enabled: boolean) => void;
     clearIndicators: () => void;
     setChartType: (type: string) => void;
+    addToWatchlist: (symbol: string) => void;
+    removeFromWatchlist: (symbol: string) => void;
+    setPrice: (symbol: string, price: number, change?: number) => void;
 }
 
 const useMarketStore = create<MarketState>((set) => ({
@@ -194,12 +200,15 @@ const useMarketStore = create<MarketState>((set) => ({
     crosshairData: null,
     orderBook: { bids: [], asks: [] },
     recentTrades: [],
-    lastPrice: 500,
+    lastPrice: 0,
     priceChange24h: 0,
-    high24h: 500,
-    low24h: 500,
-    enabledIndicators: ['sma20', 'vwap'],
+    high24h: 0,
+    low24h: 0,
+    enabledIndicators: [],
     chartType: 'Candles',
+    watchlist: ['AAPL', 'BTC', 'ETH'],
+    prices: {},
+    priceChanges: {},
 
     portfolio: {
         cash: 100000,
@@ -233,6 +242,8 @@ const useMarketStore = create<MarketState>((set) => ({
         return {
             candles: safeCandles,
             latestCandle: safeLatest,
+            prices: safeLatest ? { ...state.prices, [state.currentSymbol]: safeLatest.close } : state.prices,
+            lastPrice: safeLatest ? safeLatest.close : state.lastPrice
         };
     }),
 
@@ -259,10 +270,11 @@ const useMarketStore = create<MarketState>((set) => ({
         if (updatedCandles.length > 2000) {
             updatedCandles.shift();
         }
-
         return {
-            candles: updatedCandles,
             latestCandle: normalizedCandle,
+            candles: updatedCandles,
+            lastPrice: normalizedCandle.close,
+            prices: { ...state.prices, [state.currentSymbol]: normalizedCandle.close }
         };
     }),
 
@@ -302,7 +314,28 @@ const useMarketStore = create<MarketState>((set) => ({
     })),
 
     clearIndicators: () => set({ enabledIndicators: [] }),
-    setChartType: (type) => set({ chartType: type })
+    setChartType: (type) => set({ chartType: type }),
+    addToWatchlist: (symbol) => set((state) => ({
+        watchlist: state.watchlist.includes(symbol) ? state.watchlist : [...state.watchlist, symbol]
+    })),
+    removeFromWatchlist: (symbol) => set((state) => ({
+        watchlist: state.watchlist.filter((s) => s !== symbol)
+    })),
+
+    setPrice: (symbol, price, change) => set((state) => {
+        const nextPrices = { ...state.prices, [symbol]: price };
+        const nextChanges = change !== undefined ? { ...state.priceChanges, [symbol]: change } : state.priceChanges;
+
+        if (symbol === state.currentSymbol) {
+            return {
+                prices: nextPrices,
+                priceChanges: nextChanges,
+                lastPrice: price,
+                priceChange24h: change !== undefined ? change : state.priceChange24h
+            };
+        }
+        return { prices: nextPrices, priceChanges: nextChanges };
+    }),
 }));
 
 export default useMarketStore;

@@ -85,12 +85,14 @@ export default function Header() {
                 <div className="tv-header-separator" />
 
                 {/* Symbol selector — full TickerSearch modal */}
-                <TickerSearch />
+                <div className="flex items-center mx-1">
+                    <TickerSearch />
+                </div>
 
-                <div className="tv-header-separator" />
+                <div className="tv-header-separator mx-1" />
 
                 {/* Timeframe selector */}
-                <div className="tv-header-timeframes">
+                <div className="flex items-center gap-1 px-1">
                     {TIMEFRAMES.map(tf => (
                         <button
                             type="button"
@@ -101,8 +103,8 @@ export default function Header() {
                             {tf.label}
                         </button>
                     ))}
-                    <button type="button" className="tv-header-tf-btn">
-                        <ChevronDown size={12} />
+                    <button type="button" className="tv-header-tf-btn p-1">
+                        <ChevronDown size={14} />
                     </button>
                 </div>
 
@@ -127,7 +129,7 @@ export default function Header() {
                             borderRadius: '6px', zIndex: 100, display: 'flex', flexDirection: 'column',
                             minWidth: '160px', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
                         }}>
-                            {['Candles', 'Hollow candles', 'Columns', 'Volume candles', 'Line', 'Area', 'Baseline'].map((type) => (
+                            {['Candles', 'Hollow candles', 'Line', 'Area', 'Baseline'].map((type) => (
                                 <button
                                     key={type}
                                     style={{

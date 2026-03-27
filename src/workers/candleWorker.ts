@@ -41,7 +41,7 @@ self.onmessage = (e) => {
                 lastCandle.high = Math.max(lastCandle.high, c.high);
                 lastCandle.low = Math.min(lastCandle.low, c.low);
                 lastCandle.close = c.close;
-                lastCandle.volume = Math.max(lastCandle.volume, c.volume);
+                lastCandle.volume += c.volume;
             }
         }
 
@@ -139,7 +139,7 @@ self.onmessage = (e) => {
             lastCandle.low = Math.min(lastCandle.low, c.low);
             lastCandle.close = c.close;
             // Since CANDLE_1S aggregates, we just take the max volume to prevent double-counting trades
-            lastCandle.volume = Math.max(lastCandle.volume, c.volume);
+            lastCandle.volume += c.volume;
             self.postMessage({ type: 'CANDLE_UPDATE', candle: { ...lastCandle }, isNew: false });
         }
     }

@@ -146,25 +146,67 @@
   }
 }
 
-.tv-symbol-link {
+.ticker-search-trigger {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  background: #2a2e39;
+  border: 1px solid #363a45;
   border-radius: 4px;
-  text-decoration: none;
-  transition: all 0.12s ease;
+  cursor: pointer;
+  transition: all 0.1s ease;
+  margin: 0 4px;
 }
 
-.tv-symbol-link:hover {
-  background: #2a2e39;
+.ticker-search-trigger:hover {
+  background: #363a45;
+}
+
+.ticker-symbol {
+  color: #d1d4dc;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.ticker-chevron {
+  color: #787b86;
 }
 
 .tv-symbol-text {
   color: #d1d4dc;
   font-size: 14px;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0em;
+}
+
+.tv-symbol-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 8px;
+  background: #2a2e39;
+  border: 1px solid #363a45;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.tv-symbol-btn:hover {
+  background: #363a45;
+}
+
+.tv-symbol-btn .symbol {
+  color: #d1d4dc;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.tv-symbol-btn .chevron {
+  color: #787b86;
 }
 
 .tv-header-timeframes {
@@ -174,20 +216,24 @@
 }
 
 .tv-header-tf-btn {
-  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 10px;
   border: none;
   border-radius: 4px;
   background: transparent;
   color: #787b86;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.12s ease;
+  transition: all 0.1s ease;
   font-family: inherit;
 }
 
 .tv-header-tf-btn:hover {
-  background: #2a2e39;
+  background: rgba(42, 46, 57, 0.5);
   color: #d1d4dc;
 }
 
@@ -195,6 +241,7 @@
   background: #2962ff;
   color: #ffffff;
   font-weight: 600;
+  box-shadow: 0 2px 4px rgba(41, 98, 255, 0.3);
 }
 
 .tv-price-strip {
@@ -446,7 +493,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 12px;
+  padding: 4px 8px;
   border-bottom: 1px solid #2a2e39;
 }
 
@@ -527,9 +574,9 @@
 .tv-ob-row {
   display: flex;
   align-items: center;
-  padding: 1px 12px;
+  padding: 0px 8px;
   position: relative;
-  height: 22px;
+  height: 20px;
   cursor: pointer;
   transition: background 0.1s ease;
 }
@@ -589,7 +636,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 12px;
+  padding: 4px 8px;
   border-top: 1px solid #1e222d;
   border-bottom: 1px solid #1e222d;
   background: rgba(42, 46, 57, 0.3);
@@ -1011,8 +1058,13 @@
 }
 
 @keyframes modal-fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes modal-slide-down {
@@ -1020,6 +1072,7 @@
     opacity: 0;
     transform: translateY(-20px) scale(0.98);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);

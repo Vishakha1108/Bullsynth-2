@@ -1,0 +1,175 @@
+import { useMemo } from 'react';
+import { TrendingDown, Plus, MoreHorizontal, LayoutGrid, ExternalLink, Pencil, Info } from 'lucide-react';
+import useMarketStore from '../store/useMarketStore';
+import { candleWorker, requestHistory } from '../services/websocket';
+
+export default function Watchlist() {
+    const watchlist = useMarketStore(s => s.watchlist);
+    const currentSymbol = useMarketStore(s => s.currentSymbol);
+    const setCurrentSymbol = useMarketStore(s => s.setCurrentSymbol);
+    const lastPrice = useMarketStore(s => s.lastPrice);
+    const priceChange24h = useMarketStore(s => s.priceChange24h);
+    const prices = useMarketStore(s => s.prices);
+    const priceChanges = useMarketStore(s => s.priceChanges);
+
+    const handleSelect = (symbol: string) => {
+        if (symbol === currentSymbol) return;
+        setCurrentSymbol(symbol);
+        const timeframeSec = useMarketStore.getState().timeframe;
+        candleWorker.postMessage({ type: 'INIT', payload: { timeframeSec } });
+        requestHistory(symbol);
+    };
+
+    // Derived mock stats for the detailed view
+    const selectedSymbolStats = useMemo(() => {
+        const seed = currentSymbol.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+        return {
+            name: currentSymbol === 'AAPL' ? 'Apple Inc' : currentSymbol === 'BTC' ? 'Bitcoin' : currentSymbol === 'ETH' ? 'Ethereum' : `${currentSymbol} Corp`,
+            exchange: currentSymbol === 'AAPL' ? 'NASDAQ' : 'BINANCE',
+            sector: currentSymbol === 'AAPL' ? 'Electronic Technology' : 'Crypto',
+            industry: currentSymbol === 'AAPL' ? 'Telecommunications Equipment' : 'Blockchain',
+            volume: (seed * 123456 % 100).toFixed(2) + 'M',
+            avgVolume: (seed * 654321 % 100).toFixed(2) + 'M',
+            marketCap: (seed * 987654 % 5).toFixed(2) + 'T',
+            nextEarnings: 'In ' + (seed % 30 + 1) + ' days'
+        };
+    }, [currentSymbol]);
+
+    return (
+        <div className="flex flex-col h-full bg-[#131722] text-[#d1d4dc] font-sans border-l border-[#2a2e39]">
+            {/* Watchlist Header */}
+            <div className="flex items-center justify-between px-3 py-2 border-b border-[#2a2e39] bg-[#1c202b]">
+                <div className="flex items-center gap-2 cursor-pointer hover:bg-[#2a2e39] px-1.5 py-0.5 rounded transition-colors">
+                    <span className="text-xs font-bold text-[#d1d4dc]">Watchlist</span>
+                    <TrendingDown size={12} className="text-[#d1d4dc]" />
+                </div>
+                <div className="flex items-center gap-2 text-[#787b86]">
+                    <Plus size={16} className="cursor-pointer hover:text-white" />
+                    <LayoutGrid size={15} className="cursor-pointer hover:text-white" />
+                    <MoreHorizontal size={16} className="cursor-pointer hover:text-white" />
+                </div>
+            </div>
+
+            {/* Watchlist Table Header */}
+            <div className="flex px-3 py-1 text-[10px] text-[#787b86] font-bold uppercase tracking-tight border-b border-[#2a2e39]">
+                <span className="flex-1">Symbol</span>
+                <span className="w-16 text-right">Last</span>
+                <span className="w-12 text-right">Chg</span>
+                <span className="w-14 text-right">Chg%</span>
+            </div>
+
+            {/* Watchlist List */}
+            <div className="flex-1 overflow-y-auto styling-scrollbar">
+                {watchlist.map(symbol => {
+                    const isActive = symbol === currentSymbol;
+                    // Mock variation for others
+                    const seed = symbol.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+                    const mockChgPct = (seed % 4 - 2).toFixed(2);
+
+                    const price = prices[symbol] || (isActive ? (lastPrice || 150 + (seed % 50)) : 150 + (seed % 50));
+                    const chgPctNum = priceChanges[symbol] !== undefined ? priceChanges[symbol] : (isActive ? priceChange24h : parseFloat(mockChgPct));
+                    const chgVal = (price * chgPctNum / 100).toFixed(2);
+                    const chgPctStr = chgPctNum.toFixed(2);
+                    const isUp = chgPctNum >= 0;
+
+                    return (
+                        <div
+                            key={symbol}
+                            className={`flex items-center px-3 py-2 border-b border-[#2a2e39]/30 cursor-pointer transition-colors group ${isActive ? 'bg-[#2a2e39]/60' : 'hover:bg-[#1e222d]'}`}
+                            onClick={() => handleSelect(symbol)}
+                        >
+                            <div className="flex-1 flex items-center gap-2 min-w-0">
+                                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white ${symbol === 'BTC' ? 'bg-[#f7931a]' : symbol === 'ETH' ? 'bg-[#627eea]' : 'bg-[#2962ff]'}`}>
+                                    {symbol[0]}
+                                </div>
+                                <div className={`text-xs font-bold truncate ${isActive ? 'text-white' : 'text-[#d1d4dc]'}`}>{symbol}</div>
+                            </div>
+
+                            <div className="w-16 text-right text-xs font-mono font-medium">
+                                {price.toFixed(2)}
+                            </div>
+
+                            <div className={`w-12 text-right text-[11px] font-mono ${isUp ? 'text-[#26a69a]' : 'text-[#ef5350]'}`}>
+                                {isUp ? '+' : ''}{chgVal}
+                            </div>
+
+                            <div className={`w-14 text-right text-[11px] font-mono ${isUp ? 'text-[#26a69a]' : 'text-[#ef5350]'}`}>
+                                {isUp ? '+' : ''}{chgPctStr}%
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+
+            {/* Symbol Detail Section (Bottom) */}
+            <div className="border-t border-[#2a2e39] bg-[#131722] p-4 flex flex-col gap-3 min-h-[320px]">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white ${currentSymbol === 'BTC' ? 'bg-[#f7931a]' : 'bg-[#2962ff]'}`}>
+                            {currentSymbol[0]}
+                        </div>
+                        <span className="text-sm font-bold text-white uppercase">{currentSymbol}</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-[#787b86]">
+                        <LayoutGrid size={16} className="cursor-pointer hover:text-white" />
+                        <Pencil size={15} className="cursor-pointer hover:text-white" />
+                        <MoreHorizontal size={16} className="cursor-pointer hover:text-white" />
+                    </div>
+                </div>
+
+                <div>
+                    <div className="flex items-center gap-1.5 text-xs text-[#d1d4dc] font-medium">
+                        {selectedSymbolStats.name} <ExternalLink size={12} className="text-[#787b86]" /> • <span className="text-[#787b86]">{selectedSymbolStats.exchange}</span>
+                    </div>
+                    <div className="text-[10px] text-[#787b86] mt-0.5">
+                        {selectedSymbolStats.sector} • {selectedSymbolStats.industry}
+                    </div>
+                </div>
+
+                <div className="mt-1">
+                    <div className="flex items-baseline gap-2">
+                        <span className="text-2xl font-bold text-white font-mono">{lastPrice > 0 ? lastPrice.toFixed(2) : '---'}</span>
+                        <span className="text-xs text-[#787b86] font-medium">USD</span>
+                        <span className={`text-sm font-bold font-mono ${priceChange24h >= 0 ? 'text-[#26a69a]' : 'text-[#ef5350]'}`}>
+                            {priceChange24h >= 0 ? '+' : ''}{(lastPrice * priceChange24h / 100).toFixed(2)} {priceChange24h >= 0 ? '+' : ''}{priceChange24h.toFixed(2)}%
+                        </span>
+                    </div>
+                    <div className="text-[10px] text-[#787b86] mt-0.5">
+                        Last update at {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    </div>
+                </div>
+
+                {/* News/Action mock bar */}
+                <div className="bg-[#1e222d] rounded-md p-2 flex items-center gap-3 cursor-pointer hover:bg-[#2a2e39] transition-colors border border-transparent hover:border-[#363a45]">
+                    <div className="w-8 h-8 rounded bg-[#ef5350]/20 flex items-center justify-center text-[#ef5350]">
+                        <Info size={16} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <div className="text-[10px] text-[#787b86]">Latest News • 23 minutes ago</div>
+                        <div className="text-[11px] font-bold text-[#d1d4dc] truncate">{currentSymbol} Price Target Maintained at $350.00...</div>
+                    </div>
+                </div>
+
+                {/* Key Stats Grid */}
+                <div className="grid grid-cols-2 gap-y-3 mt-1">
+                    <div>
+                        <div className="text-[10px] text-[#787b86]">Next earnings report</div>
+                        <div className="text-xs font-bold text-[#d1d4dc]">{selectedSymbolStats.nextEarnings}</div>
+                    </div>
+                    <div>
+                        <div className="text-[10px] text-[#787b86] text-right">Volume</div>
+                        <div className="text-xs font-bold text-[#d1d4dc] text-right">{selectedSymbolStats.volume}</div>
+                    </div>
+                    <div>
+                        <div className="text-[10px] text-[#787b86]">Average Volume (30D)</div>
+                        <div className="text-xs font-bold text-[#d1d4dc]">{selectedSymbolStats.avgVolume}</div>
+                    </div>
+                    <div>
+                        <div className="text-[10px] text-[#787b86] text-right">Market capitalization</div>
+                        <div className="text-xs font-bold text-[#d1d4dc] text-right">{selectedSymbolStats.marketCap}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
