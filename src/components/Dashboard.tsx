@@ -1,275 +1,99 @@
-import { Link } from 'react-router-dom';
-import { useEffect, useState } from 'react';
-import {
-    TrendingUp, Wallet, PieChart,
-    ArrowUpDown, Clock, ExternalLink
-} from 'lucide-react';
-import useMarketStore from '../store/useMarketStore';
-import { fetchTickers, type Ticker } from '../services/api';
+import { useState, useEffect } from 'react';
+import { Navbar } from './Navbar';
+import { WalletWidget } from './WalletWidget';
+import { BotsWidget } from './BotsWidget';
+import { AssetList } from './AssetList';
+import { AssetDetail } from './AssetDetail';
+import { MarketPerformersWidget } from './MarketPerformersWidget';
+import { ThemeProvider } from './theme-provider';
+import mockData from '../Data/mockData.json';
 
 export default function Dashboard() {
-    const [tickers, setTickers] = useState<Ticker[]>([]);
-    const portfolio = useMarketStore(state => state.portfolio);
-    const openOrders = useMarketStore(state => state.openOrders);
-    const recentTrades = useMarketStore(state => state.recentTrades);
+  const [selectedBotId, setSelectedBotId] = useState<string>(mockData.bots[0].id);
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
 
-    useEffect(() => {
-        fetchTickers().then(setTickers);
-    }, []);
+  const selectedBot = mockData.bots.find(b => b.id === selectedBotId) || mockData.bots[0];
+  const assetsForBot = selectedBot.assets;
+  
+  const selectedAsset = assetsForBot.find(a => a.id === selectedAssetId) || 
+    (assetsForBot.length > 0 ? assetsForBot[0] : null);
 
-    const totalValue = portfolio.totalValue;
-    const isPnlPositive = portfolio.unrealizedPnl > 0;
+  useEffect(() => {
+    // When bot changes, select its first asset automatically
+    if (selectedBot.assets.length > 0) {
+      setSelectedAssetId(selectedBot.assets[0].id);
+    } else {
+      setSelectedAssetId(null);
+    }
+  }, [selectedBotId]);
 
-    return (
-        <div className="nb-landing">
-            {/* ── Navbar ─────────────────────────────────────────────────── */}
-            <nav className="nb-navbar">
-                <div className="nb-navbar-inner">
-                    <Link to="/" className="nb-logo">
-                        <TrendingUp size={22} />
-                        <span>NEXTBULL</span>
-                    </Link>
-                    <div className="nb-nav-links">
-                        <Link to="/" className="nb-nav-link">Home</Link>
-                        <Link to="/terminal" className="nb-nav-link">Terminal</Link>
-                        <Link to="/user/dashboard" className="nb-nav-link active">Dashboard</Link>
-                    </div>
-                    <div className="nb-nav-actions">
-                        <Link to="/terminal" className="nb-nav-signup">Open Terminal</Link>
-                    </div>
-                </div>
-            </nav>
-
-            {/* ── Dashboard Content ────────────────────────────────────────── */}
-            <div className="db-container">
-                <div className="db-header">
-                    <h1 className="db-title">Dashboard</h1>
-                    <p className="db-subtitle">Overview of your portfolio and market activity</p>
-                </div>
-
-                {/* ── Portfolio Stats ──────────────────────────────────────── */}
-                <div className="db-stats-grid">
-                    <div className="db-stat-card">
-                        <div className="db-stat-icon">
-                            <Wallet size={20} />
-                        </div>
-                        <div>
-                            <div className="db-stat-label">Cash Balance</div>
-                            <div className="db-stat-value">
-                                ${portfolio.cash.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </div>
-                        </div>
-                    </div>
-                    <div className="db-stat-card">
-                        <div className="db-stat-icon">
-                            <PieChart size={20} />
-                        </div>
-                        <div>
-                            <div className="db-stat-label">Total Value</div>
-                            <div className="db-stat-value">
-                                ${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </div>
-                        </div>
-                    </div>
-                    <div className="db-stat-card">
-                        <div className="db-stat-icon pnl">
-                            <ArrowUpDown size={20} />
-                        </div>
-                        <div>
-                            <div className="db-stat-label">Unrealized P&L</div>
-                            <div className={`db-stat-value ${isPnlPositive ? 'up' : portfolio.unrealizedPnl < 0 ? 'down' : ''}`}>
-                                {isPnlPositive ? '+' : ''}{portfolio.unrealizedPnl.toFixed(2)}
-                            </div>
-                        </div>
-                    </div>
-                    <div className="db-stat-card">
-                        <div className="db-stat-icon">
-                            <Clock size={20} />
-                        </div>
-                        <div>
-                            <div className="db-stat-label">Open Orders</div>
-                            <div className="db-stat-value">{openOrders.length}</div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* ── Holdings ─────────────────────────────────────────────── */}
-                {portfolio.holdings.length > 0 && (
-                    <div className="db-section">
-                        <h2 className="db-section-title">Holdings</h2>
-                        <div className="db-table-wrap">
-                            <table className="nb-ticker-table">
-                                <thead>
-                                    <tr>
-                                        <th>Asset</th>
-                                        <th>Quantity</th>
-                                        <th>Avg Price</th>
-                                        <th>Current Price</th>
-                                        <th>Value</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {portfolio.holdings.map((h, i) => {
-                                        return (
-                                            <tr key={i}>
-                                                <td className="nb-ticker-sym">{h.asset}</td>
-                                                <td>{h.qty}</td>
-                                                <td>${h.avgPrice.toFixed(2)}</td>
-                                                <td>${h.currentPrice.toFixed(2)}</td>
-                                                <td className="nb-ticker-price">${h.marketValue.toFixed(2)}</td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                )}
-
-                {/* ── Watchlist / Tickers ──────────────────────────────────── */}
-                <div className="db-section">
-                    <h2 className="db-section-title">Watchlist</h2>
-                    <div className="db-table-wrap">
-                        <table className="nb-ticker-table">
-                            <thead>
-                                <tr>
-                                    <th>Symbol</th>
-                                    <th>Name</th>
-                                    <th>Price</th>
-                                    <th>24h Change</th>
-                                    <th>Volume</th>
-                                    <th>Category</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {tickers.map(t => (
-                                    <tr key={t.symbol}>
-                                        <td className="nb-ticker-sym">{t.symbol}</td>
-                                        <td className="nb-ticker-name">{t.name}</td>
-                                        <td className="nb-ticker-price">
-                                            ${t.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </td>
-                                        <td className={`nb-ticker-change ${t.change24h >= 0 ? 'up' : 'down'}`}>
-                                            {t.change24h >= 0 ? '+' : ''}{t.change24h.toFixed(2)}%
-                                        </td>
-                                        <td className="nb-ticker-vol">{t.volume.toLocaleString()}</td>
-                                        <td>
-                                            <span className="nb-ticker-cat">{t.category}</span>
-                                        </td>
-                                        <td>
-                                            <Link
-                                                to={`/terminal?symbol=${encodeURIComponent(t.symbol)}`}
-                                                className="nb-ticker-trade-btn"
-                                            >
-                                                <ExternalLink size={14} />
-                                            </Link>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                {/* ── Open Orders ──────────────────────────────────────────── */}
-                <div className="db-section">
-                    <h2 className="db-section-title">Open Orders ({openOrders.length})</h2>
-                    <div className="db-table-wrap">
-                        {openOrders.length === 0 ? (
-                            <div className="db-empty">No open orders</div>
-                        ) : (
-                            <table className="nb-ticker-table">
-                                <thead>
-                                    <tr>
-                                        <th>Side</th>
-                                        <th>Type</th>
-                                        <th>Price</th>
-                                        <th>Quantity</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {openOrders.map(o => (
-                                        <tr key={o.order_id}>
-                                            <td className={o.side === 'BUY' ? 'nb-text-bull' : 'nb-text-bear'}>
-                                                {o.side}
-                                            </td>
-                                            <td className="nb-ticker-name">{o.type}</td>
-                                            <td className="nb-ticker-price">
-                                                ${o.price.toFixed(2)}
-                                            </td>
-                                            <td>{o.remainingQty}</td>
-                                            <td className="nb-ticker-cat-inline">{o.status || 'Open'}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        )}
-                    </div>
-                </div>
-
-                {/* ── Recent Trades ────────────────────────────────────────── */}
-                <div className="db-section">
-                    <h2 className="db-section-title">Recent Trades</h2>
-                    <div className="db-table-wrap">
-                        {recentTrades.length === 0 ? (
-                            <div className="db-empty">No recent trades — start trading in the Terminal</div>
-                        ) : (
-                            <table className="nb-ticker-table">
-                                <thead>
-                                    <tr>
-                                        <th>Time</th>
-                                        <th>Side</th>
-                                        <th>Price</th>
-                                        <th>Quantity</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {recentTrades.slice(0, 20).map((t, i) => {
-                                        const d = new Date(t.timestamp);
-                                        const ts = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`;
-                                        return (
-                                            <tr key={i}>
-                                                <td className="nb-ticker-name">{ts}</td>
-                                                <td className={t.side === 'BUY' ? 'nb-text-bull' : 'nb-text-bear'}>
-                                                    {t.side}
-                                                </td>
-                                                <td className="nb-ticker-price">${t.price.toFixed(2)}</td>
-                                                <td>{t.qty}</td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            {/* ── Footer ──────────────────────────────────────────────────── */}
-            <footer className="nb-footer">
-                <div className="nb-footer-inner">
-                    <div className="nb-footer-brand">
-                        <div className="nb-logo">
-                            <TrendingUp size={20} />
-                            <span>NEXTBULL</span>
-                        </div>
-                        <p className="nb-footer-tagline">Power your financial decisions</p>
-                    </div>
-                    <div className="nb-footer-links">
-                        <div className="nb-footer-col">
-                            <h4>Quick Links</h4>
-                            <Link to="/">Home</Link>
-                            <Link to="/terminal">Terminal</Link>
-                            <Link to="/user/dashboard">Dashboard</Link>
-                        </div>
-                    </div>
-                </div>
-                <div className="nb-footer-bottom">
-                    © NextBull 2025. All rights reserved.
-                </div>
-            </footer>
+  return (
+    <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme" attribute="class">
+      <div className="h-screen overflow-hidden bg-background text-foreground flex flex-col font-sans selection:bg-primary/30 relative">
+        {/* Abstract background elements for 'blue black theme' */}
+        <div className="fixed inset-0 pointer-events-none z-[-1]">
+           <div className="absolute top-[10%] left-[20%] w-[500px] h-[500px] bg-blue-600/10 rounded-full blur-[120px]" />
+           <div className="absolute top-[40%] right-[10%] w-[400px] h-[400px] bg-purple-600/10 rounded-full blur-[100px]" />
+           <div className="absolute bottom-[10%] left-[30%] w-[600px] h-[600px] bg-primary/5 rounded-full blur-[150px]" />
         </div>
-    );
+
+        <Navbar />
+        
+        {/* Main container */}
+        <main className="flex-1 min-h-0 p-4 lg:p-6 max-w-[2000px] w-full mx-auto flex flex-col gap-6 z-10">
+          
+          {/* Top Row: Wallet, Bots (reduced width) */}
+          <div className="flex flex-col md:flex-row gap-6 animate-in fade-in slide-in-from-bottom-4 duration-700 shrink-0">
+             
+             <div className="w-full md:w-80 md:h-[220px]">
+               <WalletWidget 
+                 balance={mockData.user.wallet.balance}
+                 pnlValue={mockData.user.wallet.pnlValue}
+                 pnlPercentage={mockData.user.wallet.pnlPercentage}
+                 isPositive={mockData.user.wallet.isPositive}
+               />
+             </div>
+             
+             <div className="w-full md:w-[550px] shrink-0 md:h-[220px]">
+               <BotsWidget 
+                 bots={mockData.bots}
+                 selectedBotId={selectedBotId}
+                 onSelectBot={setSelectedBotId}
+               />
+             </div>
+             
+             {/* Market Performers occupying remaining space */}
+             <div className="hidden md:block flex-1 min-w-0 md:h-[220px]">
+               <MarketPerformersWidget performers={mockData.marketPerformers} />
+             </div>
+          </div>
+
+          {/* Bottom Row: List Detail (2/3 width), List (1/3 width) - fully scrollable area */}
+          <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-6 items-stretch animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-150">
+            <div className="lg:w-2/3 h-full overflow-y-auto pr-2 custom-scrollbar">
+               <AssetDetail asset={selectedAsset!} />
+            </div>
+            <div className="lg:w-1/3 h-full overflow-y-auto pr-2 custom-scrollbar">
+               <AssetList 
+                 assets={assetsForBot} 
+                 selectedAssetId={selectedAssetId}
+                 onSelectAsset={setSelectedAssetId}
+               />
+            </div>
+          </div>
+        </main>
+        
+        {/* Footer matching wireframe */}
+        <footer className="p-3 border-t border-border bg-background/50 backdrop-blur-sm z-10 shrink-0">
+          <div className="max-w-[1800px] mx-auto flex items-center justify-between">
+            <p className="text-muted-foreground text-xs tracking-widest font-semibold uppercase">&copy; 2026 NEXTBULL. All rights reserved.</p>
+            <div className="flex gap-4 text-xs tracking-widest font-semibold uppercase text-muted-foreground">
+               <button className="hover:text-primary transition-colors cursor-pointer">Privacy</button>
+               <button className="hover:text-primary transition-colors cursor-pointer">Terms</button>
+            </div>
+          </div>
+        </footer>
+      </div>
+    </ThemeProvider>
+  );
 }
