@@ -162,11 +162,10 @@ interface MarketState {
     prices: Record<string, number>;
     priceChanges: Record<string, number>;
 
+    historySequence: number;
     portfolio: Portfolio;
     openOrders: Order[];
     wsConnected: boolean;
-
-    historySequence: number;
     setTimeframe: (seconds: number) => void;
     setCurrentSymbol: (symbol: string) => void;
     setSymbols: (symbols: string[]) => void;
@@ -250,7 +249,7 @@ const useMarketStore = create<MarketState>((set) => ({
             latestCandle: safeLatest,
             prices: safeLatest ? { ...state.prices, [state.currentSymbol]: safeLatest.close } : state.prices,
             lastPrice: safeLatest ? safeLatest.close : state.lastPrice,
-            historySequence: state.historySequence + 1
+            historySequence: state.historySequence + 1,
         };
     }),
 
@@ -285,7 +284,7 @@ const useMarketStore = create<MarketState>((set) => ({
         };
     }),
 
-    clearCandles: () => set({ candles: [], latestCandle: null }),
+    clearCandles: () => set((state) => ({ candles: [], latestCandle: null, historySequence: state.historySequence + 1 })),
 
     setOrderBook: (bids, asks) => set({ orderBook: { bids, asks } }),
 

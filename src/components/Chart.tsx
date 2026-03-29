@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { createChart, CandlestickSeries, HistogramSeries, LineSeries, AreaSeries, BaselineSeries, ColorType, CrosshairMode } from 'lightweight-charts';
-import type { ISeriesApi, IChartApi } from 'lightweight-charts';
+import type { ISeriesApi, IChartApi, UTCTimestamp } from 'lightweight-charts';
 import useMarketStore, { INDICATOR_COLORS, INDICATOR_LIBRARY, TIMEFRAMES } from '../store/useMarketStore';
+import type { Candle } from '../store/useMarketStore';
+import { requestHistory, isSymbolCached } from '../services/websocket';
 import { useTheme } from '../store/ThemeContext';
 import {
     Search, Crosshair, TrendingUp, Minus, Type, Ruler,
@@ -56,6 +58,11 @@ export function TickerSearch() {
     const storeSymbols = useMarketStore(s => s.symbols);
     const inputRef = useRef<HTMLInputElement>(null);
 
+    const closeSearch = useCallback(() => {
+        setIsOpen(false);
+        setQuery('');
+    }, []);
+
     // Derive tickers list from store - use tickers if available, fall back to symbols
     const tickers = useMemo(() => {
         if (storeTickers.length > 0) return storeTickers;
@@ -65,8 +72,6 @@ export function TickerSearch() {
     useEffect(() => {
         if (isOpen) {
             setTimeout(() => inputRef.current?.focus(), 50);
-        } else {
-            setQuery('');
         }
     }, [isOpen]);
 
@@ -81,18 +86,23 @@ export function TickerSearch() {
 
     const handleSelect = useCallback((symbol: string) => {
         setCurrentSymbol(symbol);
-        setIsOpen(false);
-        setQuery('');
-        // Worker synchronization is now automatically handled globally by zustand subscription
-    }, [setCurrentSymbol]);
+        closeSearch();
+
+        // Immediately clear stale chart data before zustand subscription triggers worker INIT
+        useMarketStore.getState().clearCandles();
+
+        if (!isSymbolCached(symbol)) {
+            requestHistory(symbol);
+        }
+    }, [setCurrentSymbol, closeSearch]);
 
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') setIsOpen(false);
+            if (e.key === 'Escape') closeSearch();
         };
         if (isOpen) window.addEventListener('keydown', handler);
         return () => window.removeEventListener('keydown', handler);
-    }, [isOpen]);
+    }, [isOpen, closeSearch]);
 
     return (
         <div className="ticker-search-container">
@@ -105,12 +115,12 @@ export function TickerSearch() {
             </button>
 
             {isOpen && (
-                <div className="tv-modal-overlay" onClick={() => setIsOpen(false)}>
+                <div className="tv-modal-overlay" onClick={() => closeSearch()}>
                     <div className="tv-modal-content" onClick={e => e.stopPropagation()}>
                         <div className="tv-modal-header">
                             <div className="tv-modal-title-row">
                                 <span className="tv-modal-title">Symbol Search</span>
-                                <button className="tv-modal-close" onClick={() => setIsOpen(false)}>
+                                <button className="tv-modal-close" onClick={() => closeSearch()}>
                                     <X size={18} />
                                 </button>
                             </div>
@@ -170,10 +180,14 @@ export function TickerSearch() {
                                                 </div>
                                             </button>
                                             <button
-                                                className={`p-2 mr-2 rounded hover:bg-[#2a2e39] transition-colors ${isWatched ? 'text-yellow-500' : 'text-[#787b86] opacity-0 group-hover:opacity-100'}`}
+                                                className={`p-2 mr-2 rounded hover:bg-border-subtle transition-colors ${isWatched ? 'text-yellow-500' : 'text-text-secondary opacity-0 group-hover:opacity-100'}`}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    isWatched ? removeFromWatchlist(t.symbol) : addToWatchlist(t.symbol);
+                                                    if (isWatched) {
+                                                        removeFromWatchlist(t.symbol);
+                                                    } else {
+                                                        addToWatchlist(t.symbol);
+                                                    }
                                                 }}
                                                 title={isWatched ? "Remove from Watchlist" : "Add to Watchlist"}
                                             >
@@ -199,13 +213,13 @@ function OHLCVOverlay() {
     const latestCandle = useMarketStore(s => s.latestCandle);
 
     const tf = TIMEFRAMES.find(t => t.seconds === timeframe);
-    const rawData = (crosshairData || latestCandle) as any;
+    const rawData = crosshairData || latestCandle;
 
     if (!rawData) return null;
 
-    const o = rawData.open ?? rawData.value ?? rawData.close ?? 0;
-    const h = rawData.high ?? rawData.value ?? rawData.close ?? 0;
-    const l = rawData.low ?? rawData.value ?? rawData.close ?? 0;
+    const o = rawData.open ?? rawData.close ?? 0;
+    const h = rawData.high ?? rawData.close ?? 0;
+    const l = rawData.low ?? rawData.close ?? 0;
     const c = rawData.close ?? rawData.value ?? 0;
     const v = rawData.volume ?? 0;
 
@@ -290,7 +304,7 @@ function ChartToolbar() {
 }
 
 class ChartErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: Error | null }> {
-    constructor(props: any) { super(props); this.state = { hasError: false, error: null }; }
+    constructor(props: { children: React.ReactNode }) { super(props); this.state = { hasError: false, error: null }; }
     static getDerivedStateFromError(error: Error) { return { hasError: true, error }; }
     render() {
         if (this.state.hasError) {
@@ -315,11 +329,12 @@ function Chart() {
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<IChartApi | null>(null);
     const seriesRef = useRef<{
-        candle: ISeriesApi<"Candlestick">;
+        candle: ISeriesApi<"Candlestick"> | ISeriesApi<"Line"> | ISeriesApi<"Area"> | ISeriesApi<"Baseline">;
         volume: ISeriesApi<"Histogram">;
     } | null>(null);
 
     const candles = useMarketStore(s => s.candles);
+    const historySequence = useMarketStore(s => s.historySequence);
     const enabledIndicators = useMarketStore((s) => s.enabledIndicators);
     const chartType = useMarketStore(s => s.chartType);
     const setCrosshairData = useMarketStore(s => s.setCrosshairData);
@@ -363,12 +378,12 @@ function Chart() {
         });
     }, [theme]);
 
-    const formatCandleData = useCallback((c: any) => {
+    const formatCandleData = useCallback((c: Candle) => {
         if (chartType.toLowerCase().includes('line') || chartType === 'Area' || chartType === 'Baseline') {
-            return { time: c.time as any, value: c.close };
+            return { time: c.time as UTCTimestamp, value: c.close };
         }
         return {
-            time: c.time as any,
+            time: c.time as UTCTimestamp,
             open: c.open,
             high: c.high,
             low: c.low,
@@ -496,14 +511,14 @@ function Chart() {
                 setCrosshairData(null);
                 return;
             }
-            const candleData = param.seriesData.get(mainSeries) as any;
+            const candleData = param.seriesData.get(mainSeries) as { open?: number; high?: number; low?: number; close?: number; value?: number } | undefined;
             if (candleData) {
-                const volData = param.seriesData.get(volumeSeries) as any;
+                const volData = param.seriesData.get(volumeSeries) as { value?: number } | undefined;
                 setCrosshairData({
-                    open: candleData.open,
-                    high: candleData.high,
-                    low: candleData.low,
-                    close: candleData.close,
+                    open: candleData.open ?? candleData.value ?? 0,
+                    high: candleData.high ?? candleData.value ?? 0,
+                    low: candleData.low ?? candleData.value ?? 0,
+                    close: candleData.close ?? candleData.value ?? 0,
                     volume: volData?.value ?? 0,
                     time: param.time as number,
                 });
@@ -511,14 +526,14 @@ function Chart() {
         });
 
         chartRef.current = chart;
-        seriesRef.current = { candle: mainSeries as any, volume: volumeSeries };
+        seriesRef.current = { candle: mainSeries, volume: volumeSeries };
 
         // Init with existing candles if component mounts after websocket already received them
         const existingCandles = useMarketStore.getState().candles;
         if (existingCandles.length > 0 && Array.isArray(existingCandles)) {
-            mainSeries.setData(existingCandles.map(formatCandleData) as any[]);
+            mainSeries.setData(existingCandles.map(formatCandleData) as Parameters<typeof mainSeries.setData>[0]);
             volumeSeries.setData(existingCandles.map(c => ({
-                time: c.time as any,
+                time: c.time as UTCTimestamp,
                 value: c.volume,
                 color: c.close >= c.open ? 'rgba(38,166,154,0.35)' : 'rgba(239,83,80,0.35)'
             })));
@@ -545,35 +560,27 @@ function Chart() {
         };
     }, [removeAllIndicatorSeries, setCrosshairData, theme, chartType, formatCandleData]);
 
-    // When candles array is cleared (timeframe/symbol change), reset chart data
+    // Batch data sync — triggers only on history load/clear (historySequence), not individual candle updates
     useEffect(() => {
-        if (seriesRef.current && candles.length === 0) {
+        if (!seriesRef.current) return;
+        const currentCandles = useMarketStore.getState().candles;
+
+        if (currentCandles.length === 0) {
             seriesRef.current.candle.setData([]);
             seriesRef.current.volume.setData([]);
+            return;
         }
-    }, [candles.length === 0]);
 
-    const historySequence = useMarketStore(s => s.historySequence);
-
-    // Keep base candle + volume data in sync
-    // Initial candle data (History)
-    useEffect(() => {
-        if (!seriesRef.current || candles.length === 0) return;
-
-        // Use setData for the initial load or large history update
-        seriesRef.current.candle.setData(candles.map(formatCandleData));
-        seriesRef.current.volume.setData(candles.map(c => ({
-            time: c.time as any,
+        seriesRef.current.candle.setData(currentCandles.map(formatCandleData));
+        seriesRef.current.volume.setData(currentCandles.map(c => ({
+            time: c.time as UTCTimestamp,
             value: c.volume,
             color: c.close >= c.open ? 'rgba(38, 166, 154, 0.5)' : 'rgba(239, 83, 80, 0.5)',
         })));
 
-        // Fix for "not appearing" - ensure chart scales to fit data if it's the first bit of data
-        if (candles.length > 0 && candles.length < 50) {
-            chartRef.current?.timeScale().fitContent();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [historySequence, formatCandleData]); // Trigger explicitly on sequence bump, length overlap is no longer an issue
+        // Scroll to latest candle — prevents "replay from start" on initial load
+        chartRef.current?.timeScale().scrollToRealTime();
+    }, [historySequence, formatCandleData]);
 
     // Real-time updates
     const latestCandle = useMarketStore(s => s.latestCandle);
@@ -583,7 +590,7 @@ function Chart() {
         const formatted = formatCandleData(latestCandle);
         seriesRef.current.candle.update(formatted);
         seriesRef.current.volume.update({
-            time: latestCandle.time as any,
+            time: latestCandle.time as UTCTimestamp,
             value: latestCandle.volume,
             color: latestCandle.close >= latestCandle.open ? 'rgba(38, 166, 154, 0.5)' : 'rgba(239, 83, 80, 0.5)',
         });
@@ -601,8 +608,8 @@ function Chart() {
 
         const lineDataFromValues = (values: Array<number | null>) => (
             values
-                .map((value, idx) => (value == null ? null : { time: candles[idx].time as any, value }))
-                .filter((point): point is { time: any; value: number } => point !== null)
+                .map((value, idx) => (value == null ? null : { time: candles[idx].time as UTCTimestamp, value }))
+                .filter((point): point is { time: UTCTimestamp; value: number } => point !== null)
         );
 
         if (enabledIndicators.includes('sma20')) {
@@ -719,12 +726,12 @@ function Chart() {
                         value == null
                             ? null
                             : {
-                                time: candles[idx].time as any,
+                                time: candles[idx].time as UTCTimestamp,
                                 value,
                                 color: value >= 0 ? 'rgba(38,166,154,0.5)' : 'rgba(239,83,80,0.5)',
                             }
                     ))
-                    .filter((point): point is { time: any; value: number; color: string } => point !== null)
+                    .filter((point): point is { time: UTCTimestamp; value: number; color: string } => point !== null)
             );
 
             addLineIndicator(macdLine);

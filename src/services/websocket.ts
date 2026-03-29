@@ -19,6 +19,12 @@ candleWorker.onmessage = (e) => {
     }
 };
 
+// Track which symbols already have history fetched — avoids redundant re-fetches
+const fetchedSymbols = new Set<string>();
+export function isSymbolCached(symbol: string): boolean {
+    return fetchedSymbols.has(symbol);
+}
+
 /**
  * Change the candle timeframe. Call this when the user clicks a timeframe button.
  * It re-initializes the worker which clears history and starts fresh aggregation.
@@ -34,7 +40,9 @@ useMarketStore.subscribe((state, prevState) => {
             type: 'INIT',
             payload: { timeframeSec: state.timeframe, symbol: state.currentSymbol }
         });
-        requestHistory();
+        if (!isSymbolCached(state.currentSymbol)) {
+            requestHistory();
+        }
     }
 });
 
@@ -48,7 +56,7 @@ class WSManager {
     private url: string;
     private ws: WebSocket | null = null;
     private reconnectDelay = 1000;
-    private reconnectTimer: any = null;
+    private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
     constructor(url: string) {
         this.url = url;
@@ -63,9 +71,10 @@ class WSManager {
             useMarketStore.getState().setWsConnected(true);
 
             // Initialize the candle worker with current timeframe
+            const initState = useMarketStore.getState();
             candleWorker.postMessage({
                 type: 'INIT',
-                payload: { timeframeSec: useMarketStore.getState().timeframe }
+                payload: { timeframeSec: initState.timeframe, symbol: initState.currentSymbol }
             });
 
             // Ask for symbol list in case welcome arrives before UI is ready.
@@ -92,12 +101,12 @@ class WSManager {
 
                 if (msgType === 'welcome' || msgType === 'symbols') {
                     const rawSymbols = Array.isArray(msg.symbols) ? msg.symbols : [];
-                    const symbols = rawSymbols.map((item: any) => typeof item === 'string' ? item : item.symbol).filter(Boolean);
-                    const tickers = rawSymbols.map((item: any) => ({
+                    const symbols = rawSymbols.map((item: { symbol?: string; name?: string; category?: string; asset_type?: string } | string) => typeof item === 'string' ? item : item.symbol).filter(Boolean);
+                    const tickers = rawSymbols.map((item: { symbol?: string; name?: string; category?: string; asset_type?: string } | string) => ({
                         symbol: typeof item === 'string' ? item : item.symbol,
-                        name: item.name || '',
-                        category: item.category || item.asset_type || 'Stocks',
-                    })).filter((t: any) => t.symbol);
+                        name: typeof item === 'string' ? '' : (item.name || ''),
+                        category: typeof item === 'string' ? 'Stocks' : (item.category || item.asset_type || 'Stocks'),
+                    })).filter((t: { symbol?: string }) => t.symbol);
 
                     if (symbols.length > 0) {
                         state.setSymbols(symbols);
@@ -167,7 +176,7 @@ class WSManager {
                 if (msgType === 'history') {
                     // if (msg.symbol !== state.currentSymbol) return; // This line moves down
 
-                    const candles = msg.candles.map((c: any) => ({
+                    const candles = msg.candles.map((c: Record<string, unknown>) => ({
                         time: normalizeToSec(c.t ?? c.ts ?? c.time),
                         open: Number(c.o || 0),
                         high: Number(c.h || 0),
@@ -181,6 +190,7 @@ class WSManager {
                     }
 
                     if (msg.symbol !== state.currentSymbol) return;
+                    fetchedSymbols.add(msg.symbol);
                     candleWorker.postMessage({ type: 'HISTORY', payload: candles });
                     return;
                 }
@@ -265,12 +275,13 @@ class WSManager {
                     console.warn('Server error:', msg.message);
                     return;
                 }
-            } catch (err) {
+            } catch {
                 // ignore JSON errors
             }
         };
 
         this.ws.onclose = () => {
+            fetchedSymbols.clear();
             useMarketStore.getState().setWsConnected(false);
             console.log(`WS closed, reconnecting in ${this.reconnectDelay}ms`);
             if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
@@ -279,7 +290,7 @@ class WSManager {
         };
     }
 
-    send(message: any) {
+    send(message: Record<string, unknown>) {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
             this.ws.send(JSON.stringify(message));
         }

@@ -8,6 +8,8 @@ import {
   Activity, ArrowUpRight, ArrowDownRight, X, ExternalLink,
 } from 'lucide-react';
 
+import type { LucideIcon } from 'lucide-react';
+
 const SYMBOL_COLORS: Record<string, string> = {
   AAPL: '#555555', GOOGL: '#4285F4', MSFT: '#7FBA00', AMZN: '#FF9900',
   TSLA: '#CC0000', META: '#1877F2', NVDA: '#76B900', JPM: '#003A70',
@@ -24,7 +26,7 @@ function fmtUsd(value: number): string {
 
 // ─── Stat Card ───────────────────────────────────────────────
 function StatCard({ label, value, icon: Icon, change, subtitle }: {
-  label: string; value: string; icon: any; change?: number; subtitle?: string;
+  label: string; value: string; icon: LucideIcon; change?: number; subtitle?: string;
 }) {
   return (
     <div className="dash-card p-5 flex flex-col gap-3 group">
@@ -61,7 +63,7 @@ export default function Dashboard() {
     if (!wsConnected) {
       wsManager.connect();
     }
-  }, []);
+  }, [wsConnected]);
 
   useEffect(() => {
     if (wsConnected) {

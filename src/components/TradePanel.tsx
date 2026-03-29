@@ -68,7 +68,7 @@ export default function TradePanel() {
                     <button
                         key={t}
                         className={`tv-trade-type-btn ${type === t ? 'active' : ''}`}
-                        onClick={() => setType(t as any)}
+                        onClick={() => setType(t as 'limit' | 'market')}
                     >
                         {t.charAt(0).toUpperCase() + t.slice(1)}
                     </button>

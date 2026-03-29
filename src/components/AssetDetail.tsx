@@ -17,7 +17,7 @@ interface AssetDetailProps {
   };
 }
 
-const CustomTooltip = ({ active, payload }: any) => {
+const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: { time: string }; value: number }> }) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-background/90 backdrop-blur-md border border-border p-3 rounded-md shadow-2xl">

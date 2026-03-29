@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { TrendingDown, Plus, MoreHorizontal, LayoutGrid, ExternalLink, Pencil, Info, X } from 'lucide-react';
 import useMarketStore from '../store/useMarketStore';
-import { candleWorker, requestHistory } from '../services/websocket';
+import { candleWorker, requestHistory, isSymbolCached } from '../services/websocket';
 
 export default function Watchlist({ onClose }: { onClose?: () => void }) {
     const watchlist = useMarketStore(s => s.watchlist);
@@ -15,9 +15,12 @@ export default function Watchlist({ onClose }: { onClose?: () => void }) {
     const handleSelect = (symbol: string) => {
         if (symbol === currentSymbol) return;
         setCurrentSymbol(symbol);
+        useMarketStore.getState().clearCandles();
         const timeframeSec = useMarketStore.getState().timeframe;
-        candleWorker.postMessage({ type: 'INIT', payload: { timeframeSec } });
-        requestHistory(symbol);
+        candleWorker.postMessage({ type: 'INIT', payload: { timeframeSec, symbol } });
+        if (!isSymbolCached(symbol)) {
+            requestHistory(symbol);
+        }
     };
 
     // Derived mock stats for the detailed view
@@ -90,11 +93,11 @@ export default function Watchlist({ onClose }: { onClose?: () => void }) {
                                 {price.toFixed(2)}
                             </div>
 
-                            <div className={`w-12 text-right text-[11px] font-mono ${isUp ? 'text-[#26a69a]' : 'text-[#ef5350]'}`}>
+                            <div className={`w-12 text-right text-[11px] font-mono ${isUp ? 'text-bull' : 'text-bear'}`}>
                                 {isUp ? '+' : ''}{chgVal}
                             </div>
 
-                            <div className={`w-14 text-right text-[11px] font-mono ${isUp ? 'text-[#26a69a]' : 'text-[#ef5350]'}`}>
+                            <div className={`w-14 text-right text-[11px] font-mono ${isUp ? 'text-bull' : 'text-bear'}`}>
                                 {isUp ? '+' : ''}{chgPctStr}%
                             </div>
                         </div>
@@ -103,7 +106,7 @@ export default function Watchlist({ onClose }: { onClose?: () => void }) {
             </div>
 
             {/* Symbol Detail Section (Bottom) */}
-            <div className="border-t border-border-subtle bg-bg-terminal p-4 flex flex-col gap-3 min-h-[320px]">
+            <div className="border-t border-border-subtle bg-bg-terminal p-4 flex flex-col gap-3 min-h-80">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white ${currentSymbol === 'BTC' ? 'bg-[#f7931a]' : 'bg-[#2962ff]'}`}>
@@ -131,7 +134,7 @@ export default function Watchlist({ onClose }: { onClose?: () => void }) {
                     <div className="flex items-baseline gap-2">
                         <span className="text-2xl font-bold text-text-primary font-mono">{lastPrice > 0 ? lastPrice.toFixed(2) : '---'}</span>
                         <span className="text-xs text-text-secondary font-medium">USD</span>
-                        <span className={`text-sm font-bold font-mono ${priceChange24h >= 0 ? 'text-[#26a69a]' : 'text-[#ef5350]'}`}>
+                        <span className={`text-sm font-bold font-mono ${priceChange24h >= 0 ? 'text-bull' : 'text-bear'}`}>
                             {priceChange24h >= 0 ? '+' : ''}{(lastPrice * priceChange24h / 100).toFixed(2)} {priceChange24h >= 0 ? '+' : ''}{priceChange24h.toFixed(2)}%
                         </span>
                     </div>
@@ -142,7 +145,7 @@ export default function Watchlist({ onClose }: { onClose?: () => void }) {
 
                 {/* News/Action mock bar */}
                 <div className="bg-bg-elevated rounded-md p-2 flex items-center gap-3 cursor-pointer hover:bg-border-subtle transition-colors border border-transparent hover:border-[#363a45]">
-                    <div className="w-8 h-8 rounded bg-[#ef5350]/20 flex items-center justify-center text-[#ef5350]">
+                    <div className="w-8 h-8 rounded bg-bear/20 flex items-center justify-center text-bear">
                         <Info size={16} />
                     </div>
                     <div className="flex-1 min-w-0">
