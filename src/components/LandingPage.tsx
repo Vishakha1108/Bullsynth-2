@@ -1,13 +1,22 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import {
     TrendingUp, BarChart3, ArrowUpDown, Activity, Zap, Globe,
-    Brain, Users, Shield, LineChart, Sparkles, ArrowRight
+    Brain, Users, Shield, LineChart, Sparkles, ArrowRight, LogOut
 } from 'lucide-react';
 import { fetchTickers, type Ticker } from '../services/api';
+import useMarketStore from '../store/useMarketStore';
 
 export default function LandingPage() {
     const [tickers, setTickers] = useState<Ticker[]>([]);
+    const userId = useMarketStore((state) => state.userId);
+    const setUserId = useMarketStore((state) => state.setUserId);
+    const navigate = useNavigate();
+
+    const handleLogout = () => {
+        setUserId(null);
+        navigate('/');
+    };
 
     useEffect(() => {
         fetchTickers().then(setTickers);
@@ -27,8 +36,17 @@ export default function LandingPage() {
                         <Link to="/user/dashboard" className="nb-nav-link">Dashboard</Link>
                     </div>
                     <div className="nb-nav-actions">
-                        <Link to="/terminal" className="nb-nav-signin">Sign in</Link>
-                        <Link to="/terminal" className="nb-nav-signup">Sign up</Link>
+                        {userId ? (
+                            <button onClick={handleLogout} className="nb-nav-signin flex items-center gap-2">
+                                <LogOut size={16} />
+                                Logout
+                            </button>
+                        ) : (
+                            <>
+                                <Link to="/terminal" className="nb-nav-signin">Sign in</Link>
+                                <Link to="/terminal" className="nb-nav-signup">Sign up</Link>
+                            </>
+                        )}
                     </div>
                 </div>
             </nav>

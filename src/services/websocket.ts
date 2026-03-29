@@ -138,7 +138,13 @@ class WSManager {
                 if (msgType === 'trade') {
                     const price = Number(msg.price || 0);
                     const sym = String(msg.symbol || state.currentSymbol);
-                    state.setPrice(sym, price);
+                    if (sym === state.currentSymbol && state.candles.length > 0) {
+                        const openPrice = state.candles[0].open;
+                        const change = openPrice > 0 ? ((price - openPrice) / openPrice) * 100 : 0;
+                        state.setPrice(sym, price, change);
+                    } else {
+                        state.setPrice(sym, price);
+                    }
 
                     if (sym !== state.currentSymbol) return;
 
@@ -186,7 +192,10 @@ class WSManager {
                     }));
 
                     if (candles.length > 0) {
-                        state.setPrice(msg.symbol, candles[candles.length - 1].close);
+                        const closePrice = candles[candles.length - 1].close;
+                        const openPrice = candles[0].open;
+                        const change = openPrice > 0 ? ((closePrice - openPrice) / openPrice) * 100 : 0;
+                        state.setPrice(msg.symbol, closePrice, change);
                     }
 
                     if (msg.symbol !== state.currentSymbol) return;
@@ -197,7 +206,13 @@ class WSManager {
 
                 if (msgType === 'candle') {
                     const price = Number(msg.c || 0);
-                    state.setPrice(msg.symbol, price);
+                    if (msg.symbol === state.currentSymbol && state.candles.length > 0) {
+                        const openPrice = state.candles[0].open;
+                        const change = openPrice > 0 ? ((price - openPrice) / openPrice) * 100 : 0;
+                        state.setPrice(msg.symbol, price, change);
+                    } else {
+                        state.setPrice(msg.symbol, price);
+                    }
 
                     const next = {
                         symbol: msg.symbol,
