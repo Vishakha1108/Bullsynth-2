@@ -1,24 +1,33 @@
-import { Activity, LogOut } from "lucide-react";
+import { Activity, LogOut, Monitor } from "lucide-react";
+import { useNavigate } from 'react-router-dom';
 import { ModeToggle } from './mode-toggle';
 
 export function Navbar() {
+  const navigate = useNavigate();
   return (
-    <nav className="w-full h-16 flex items-center justify-between px-8 bg-card border-b border-border shadow-2xl z-50">
-      <div className="flex items-center gap-4">
-        <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary/50 flex items-center justify-center">
-          <Activity className="w-5 h-5 text-primary" />
-        </div>
-        <span className="text-xl font-bold tracking-widest text-foreground">NEXTBULL</span>
-      </div>
+    <nav className="dash-navbar w-full h-14 flex items-center justify-between px-8 z-50">
       <div className="flex items-center gap-6">
-        <ModeToggle />
-        <div className="h-6 w-px bg-border mx-2" />
-        <div className="flex items-center gap-6">
-          <span className="text-lg font-semibold tracking-wide text-foreground">Alex Carter</span>
-          <button className="p-3 bg-background/50 hover:bg-primary/20 rounded-full transition-all cursor-pointer text-muted-foreground hover:text-primary border border-transparent hover:border-primary/30 shadow-lg">
-            <LogOut className="w-5 h-5" />
-          </button>
+        <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/user/dashboard')}>
+          <div className="w-7 h-7 rounded-md bg-accent/20 border border-accent/40 flex items-center justify-center">
+            <Activity className="w-4 h-4 text-accent" />
+          </div>
+          <span className="text-base font-bold tracking-wider text-text-primary">NEXTBULL</span>
         </div>
+        <div className="h-5 w-px bg-border-subtle" />
+        <button
+          onClick={() => navigate('/terminal')}
+          className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-text-secondary hover:text-text-primary dash-nav-btn rounded transition-all cursor-pointer"
+        >
+          <Monitor className="w-3.5 h-3.5" />
+          Terminal
+        </button>
+      </div>
+      <div className="flex items-center gap-4">
+        <ModeToggle />
+        <div className="h-5 w-px bg-border-subtle" />
+        <button className="p-2 dash-nav-btn rounded transition-all cursor-pointer text-text-secondary hover:text-text-primary">
+          <LogOut className="w-4 h-4" />
+        </button>
       </div>
     </nav>
   );

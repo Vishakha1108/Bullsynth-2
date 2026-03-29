@@ -1,11 +1,11 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
+@import "@fontsource-variable/inter";
 
 @custom-variant dark (&:is(.dark *));
 
-@theme inline {
+@theme {
   --color-bg-terminal: #131722;
   --color-bg-panel: #131722;
   --color-bg-elevated: #1e222d;
@@ -15,10 +15,12 @@
   --color-accent: #2962ff;
   --color-bull: #26a69a;
   --color-bear: #ef5350;
+}
 
-  --font-heading: 'Trebuchet MS', -apple-system, sans-serif;
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Trebuchet MS', Roboto, Ubuntu, sans-serif;
-  --font-brand: 'Trebuchet MS', sans-serif;
+@theme inline {
+  --font-heading: 'Inter Variable', -apple-system, sans-serif;
+  --font-sans: 'Inter Variable', -apple-system, BlinkMacSystemFont, Roboto, Ubuntu, sans-serif;
+  --font-brand: 'Inter Variable', sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
 }
 
@@ -2563,6 +2565,113 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   DASHBOARD COMPONENT STYLES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Dashboard root ──────────────────────────────────────────────────────── */
+.dash-root {
+  background: var(--color-bg-terminal);
+  color: var(--color-text-primary);
+}
+
+/* ── Dashboard cards ─────────────────────────────────────────────────────── */
+.dash-card {
+  background: #1e222d;
+  border: 1px solid #2a2e39;
+  border-radius: 0.5rem;
+  transition: border-color 0.2s;
+}
+.dash-card:hover {
+  border-color: #363a45;
+}
+
+.dash-icon-bg {
+  background: #2a2e39;
+}
+
+/* ── Dashboard section headers ───────────────────────────────────────────── */
+.dash-section-header {
+  border-bottom: 1px solid #2a2e39;
+}
+
+/* ── Dashboard table styling ─────────────────────────────────────────────── */
+.dash-table-header {
+  border-bottom: 1px solid #2a2e39;
+}
+.dash-table-row {
+  border-bottom: 1px solid rgba(42, 46, 57, 0.5);
+  transition: background-color 0.15s;
+}
+.dash-table-row:hover {
+  background: rgba(42, 46, 57, 0.3);
+}
+.dash-thead {
+  background: #1e222d;
+}
+
+/* ── Dashboard navbar ────────────────────────────────────────────────────── */
+.dash-navbar {
+  background: #131722;
+  border-bottom: 1px solid #2a2e39;
+}
+.dash-nav-btn:hover {
+  background: #2a2e39;
+}
+
+/* ── Dashboard footer ────────────────────────────────────────────────────── */
+.dash-footer {
+  border-top: 1px solid #2a2e39;
+}
+
+/* ── Dashboard change badges ─────────────────────────────────────────────── */
+.dash-change-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.25rem;
+}
+.dash-change-badge.bull {
+  color: #26a69a;
+  background: rgba(38, 166, 154, 0.1);
+}
+.dash-change-badge.bear {
+  color: #ef5350;
+  background: rgba(239, 83, 80, 0.1);
+}
+
+/* ── Dashboard side badges ───────────────────────────────────────────────── */
+.dash-side-badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.25rem;
+}
+.dash-side-badge.bull {
+  color: #26a69a;
+  background: rgba(38, 166, 154, 0.1);
+}
+.dash-side-badge.bear {
+  color: #ef5350;
+  background: rgba(239, 83, 80, 0.1);
+}
+
+/* ── Dashboard order list ────────────────────────────────────────────────── */
+.dash-order-list > * + * {
+  border-top: 1px solid rgba(42, 46, 57, 0.5);
+}
+.dash-order-item {
+  transition: background-color 0.15s;
+}
+.dash-order-item:hover {
+  background: rgba(42, 46, 57, 0.3);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    LIGHT MODE OVERRIDES  (.light on <html>)
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -2570,6 +2679,19 @@
 .light body {
   background: #f0f3fa;
   color: #131722;
+}
+
+/* ── Theme-aware design tokens ───────────────────────────────────────────── */
+.light {
+  --color-bg-terminal: #f0f3fa;
+  --color-bg-panel: #f0f3fa;
+  --color-bg-elevated: #ffffff;
+  --color-border-subtle: #d1d4dc;
+  --color-text-primary: #131722;
+  --color-text-secondary: #787b86;
+  --color-accent: #2962ff;
+  --color-bull: #26a69a;
+  --color-bear: #ef5350;
 }
 
 /* ── Structural panels / wrappers ────────────────────────────────────────── */
@@ -3096,6 +3218,58 @@
 
 .light .border-\[\#2a2e39\] {
   border-color: #d1d4dc !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DASHBOARD LIGHT MODE OVERRIDES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.light .dash-card {
+  background: #ffffff;
+  border-color: #d1d4dc;
+}
+.light .dash-card:hover {
+  border-color: #b2b5be;
+}
+
+.light .dash-icon-bg {
+  background: #e0e3eb;
+}
+
+.light .dash-section-header {
+  border-bottom-color: #d1d4dc;
+}
+
+.light .dash-table-header {
+  border-bottom-color: #d1d4dc;
+}
+.light .dash-table-row {
+  border-bottom-color: rgba(209, 212, 220, 0.5);
+}
+.light .dash-table-row:hover {
+  background: rgba(209, 212, 220, 0.3);
+}
+.light .dash-thead {
+  background: #ffffff;
+}
+
+.light .dash-navbar {
+  background: #ffffff;
+  border-bottom-color: #d1d4dc;
+}
+.light .dash-nav-btn:hover {
+  background: #e0e3eb;
+}
+
+.light .dash-footer {
+  border-top-color: #d1d4dc;
+}
+
+.light .dash-order-list > * + * {
+  border-top-color: rgba(209, 212, 220, 0.5);
+}
+.light .dash-order-item:hover {
+  background: rgba(209, 212, 220, 0.3);
 }
 
 @theme inline {

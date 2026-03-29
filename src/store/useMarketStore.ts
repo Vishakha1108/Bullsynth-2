@@ -147,6 +147,7 @@ interface MarketState {
     timeframe: number; // in seconds
     currentSymbol: string;
     symbols: string[];
+    tickers: { symbol: string; name: string; category: string }[];
     userId: string | null;
     crosshairData: CrosshairData | null;
     orderBook: { bids: { price: number, qty: number }[], asks: { price: number, qty: number }[] };
@@ -168,6 +169,7 @@ interface MarketState {
     setTimeframe: (seconds: number) => void;
     setCurrentSymbol: (symbol: string) => void;
     setSymbols: (symbols: string[]) => void;
+    setTickers: (tickers: { symbol: string; name: string; category: string }[]) => void;
     setUserId: (uid: string | null) => void;
     resetSymbolData: () => void;
     setCrosshairData: (data: CrosshairData | null) => void;
@@ -196,6 +198,7 @@ const useMarketStore = create<MarketState>((set) => ({
     timeframe: 1, // 1 second default
     currentSymbol: 'AAPL',
     symbols: AVAILABLE_SYMBOLS,
+    tickers: [],
     userId: null,
     crosshairData: null,
     orderBook: { bids: [], asks: [] },
@@ -223,6 +226,7 @@ const useMarketStore = create<MarketState>((set) => ({
     setTimeframe: (seconds) => set({ timeframe: seconds }),
     setCurrentSymbol: (symbol) => set({ currentSymbol: symbol }),
     setSymbols: (symbols) => set({ symbols }),
+    setTickers: (tickers) => set({ tickers }),
     setUserId: (uid) => set({ userId: uid }),
     resetSymbolData: () => set({
         candles: [],

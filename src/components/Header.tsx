@@ -3,12 +3,14 @@ import useMarketStore, { INDICATOR_COLORS, INDICATOR_LIBRARY, TIMEFRAMES } from 
 import { changeTimeframe } from '../services/websocket';
 import { TickerSearch } from './Chart';
 import { useTheme } from '../store/ThemeContext';
+import { useNavigate } from 'react-router-dom';
 import {
     Menu, BarChart3, BarChart2, Bell, RotateCcw,
-    Search, Settings, ChevronDown, Maximize2, Sun, Moon
+    Search, Settings, ChevronDown, Maximize2, Sun, Moon, LayoutDashboard
 } from 'lucide-react';
 
 export default function Header() {
+    const navigate = useNavigate();
     const { theme, toggleTheme } = useTheme();
     const currentPrice = useMarketStore((state) => state.lastPrice);
     const timeframe = useMarketStore((state) => state.timeframe);
@@ -261,6 +263,18 @@ export default function Header() {
                 </button>
                 <button type="button" className="tv-header-btn" title="Fullscreen">
                     <Maximize2 size={16} />
+                </button>
+
+                <div className="tv-header-separator" />
+
+                <button
+                    type="button"
+                    className="tv-header-btn icon-text"
+                    title="Dashboard"
+                    onClick={() => navigate('/user/dashboard')}
+                >
+                    <LayoutDashboard size={16} />
+                    <span>Dashboard</span>
                 </button>
 
                 <div className="tv-header-separator" />

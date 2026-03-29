@@ -3,12 +3,11 @@ import { createChart, CandlestickSeries, HistogramSeries, LineSeries, AreaSeries
 import type { ISeriesApi, IChartApi } from 'lightweight-charts';
 import useMarketStore, { INDICATOR_COLORS, INDICATOR_LIBRARY, TIMEFRAMES } from '../store/useMarketStore';
 import { candleWorker, requestHistory } from '../services/websocket';
-import { fetchTickers, type Ticker } from '../services/api';
 import { useTheme } from '../store/ThemeContext';
 import {
     Search, Crosshair, TrendingUp, Minus, Type, Ruler,
     ChevronDown, X, Pencil, MousePointer2, Hash,
-    MoveHorizontal, ZoomIn, Star, Loader2
+    MoveHorizontal, ZoomIn, Star
 } from 'lucide-react';
 import {
     calculateBollingerBands,
@@ -48,20 +47,24 @@ export function TickerSearch() {
     const [isOpen, setIsOpen] = useState(false);
     const [query, setQuery] = useState('');
     const [tab, setTab] = useState('All');
-    const [tickers, setTickers] = useState<Ticker[]>([]);
 
     const currentSymbol = useMarketStore(s => s.currentSymbol);
     const setCurrentSymbol = useMarketStore(s => s.setCurrentSymbol);
     const watchlist = useMarketStore(s => s.watchlist);
     const addToWatchlist = useMarketStore(s => s.addToWatchlist);
     const removeFromWatchlist = useMarketStore(s => s.removeFromWatchlist);
+    const storeTickers = useMarketStore(s => s.tickers);
+    const storeSymbols = useMarketStore(s => s.symbols);
     const inputRef = useRef<HTMLInputElement>(null);
-    const [loading, setLoading] = useState(false);
+
+    // Derive tickers list from store - use tickers if available, fall back to symbols
+    const tickers = useMemo(() => {
+        if (storeTickers.length > 0) return storeTickers;
+        return storeSymbols.map(s => ({ symbol: s, name: s, category: 'Stocks' }));
+    }, [storeTickers, storeSymbols]);
 
     useEffect(() => {
         if (isOpen) {
-            setLoading(true);
-            fetchTickers().then(setTickers).finally(() => setLoading(false));
             setTimeout(() => inputRef.current?.focus(), 50);
         } else {
             setQuery('');
@@ -148,12 +151,7 @@ export function TickerSearch() {
                         </div>
 
                         <div className="tv-modal-list styling-scrollbar">
-                            {loading ? (
-                                <div className="flex items-center justify-center p-12 text-[#787b86]">
-                                    <Loader2 className="animate-spin mr-2" size={24} />
-                                    <span>Loading symbols...</span>
-                                </div>
-                            ) : filtered.length === 0 ? (
+                            {filtered.length === 0 ? (
                                 <div className="tv-modal-empty">No symbols match your criteria</div>
                             ) : (
                                 filtered.map(t => {

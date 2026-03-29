@@ -87,34 +87,25 @@ class WSManager {
                 const state = useMarketStore.getState();
                 const msgType = msg?.type;
 
-                if (msgType === 'welcome') {
-                    const symbols = Array.isArray(msg.symbols)
-                        ? msg.symbols.map((item: { symbol: string }) => item.symbol).filter(Boolean)
-                        : [];
+                if (msgType === 'welcome' || msgType === 'symbols') {
+                    const rawSymbols = Array.isArray(msg.symbols) ? msg.symbols : [];
+                    const symbols = rawSymbols.map((item: any) => typeof item === 'string' ? item : item.symbol).filter(Boolean);
+                    const tickers = rawSymbols.map((item: any) => ({
+                        symbol: typeof item === 'string' ? item : item.symbol,
+                        name: item.name || '',
+                        category: item.category || item.asset_type || 'Stocks',
+                    })).filter((t: any) => t.symbol);
 
                     if (symbols.length > 0) {
                         state.setSymbols(symbols);
+                        state.setTickers(tickers);
                         if (!symbols.includes(state.currentSymbol)) {
                             state.setCurrentSymbol(symbols[0]);
                         }
                     }
 
-                    if (typeof msg.user_id === 'string') {
+                    if (msgType === 'welcome' && typeof msg.user_id === 'string') {
                         state.setUserId(msg.user_id);
-                    }
-                    return;
-                }
-
-                if (msgType === 'symbols') {
-                    const symbols = Array.isArray(msg.symbols)
-                        ? msg.symbols.map((item: { symbol: string }) => item.symbol).filter(Boolean)
-                        : [];
-
-                    if (symbols.length > 0) {
-                        state.setSymbols(symbols);
-                        if (!symbols.includes(state.currentSymbol)) {
-                            state.setCurrentSymbol(symbols[0]);
-                        }
                     }
                     return;
                 }
@@ -303,4 +294,4 @@ function normalizeToSec(ts: unknown): number {
     return Math.floor(value < 1e12 ? value : value / 1000);
 }
 
-export const wsManager = new WSManager('ws://localhost:9001');
+export const wsManager = new WSManager(import.meta.env.VITE_WS_URL || 'ws://localhost:9001');
