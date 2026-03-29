@@ -159,6 +159,8 @@ interface MarketState {
     enabledIndicators: IndicatorId[];
     chartType: string;
     watchlist: string[];
+    activeTool: string;
+    drawings: any[];
     prices: Record<string, number>;
     priceChanges: Record<string, number>;
 
@@ -166,6 +168,10 @@ interface MarketState {
     portfolio: Portfolio;
     openOrders: Order[];
     wsConnected: boolean;
+
+    // Bot State
+    botStatus: Record<string, 'running' | 'stopped' | 'standby'>;
+    botConfigs: Record<string, any>;
     setTimeframe: (seconds: number) => void;
     setCurrentSymbol: (symbol: string) => void;
     setSymbols: (symbols: string[]) => void;
@@ -190,6 +196,11 @@ interface MarketState {
     addToWatchlist: (symbol: string) => void;
     removeFromWatchlist: (symbol: string) => void;
     setPrice: (symbol: string, price: number, change?: number) => void;
+    setActiveTool: (tool: string) => void;
+    setDrawings: (drawings: any[]) => void;
+    clearDrawings: () => void;
+    setBotStatus: (botId: string, status: 'running' | 'stopped' | 'standby') => void;
+    updateBotConfig: (botId: string, config: any) => void;
 }
 
 const useMarketStore = create<MarketState>((set) => ({
@@ -210,6 +221,8 @@ const useMarketStore = create<MarketState>((set) => ({
     enabledIndicators: [],
     chartType: 'Candles',
     watchlist: ['AAPL', 'BTC', 'ETH'],
+    activeTool: 'crosshair',
+    drawings: [],
     prices: {},
     priceChanges: {},
     historySequence: 0,
@@ -223,6 +236,24 @@ const useMarketStore = create<MarketState>((set) => ({
     },
     openOrders: [],
     wsConnected: false,
+
+    botStatus: {
+        'market_maker': 'stopped',
+        'alpha_bot': 'standby'
+    },
+    botConfigs: {
+        'market_maker': {
+            spread: 0.1,
+            size: 100,
+            maxPosition: 5000,
+            activeSymbol: 'BTC'
+        },
+        'alpha_bot': {
+            strategy: 'Trend Following',
+            riskLevel: 'Medium',
+            timeframe: '5m'
+        }
+    },
 
     setTimeframe: (seconds) => set({ timeframe: seconds }),
     setCurrentSymbol: (symbol) => set({ currentSymbol: symbol }),
@@ -342,6 +373,21 @@ const useMarketStore = create<MarketState>((set) => ({
         }
         return { prices: nextPrices, priceChanges: nextChanges };
     }),
+
+    setActiveTool: (tool) => set({ activeTool: tool }),
+    setDrawings: (drawings) => set({ drawings }),
+    clearDrawings: () => set({ drawings: [] }),
+
+    setBotStatus: (botId, status) => set((state) => ({
+        botStatus: { ...state.botStatus, [botId]: status }
+    })),
+
+    updateBotConfig: (botId, config) => set((state) => ({
+        botConfigs: {
+            ...state.botConfigs,
+            [botId]: { ...state.botConfigs[botId], ...config }
+        }
+    })),
 }));
 
 export default useMarketStore;

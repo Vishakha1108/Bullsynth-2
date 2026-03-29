@@ -8,7 +8,7 @@ import { useTheme } from '../store/ThemeContext';
 import {
     Search, Crosshair, TrendingUp, Minus, Type, Ruler,
     ChevronDown, X, Pencil, MousePointer2, Hash,
-    MoveHorizontal, ZoomIn, Star
+    MoveHorizontal, ZoomIn, Star, Trash2, Camera
 } from 'lucide-react';
 import {
     calculateBollingerBands,
@@ -266,7 +266,9 @@ function IndicatorsOverlay() {
 
 // ─── Chart Toolbar (Left side, TradingView drawing tools) ───────────────────
 function ChartToolbar() {
-    const [activeTool, setActiveTool] = useState('crosshair');
+    const activeTool = useMarketStore(s => s.activeTool);
+    const setActiveTool = useMarketStore(s => s.setActiveTool);
+    const clearDrawings = useMarketStore(s => s.clearDrawings);
 
     const tools = [
         { id: 'crosshair', icon: Crosshair, label: 'Crosshair' },
@@ -280,8 +282,11 @@ function ChartToolbar() {
         { id: 'pencil', icon: Pencil, label: 'Draw' },
         null, // separator
         { id: 'fibonacci', icon: Hash, label: 'Fibonacci' },
-        { id: 'measure', icon: Ruler, label: 'Measure' },
+        { id: 'measure', icon: Ruler, label: 'Measure (M)' },
         { id: 'zoom', icon: ZoomIn, label: 'Zoom In' },
+        null, // separator
+        { id: 'clear', icon: Trash2, label: 'Clear All (Alt+C)', action: clearDrawings },
+        { id: 'screenshot', icon: Camera, label: 'Screenshot (Alt+S)' },
     ];
 
     return (
@@ -292,7 +297,10 @@ function ChartToolbar() {
                     <button
                         key={tool.id}
                         className={`chart-toolbar-btn ${activeTool === tool.id ? 'active' : ''}`}
-                        onClick={() => setActiveTool(tool.id)}
+                        onClick={() => {
+                            if (tool.action) tool.action();
+                            else setActiveTool(tool.id);
+                        }}
                         title={tool.label}
                     >
                         <tool.icon size={16} />
@@ -338,6 +346,18 @@ function Chart() {
     const enabledIndicators = useMarketStore((s) => s.enabledIndicators);
     const chartType = useMarketStore(s => s.chartType);
     const setCrosshairData = useMarketStore(s => s.setCrosshairData);
+    const activeTool = useMarketStore(s => s.activeTool);
+    const setActiveTool = useMarketStore(s => s.setActiveTool);
+    const drawings = useMarketStore(s => s.drawings);
+    const setDrawings = useMarketStore(s => s.setDrawings);
+    const clearDrawings = useMarketStore(s => s.clearDrawings);
+
+    const [drawingStatus, setDrawingStatus] = useState<{
+        points: { time: number; price: number }[];
+        type: string;
+    } | null>(null);
+
+    const drawingSeriesRef = useRef<ISeriesApi<"Line">[]>([]);
 
     const indicatorSeriesRef = useRef<IndicatorSeriesBucket>({ line: [], histogram: [] });
 
@@ -354,6 +374,12 @@ function Chart() {
 
     const addHistogramIndicator = useCallback((series: ISeriesApi<'Histogram'>) => {
         indicatorSeriesRef.current.histogram.push(series);
+    }, []);
+
+    const removeAllDrawings = useCallback(() => {
+        if (!chartRef.current) return;
+        drawingSeriesRef.current.forEach(s => chartRef.current?.removeSeries(s));
+        drawingSeriesRef.current = [];
     }, []);
 
     // Apply chart colours based on theme
@@ -526,7 +552,7 @@ function Chart() {
         });
 
         chartRef.current = chart;
-        seriesRef.current = { candle: mainSeries, volume: volumeSeries };
+        seriesRef.current = { candle: mainSeries as any, volume: volumeSeries };
 
         // Init with existing candles if component mounts after websocket already received them
         const existingCandles = useMarketStore.getState().candles;
@@ -581,6 +607,165 @@ function Chart() {
         // Scroll to latest candle — prevents "replay from start" on initial load
         chartRef.current?.timeScale().scrollToRealTime();
     }, [historySequence, formatCandleData]);
+
+    // Shortcuts implementation
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Don't trigger shortcuts if user is typing in an input
+            if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
+
+            const isAlt = e.altKey;
+            const isCtrl = e.ctrlKey || e.metaKey;
+            const key = e.key.toLowerCase();
+
+            // Alt + T: Trendline
+            if (isAlt && key === 't') {
+                e.preventDefault();
+                setActiveTool('trendline');
+            }
+            // Alt + H: Horizontal Line
+            else if (isAlt && key === 'h') {
+                e.preventDefault();
+                setActiveTool('horzline');
+            }
+            // Alt + R: Ray
+            else if (isAlt && key === 'r') {
+                e.preventDefault();
+                setActiveTool('ray');
+            }
+            // Alt + C: Clear All
+            else if (isAlt && key === 'c') {
+                e.preventDefault();
+                clearDrawings();
+            }
+            // T: Text
+            else if (key === 't' && !isAlt && !isCtrl) {
+                e.preventDefault();
+                setActiveTool('text');
+            }
+            // M: Measure
+            else if (key === 'm' && !isAlt && !isCtrl) {
+                e.preventDefault();
+                setActiveTool('measure');
+            }
+            // Escape: Reset to crosshair
+            else if (key === 'escape') {
+                setActiveTool('crosshair');
+                setDrawingStatus(null);
+            }
+            // Alt + S: Screenshot
+            else if (isAlt && key === 's') {
+                e.preventDefault();
+                if (chartRef.current) {
+                    const canvas = chartRef.current.takeScreenshot();
+                    const link = document.createElement('a');
+                    link.download = `chart-${new Date().getTime()}.png`;
+                    link.href = canvas.toDataURL();
+                    link.click();
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [setActiveTool, clearDrawings]);
+
+    // Drawing Logic - Mouse Handlers
+    useEffect(() => {
+        if (!chartRef.current || activeTool === 'crosshair' || activeTool === 'pointer') return;
+
+        const chart = chartRef.current;
+        const container = chartContainerRef.current;
+        if (!container) return;
+
+        const handleMouseDown = (param: any) => {
+            if (!param.time || !param.point) return;
+            const price = seriesRef.current?.candle.coordinateToPrice(param.point.y);
+            if (price === null || price === undefined) return;
+
+            const time = param.time as number;
+
+            if (activeTool === 'horzline') {
+                setDrawings([...drawings, { type: 'horzline', points: [{ time, price }] }]);
+                setActiveTool('crosshair'); // Reset after one click
+                return;
+            }
+
+            if (activeTool === 'text') {
+                const text = prompt("Enter text label:");
+                if (text) {
+                    setDrawings([...drawings, { type: 'text', text, points: [{ time, price }] }]);
+                }
+                setActiveTool('crosshair');
+                return;
+            }
+
+            if (!drawingStatus) {
+                setDrawingStatus({ type: activeTool, points: [{ time, price }] });
+            } else {
+                // Finish drawing
+                setDrawings([...drawings, { ...drawingStatus, points: [...drawingStatus.points, { time, price }] }]);
+                setDrawingStatus(null);
+                if (activeTool !== 'measure') setActiveTool('crosshair');
+            }
+        };
+
+        chart.subscribeClick(handleMouseDown);
+        return () => chart.unsubscribeClick(handleMouseDown);
+    }, [activeTool, drawingStatus, drawings, setDrawings, setActiveTool]);
+
+    // Render drawings
+    useEffect(() => {
+        if (!chartRef.current) return;
+        removeAllDrawings();
+
+        const chart = chartRef.current;
+
+        // Render existing drawings
+        drawings.forEach((d) => {
+            if (d.type === 'horzline') {
+                const line = chart.addSeries(LineSeries, {
+                    color: '#2962ff',
+                    lineWidth: 2,
+                    lineStyle: 0,
+                    lastValueVisible: false,
+                    priceLineVisible: false,
+                });
+                line.setData([
+                    { time: candles[0]?.time as UTCTimestamp, value: d.points[0].price },
+                    { time: candles[candles.length - 1]?.time as UTCTimestamp, value: d.points[0].price },
+                ]);
+                drawingSeriesRef.current.push(line);
+            } else if (d.type === 'trendline' || d.type === 'ray') {
+                const line = chart.addSeries(LineSeries, {
+                    color: '#2962ff',
+                    lineWidth: 2,
+                    priceLineVisible: false,
+                    lastValueVisible: false,
+                });
+                // Simple 2-point line
+                const sortedPoints = [...d.points].sort((a, b) => a.time - b.time);
+                line.setData(sortedPoints.map(p => ({ time: p.time as UTCTimestamp, value: p.price })));
+                drawingSeriesRef.current.push(line);
+            } else if (d.type === 'text') {
+                // Use markers for text labels
+                const candleSeries = seriesRef.current?.candle as any;
+                if (candleSeries && typeof candleSeries.setMarkers === 'function') {
+                    candleSeries.setMarkers([
+                        ...(candleSeries.markers?.() || []),
+                        {
+                            time: d.points[0].time as UTCTimestamp,
+                            position: 'aboveBar',
+                            color: theme === 'dark' ? '#fff' : '#000',
+                            shape: 'arrowUp',
+                            text: d.text,
+                        }
+                    ]);
+                }
+            }
+        });
+
+    }, [drawings, candles, removeAllDrawings, theme]);
 
     // Real-time updates
     const latestCandle = useMarketStore(s => s.latestCandle);
