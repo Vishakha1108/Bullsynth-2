@@ -33,28 +33,69 @@ function normalizeTimestampToSec(input: unknown): number {
     return Math.floor(value < 1e12 ? value : value / 1000);
 }
 
+const rawCache: Record<string, Candle[]> = {};
+let currentSymbol = 'AAPL';
+
 self.onmessage = (e) => {
     const { type, payload } = e.data;
 
     if (type === 'INIT') {
-        // Received when timeframe changes
         timeframeSec = Number(payload?.timeframeSec) > 0 ? Number(payload.timeframeSec) : 60;
+        if (payload?.symbol) currentSymbol = payload.symbol;
+        
         history = [];
-        // Notify chart to clear all existing data
         self.postMessage({ type: 'CLEAR' });
-    }
-    else if (type === 'HISTORY') {
-        const rawCandles = payload; // Array of 1s candles
-        history = []; // Reset history
 
-        for (const c of rawCandles) {
-            const sourceTime = c?.time ?? c?.t ?? c?.ts;
+        const raw = rawCache[currentSymbol] || [];
+        for (const c of raw) {
+            const sourceTime = c.time;
             const normalizedSec = normalizeTimestampToSec(sourceTime);
             const candleTime = Math.floor(normalizedSec / timeframeSec) * timeframeSec;
 
-            if (!Number.isFinite(candleTime)) {
-                continue;
+            if (!Number.isFinite(candleTime)) continue;
+
+            const lastCandle = history.length > 0 ? history[history.length - 1] : null;
+
+            if (lastCandle && !Number.isFinite(lastCandle.time)) {
+                history = [];
             }
+
+            if (!lastCandle || candleTime > lastCandle.time) {
+                history.push({
+                    time: candleTime,
+                    open: c.open,
+                    high: c.high,
+                    low: c.low,
+                    close: c.close,
+                    volume: c.volume,
+                });
+            } else if (candleTime === lastCandle.time) {
+                lastCandle.high = Math.max(lastCandle.high, c.high);
+                lastCandle.low = Math.min(lastCandle.low, c.low);
+                lastCandle.close = c.close;
+                lastCandle.volume += c.volume;
+            }
+        }
+
+        if (history.length > 2000) history = history.slice(-2000);
+        self.postMessage({ type: 'HISTORY_UPDATE', candles: history });
+    }
+    else if (type === 'HISTORY') {
+        const rawCandles = payload; // Array of 1s candles
+        // Note: although backend doesn't send this, we keep support.
+        history = []; // Reset history
+        
+        if (rawCandles && rawCandles.length > 0) {
+            // Assume these belong to current symbol
+            rawCache[currentSymbol] = rawCandles.slice(-5000);
+        }
+
+        for (const c of rawCandles) {
+            const sourceTime = c.time;
+            const normalizedSec = normalizeTimestampToSec(sourceTime);
+            const candleTime = Math.floor(normalizedSec / timeframeSec) * timeframeSec;
+
+            if (!Number.isFinite(candleTime)) continue;
 
             const lastCandle = history.length > 0 ? history[history.length - 1] : null;
 
@@ -83,7 +124,6 @@ self.onmessage = (e) => {
         self.postMessage({ type: 'HISTORY_UPDATE', candles: history });
     }
     else if (type === 'TICK') {
-        // Payload: { price: number, qty: number, timestamp: number }
         const trade = payload;
         const timeInSeconds = normalizeTimestampToSec(trade?.timestamp ?? trade?.time ?? trade?.ts);
         const c = {
@@ -94,9 +134,6 @@ self.onmessage = (e) => {
             close: trade.price,
             volume: trade.qty,
         };
-        // Align candle open time to the timeframe boundary
-        // For example, with 5min (300s) timeframe and timestamp 1711195823:
-        //   candleTime = Math.floor(1711195823 / 300) * 300 = 1711195800
         const candleTime = Math.floor(c.time / timeframeSec) * timeframeSec;
 
         if (!Number.isFinite(candleTime)) {
@@ -111,7 +148,6 @@ self.onmessage = (e) => {
 
         if (!lastCandle || candleTime > lastCandle.time) {
             if (lastCandle && candleTime > lastCandle.time + timeframeSec) {
-                // Fill time gaps with flat candles so chart time is continuous, cap at 500 to prevent OOM
                 let fillTime = lastCandle.time + timeframeSec;
                 if ((candleTime - fillTime) / timeframeSec > 500) {
                     fillTime = candleTime - 500 * timeframeSec;
@@ -133,7 +169,6 @@ self.onmessage = (e) => {
                 }
             }
 
-            // New candle boundary reached
             const newCandle: Candle = {
                 time: candleTime,
                 open: trade.price,
@@ -143,13 +178,11 @@ self.onmessage = (e) => {
                 volume: trade.qty,
             };
             history.push(newCandle);
-            // Keep only the last 2000 candles in memory
             if (history.length > 2000) {
                 history = history.slice(-2000);
             }
             self.postMessage({ type: 'CANDLE_UPDATE', candle: newCandle, isNew: true });
         } else {
-            // Update existing candle
             lastCandle.high = Math.max(lastCandle.high, trade.price);
             lastCandle.low = Math.min(lastCandle.low, trade.price);
             lastCandle.close = trade.price;
@@ -159,7 +192,16 @@ self.onmessage = (e) => {
     }
     else if (type === 'CANDLE_1S') {
         const c = payload;
-        const normalizedSec = normalizeTimestampToSec(c?.time ?? c?.t ?? c?.ts);
+        const sym = c.symbol;
+        if (!sym) return;
+
+        if (!rawCache[sym]) rawCache[sym] = [];
+        rawCache[sym].push(c);
+        if (rawCache[sym].length > 5000) rawCache[sym] = rawCache[sym].slice(-5000);
+
+        if (sym !== currentSymbol) return;
+
+        const normalizedSec = normalizeTimestampToSec(c.time);
         const candleTime = Math.floor(normalizedSec / timeframeSec) * timeframeSec;
 
         if (!Number.isFinite(candleTime)) {
@@ -173,7 +215,6 @@ self.onmessage = (e) => {
         }
 
         if (!lastCandle || candleTime > lastCandle.time) {
-            // New candle boundary or filling a gap
             const newCandle: Candle = {
                 time: candleTime,
                 open: c.open,
@@ -186,11 +227,9 @@ self.onmessage = (e) => {
             if (history.length > 2000) history = history.slice(-2000);
             self.postMessage({ type: 'CANDLE_UPDATE', candle: newCandle, isNew: true });
         } else if (candleTime === lastCandle.time) {
-            // Update existing aggregated candle
             lastCandle.high = Math.max(lastCandle.high, c.high);
             lastCandle.low = Math.min(lastCandle.low, c.low);
             lastCandle.close = c.close;
-            // Since CANDLE_1S aggregates, we just take the max volume to prevent double-counting trades
             lastCandle.volume += c.volume;
             self.postMessage({ type: 'CANDLE_UPDATE', candle: { ...lastCandle }, isNew: false });
         }

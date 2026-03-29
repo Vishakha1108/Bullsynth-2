@@ -186,9 +186,8 @@ class WSManager {
                     const price = Number(msg.c || 0);
                     state.setPrice(msg.symbol, price);
 
-                    if (msg.symbol !== state.currentSymbol) return;
-
                     const next = {
+                        symbol: msg.symbol,
                         time: normalizeToSec(msg.t ?? msg.ts ?? msg.time),
                         open: Number(msg.o || 0),
                         high: Number(msg.h || 0),
