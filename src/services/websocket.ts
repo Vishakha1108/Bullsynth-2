@@ -28,17 +28,20 @@ export function requestHistory(symbol?: string) {
     wsManager.send({ type: 'get_history', symbol: sym });
 }
 
-export function changeTimeframe(seconds: number) {
-    if (useMarketStore.getState().timeframe === seconds) {
-        return;
+useMarketStore.subscribe((state, prevState) => {
+    if (state.currentSymbol !== prevState.currentSymbol || state.timeframe !== prevState.timeframe) {
+        candleWorker.postMessage({
+            type: 'INIT',
+            payload: { timeframeSec: state.timeframe, symbol: state.currentSymbol }
+        });
+        requestHistory();
     }
+});
 
-    useMarketStore.getState().setTimeframe(seconds);
-    candleWorker.postMessage({
-        type: 'INIT',
-        payload: { timeframeSec: seconds }
-    });
-    requestHistory();
+export function changeTimeframe(seconds: number) {
+    if (useMarketStore.getState().timeframe !== seconds) {
+        useMarketStore.getState().setTimeframe(seconds);
+    }
 }
 
 class WSManager {
@@ -156,7 +159,7 @@ class WSManager {
                     state.addTrade(trade);
                     candleWorker.postMessage({
                         type: 'TICK',
-                        payload: { price: trade.price, qty: trade.qty, timestamp: ts }
+                        payload: { price: trade.price, qty: trade.qty, timestamp: ts, symbol: trade.symbol }
                     });
                     return;
                 }

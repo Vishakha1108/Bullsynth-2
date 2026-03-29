@@ -166,6 +166,7 @@ interface MarketState {
     openOrders: Order[];
     wsConnected: boolean;
 
+    historySequence: number;
     setTimeframe: (seconds: number) => void;
     setCurrentSymbol: (symbol: string) => void;
     setSymbols: (symbols: string[]) => void;
@@ -212,6 +213,7 @@ const useMarketStore = create<MarketState>((set) => ({
     watchlist: ['AAPL', 'BTC', 'ETH'],
     prices: {},
     priceChanges: {},
+    historySequence: 0,
 
     portfolio: {
         cash: 100000,
@@ -247,7 +249,8 @@ const useMarketStore = create<MarketState>((set) => ({
             candles: safeCandles,
             latestCandle: safeLatest,
             prices: safeLatest ? { ...state.prices, [state.currentSymbol]: safeLatest.close } : state.prices,
-            lastPrice: safeLatest ? safeLatest.close : state.lastPrice
+            lastPrice: safeLatest ? safeLatest.close : state.lastPrice,
+            historySequence: state.historySequence + 1
         };
     }),
 

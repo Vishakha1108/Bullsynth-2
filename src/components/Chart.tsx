@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import { createChart, CandlestickSeries, HistogramSeries, LineSeries, AreaSeries, BaselineSeries, ColorType, CrosshairMode } from 'lightweight-charts';
 import type { ISeriesApi, IChartApi } from 'lightweight-charts';
 import useMarketStore, { INDICATOR_COLORS, INDICATOR_LIBRARY, TIMEFRAMES } from '../store/useMarketStore';
-import { candleWorker, requestHistory } from '../services/websocket';
 import { useTheme } from '../store/ThemeContext';
 import {
     Search, Crosshair, TrendingUp, Minus, Type, Ruler,
@@ -84,13 +83,7 @@ export function TickerSearch() {
         setCurrentSymbol(symbol);
         setIsOpen(false);
         setQuery('');
-
-        const timeframeSec = useMarketStore.getState().timeframe;
-        candleWorker.postMessage({
-            type: 'INIT',
-            payload: { timeframeSec }
-        });
-        requestHistory(symbol);
+        // Worker synchronization is now automatically handled globally by zustand subscription
     }, [setCurrentSymbol]);
 
     useEffect(() => {
@@ -560,6 +553,8 @@ function Chart() {
         }
     }, [candles.length === 0]);
 
+    const historySequence = useMarketStore(s => s.historySequence);
+
     // Keep base candle + volume data in sync
     // Initial candle data (History)
     useEffect(() => {
@@ -577,7 +572,8 @@ function Chart() {
         if (candles.length > 0 && candles.length < 50) {
             chartRef.current?.timeScale().fitContent();
         }
-    }, [candles.length, formatCandleData]); // Trigger on length change or type change
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [historySequence, formatCandleData]); // Trigger explicitly on sequence bump, length overlap is no longer an issue
 
     // Real-time updates
     const latestCandle = useMarketStore(s => s.latestCandle);

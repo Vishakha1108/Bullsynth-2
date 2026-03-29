@@ -125,6 +125,7 @@ self.onmessage = (e) => {
     }
     else if (type === 'TICK') {
         const trade = payload;
+        if (trade.symbol && trade.symbol !== currentSymbol) return;
         const timeInSeconds = normalizeTimestampToSec(trade?.timestamp ?? trade?.time ?? trade?.ts);
         const c = {
             time: timeInSeconds,
