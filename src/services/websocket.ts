@@ -130,7 +130,9 @@ class WSManager {
 
                     if (sym !== state.currentSymbol) return;
 
-                    const ts = normalizeToMs(msg.ts);
+                    const rawTs = msg.ts ?? msg.t ?? msg.time ?? msg.timestamp;
+                    const fallbackTs = state.latestCandle ? state.latestCandle.time * 1000 : Date.now();
+                    const ts = rawTs ? normalizeToMs(rawTs) : fallbackTs;
                     const inferredSide: 'BUY' | 'SELL' =
                         msg.buyer === state.userId
                             ? 'BUY'
@@ -163,7 +165,7 @@ class WSManager {
                     // if (msg.symbol !== state.currentSymbol) return; // This line moves down
 
                     const candles = msg.candles.map((c: any) => ({
-                        time: normalizeToSec(c.t),
+                        time: normalizeToSec(c.t ?? c.ts ?? c.time),
                         open: Number(c.o || 0),
                         high: Number(c.h || 0),
                         low: Number(c.l || 0),
@@ -187,7 +189,7 @@ class WSManager {
                     if (msg.symbol !== state.currentSymbol) return;
 
                     const next = {
-                        time: normalizeToSec(msg.t),
+                        time: normalizeToSec(msg.t ?? msg.ts ?? msg.time),
                         open: Number(msg.o || 0),
                         high: Number(msg.h || 0),
                         low: Number(msg.l || 0),
@@ -283,15 +285,32 @@ class WSManager {
 }
 
 function normalizeToMs(ts: unknown): number {
-    const value = Number(ts || 0);
-    if (value <= 0) return Date.now();
+    if (typeof ts === 'string') {
+        const trimmed = ts.trim();
+        if (!trimmed) return Date.now();
+
+        const numeric = Number(trimmed);
+        if (Number.isFinite(numeric) && numeric > 0) {
+            if (numeric > 1e14) return Math.floor(numeric / 1000);
+            return numeric < 1e12 ? numeric * 1000 : numeric;
+        }
+
+        const parsed = Date.parse(trimmed);
+        if (Number.isFinite(parsed) && parsed > 0) {
+            return parsed;
+        }
+
+        return Date.now();
+    }
+
+    const value = Number(ts ?? 0);
+    if (!Number.isFinite(value) || value <= 0) return Date.now();
+    if (value > 1e14) return Math.floor(value / 1000);
     return value < 1e12 ? value * 1000 : value;
 }
 
 function normalizeToSec(ts: unknown): number {
-    const value = Number(ts || 0);
-    if (value <= 0) return Math.floor(Date.now() / 1000);
-    return Math.floor(value < 1e12 ? value : value / 1000);
+    return Math.floor(normalizeToMs(ts) / 1000);
 }
 
 export const wsManager = new WSManager(import.meta.env.VITE_WS_URL || 'ws://localhost:9001');

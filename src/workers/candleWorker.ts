@@ -10,12 +10,35 @@ export interface Candle {
 let history: Candle[] = [];
 let timeframeSec = 60; // Default 1 minute
 
+function normalizeTimestampToSec(input: unknown): number {
+    if (typeof input === 'string') {
+        const trimmed = input.trim();
+        if (!trimmed) return Math.floor(Date.now() / 1000);
+
+        const numeric = Number(trimmed);
+        if (Number.isFinite(numeric) && numeric > 0) {
+            return Math.floor(numeric < 1e12 ? numeric : numeric / 1000);
+        }
+
+        const parsed = Date.parse(trimmed);
+        if (Number.isFinite(parsed) && parsed > 0) {
+            return Math.floor(parsed / 1000);
+        }
+
+        return history.length > 0 ? history[history.length - 1].time : Math.floor(Date.now() / 1000);
+    }
+
+    const value = Number(input ?? 0);
+    if (!Number.isFinite(value) || value <= 0) return history.length > 0 ? history[history.length - 1].time : Math.floor(Date.now() / 1000);
+    return Math.floor(value < 1e12 ? value : value / 1000);
+}
+
 self.onmessage = (e) => {
     const { type, payload } = e.data;
 
     if (type === 'INIT') {
         // Received when timeframe changes
-        timeframeSec = payload.timeframeSec;
+        timeframeSec = Number(payload?.timeframeSec) > 0 ? Number(payload.timeframeSec) : 60;
         history = [];
         // Notify chart to clear all existing data
         self.postMessage({ type: 'CLEAR' });
@@ -25,8 +48,19 @@ self.onmessage = (e) => {
         history = []; // Reset history
 
         for (const c of rawCandles) {
-            const candleTime = Math.floor(c.time / timeframeSec) * timeframeSec;
+            const sourceTime = c?.time ?? c?.t ?? c?.ts;
+            const normalizedSec = normalizeTimestampToSec(sourceTime);
+            const candleTime = Math.floor(normalizedSec / timeframeSec) * timeframeSec;
+
+            if (!Number.isFinite(candleTime)) {
+                continue;
+            }
+
             const lastCandle = history.length > 0 ? history[history.length - 1] : null;
+
+            if (lastCandle && !Number.isFinite(lastCandle.time)) {
+                history = [];
+            }
 
             if (!lastCandle || candleTime > lastCandle.time) {
                 history.push({
@@ -51,7 +85,7 @@ self.onmessage = (e) => {
     else if (type === 'TICK') {
         // Payload: { price: number, qty: number, timestamp: number }
         const trade = payload;
-        const timeInSeconds = Math.floor(trade.timestamp / 1000);
+        const timeInSeconds = normalizeTimestampToSec(trade?.timestamp ?? trade?.time ?? trade?.ts);
         const c = {
             time: timeInSeconds,
             open: trade.price,
@@ -65,7 +99,15 @@ self.onmessage = (e) => {
         //   candleTime = Math.floor(1711195823 / 300) * 300 = 1711195800
         const candleTime = Math.floor(c.time / timeframeSec) * timeframeSec;
 
+        if (!Number.isFinite(candleTime)) {
+            return;
+        }
+
         const lastCandle = history.length > 0 ? history[history.length - 1] : null;
+
+        if (lastCandle && !Number.isFinite(lastCandle.time)) {
+            history = [];
+        }
 
         if (!lastCandle || candleTime > lastCandle.time) {
             if (lastCandle && candleTime > lastCandle.time + timeframeSec) {
@@ -117,8 +159,18 @@ self.onmessage = (e) => {
     }
     else if (type === 'CANDLE_1S') {
         const c = payload;
-        const candleTime = Math.floor(c.time / timeframeSec) * timeframeSec;
+        const normalizedSec = normalizeTimestampToSec(c?.time ?? c?.t ?? c?.ts);
+        const candleTime = Math.floor(normalizedSec / timeframeSec) * timeframeSec;
+
+        if (!Number.isFinite(candleTime)) {
+            return;
+        }
+
         const lastCandle = history.length > 0 ? history[history.length - 1] : null;
+
+        if (lastCandle && !Number.isFinite(lastCandle.time)) {
+            history = [];
+        }
 
         if (!lastCandle || candleTime > lastCandle.time) {
             // New candle boundary or filling a gap
