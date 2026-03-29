@@ -2,8 +2,7 @@ import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import {
     TrendingUp, BarChart3, ArrowUpDown, Activity, Zap, Globe,
-    Brain, Users, Shield, LineChart, ChevronRight, LayoutDashboard,
-    Sparkles, ArrowRight
+    Brain, Users, Shield, LineChart, Sparkles, ArrowRight
 } from 'lucide-react';
 import { fetchTickers, type Ticker } from '../services/api';
 
@@ -24,8 +23,6 @@ export default function LandingPage() {
                         <span>NEXTBULL</span>
                     </Link>
                     <div className="nb-nav-links">
-                        <Link to="/" className="nb-nav-link">Products</Link>
-                        <Link to="/" className="nb-nav-link">Markets</Link>
                         <Link to="/terminal" className="nb-nav-link">Terminal</Link>
                         <Link to="/user/dashboard" className="nb-nav-link">Dashboard</Link>
                     </div>
@@ -79,61 +76,8 @@ export default function LandingPage() {
                         </Link>
                         <Link to="/user/dashboard" className="nb-cta-secondary">
                             View Dashboard
-                            <ChevronRight size={16} />
+                            <ArrowRight size={16} />
                         </Link>
-                    </div>
-                </div>
-            </section>
-
-            {/* ── Live Tickers Table ──────────────────────────────────────── */}
-            <section className="nb-section">
-                <div className="nb-section-inner">
-                    <h2 className="nb-section-title">
-                        Capital Markets <span className="nb-hero-gradient">Happen Here</span>
-                    </h2>
-                    <p className="nb-section-desc">
-                        Track and trade across global asset classes. Click any instrument to launch its chart.
-                    </p>
-                    <div className="nb-ticker-table-wrap">
-                        <table className="nb-ticker-table">
-                            <thead>
-                                <tr>
-                                    <th>Symbol</th>
-                                    <th>Name</th>
-                                    <th>Price</th>
-                                    <th>24h Change</th>
-                                    <th>Volume</th>
-                                    <th>Category</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {tickers.map(t => (
-                                    <tr key={t.symbol}>
-                                        <td className="nb-ticker-sym">{t.symbol}</td>
-                                        <td className="nb-ticker-name">{t.name}</td>
-                                        <td className="nb-ticker-price">
-                                            ${t.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </td>
-                                        <td className={`nb-ticker-change ${t.change24h >= 0 ? 'up' : 'down'}`}>
-                                            {t.change24h >= 0 ? '+' : ''}{t.change24h.toFixed(2)}%
-                                        </td>
-                                        <td className="nb-ticker-vol">{t.volume.toLocaleString()}</td>
-                                        <td>
-                                            <span className="nb-ticker-cat">{t.category}</span>
-                                        </td>
-                                        <td>
-                                            <Link
-                                                to={`/terminal?symbol=${encodeURIComponent(t.symbol)}`}
-                                                className="nb-ticker-trade-btn"
-                                            >
-                                                Trade <ChevronRight size={14} />
-                                            </Link>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
                     </div>
                 </div>
             </section>
@@ -161,47 +105,6 @@ export default function LandingPage() {
                 </div>
             </section>
 
-            {/* ── Go Further Section ──────────────────────────────────────── */}
-            <section className="nb-section nb-go-further">
-                <div className="nb-section-inner">
-                    <h2 className="nb-section-title">
-                        Go Further with <span className="nb-hero-gradient">NextBull Terminal</span>
-                    </h2>
-                    <div className="nb-go-further-grid">
-                        {[
-                            { icon: <BarChart3 size={24} />, title: 'Charts', desc: 'Precision charting with multi-timeframe analysis' },
-                            { icon: <Brain size={24} />, title: 'Research', desc: 'Deep fundamental and technical research tools' },
-                            { icon: <Globe size={24} />, title: 'Access', desc: 'Global markets from a single terminal' },
-                            { icon: <LayoutDashboard size={24} />, title: 'Portfolio', desc: 'Track and analyze your portfolio performance' },
-                            { icon: <Users size={24} />, title: 'Collaboration', desc: 'Share ideas and strategies with peers' },
-                            { icon: <Sparkles size={24} />, title: 'AI Engine', desc: 'Predictive analytics and smart alerts' },
-                        ].map((item, i) => (
-                            <Link to="/terminal" key={i} className="nb-gf-card">
-                                <div className="nb-gf-icon">{item.icon}</div>
-                                <div>
-                                    <div className="nb-gf-title">{item.title}</div>
-                                    <div className="nb-gf-desc">{item.desc}</div>
-                                </div>
-                                <ChevronRight size={16} className="nb-gf-arrow" />
-                            </Link>
-                        ))}
-                    </div>
-                </div>
-            </section>
-
-            {/* ── CTA Section ─────────────────────────────────────────────── */}
-            <section className="nb-cta-section">
-                <div className="nb-cta-glow" />
-                <h2 className="nb-cta-title">Dominate.</h2>
-                <p className="nb-cta-desc">
-                    Harness the power of the most powerful financial platform in the world.
-                </p>
-                <Link to="/terminal" className="nb-cta-primary">
-                    Sign Up — It's Free
-                    <ArrowRight size={18} />
-                </Link>
-            </section>
-
             {/* ── Footer ──────────────────────────────────────────────────── */}
             <footer className="nb-footer">
                 <div className="nb-footer-inner">
@@ -215,35 +118,18 @@ export default function LandingPage() {
                     </div>
                     <div className="nb-footer-links">
                         <div className="nb-footer-col">
-                            <h4>Products</h4>
-                            <Link to="/">Deep Research</Link>
-                            <Link to="/">AI Engine</Link>
-                            <Link to="/">Options Trading</Link>
-                            <Link to="/">Financial Analysis</Link>
+                            <h4>Platform</h4>
+                            <Link to="/terminal">Terminal</Link>
+                            <Link to="/user/dashboard">Dashboard</Link>
                         </div>
                         <div className="nb-footer-col">
-                            <h4>Markets</h4>
-                            <Link to="/">All Markets</Link>
-                            <Link to="/">Tokenized Assets</Link>
-                            <Link to="/">NextBull Connect</Link>
-                        </div>
-                        <div className="nb-footer-col">
-                            <h4>Terminal</h4>
-                            <Link to="/terminal">Overview</Link>
-                            <Link to="/">Charts</Link>
-                            <Link to="/user/dashboard">Portfolio</Link>
-                            <Link to="/">Education</Link>
-                        </div>
-                        <div className="nb-footer-col">
-                            <h4>More</h4>
-                            <Link to="/">About</Link>
-                            <Link to="/">Why Us</Link>
-                            <Link to="/">FAQs</Link>
+                            <h4>Company</h4>
+                            <a href="mailto:contact@nextbull.in">Contact</a>
                         </div>
                     </div>
                 </div>
                 <div className="nb-footer-bottom">
-                    © NextBull 2025. All rights reserved.
+                    © NextBull 2026. All rights reserved.
                 </div>
             </footer>
         </div>
