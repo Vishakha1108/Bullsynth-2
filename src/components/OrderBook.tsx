@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
+import { X } from 'lucide-react';
 import useMarketStore from '../store/useMarketStore';
 
-const OrderBook = React.memo(function OrderBook() {
+const OrderBook = React.memo(function OrderBook({ onClose }: { onClose?: () => void }) {
     const { bids, asks } = useMarketStore(state => state.orderBook);
     const lastPrice = useMarketStore(state => state.lastPrice);
     const [displayMode, setDisplayMode] = useState<'both' | 'bids' | 'asks'>('both');
@@ -42,7 +43,10 @@ const OrderBook = React.memo(function OrderBook() {
                         <svg width="14" height="14" viewBox="0 0 14 14"><rect x="1" y="1" width="12" height="12" fill="#ef5350" rx="1" /></svg>
                     </button>
                 </div>
-                <span className="tv-ob-precision">0.01</span>
+                <div className="flex items-center gap-3">
+                    <span className="tv-ob-precision">0.01</span>
+                    {onClose && <X size={16} className="cursor-pointer text-[#787b86] hover:text-[#d1d4dc] transition-colors" onClick={onClose} />}
+                </div>
             </div>
 
             {/* Column headers */}
