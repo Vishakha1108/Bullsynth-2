@@ -1,14 +1,14 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
 import {
     TrendingUp, BarChart3, ArrowUpDown, Activity, Zap, Globe,
     Brain, Users, Shield, LineChart, Sparkles, ArrowRight, LogOut
 } from 'lucide-react';
-import { fetchTickers, type Ticker } from '../services/api';
 import useMarketStore from '../store/useMarketStore';
 
 export default function LandingPage() {
-    const [tickers, setTickers] = useState<Ticker[]>([]);
+    const tickers = useMarketStore((state) => state.tickers);
+    const prices = useMarketStore((state) => state.prices);
+    const priceChanges = useMarketStore((state) => state.priceChanges);
     const userId = useMarketStore((state) => state.userId);
     const setUserId = useMarketStore((state) => state.setUserId);
     const navigate = useNavigate();
@@ -17,10 +17,6 @@ export default function LandingPage() {
         setUserId(null);
         navigate('/');
     };
-
-    useEffect(() => {
-        fetchTickers().then(setTickers);
-    }, []);
 
     return (
         <div className="nb-landing">
@@ -51,19 +47,23 @@ export default function LandingPage() {
             {/* ── Ticker Marquee ──────────────────────────────────────────── */}
             <div className="nb-marquee-bar">
                 <div className="nb-marquee-track">
-                    {[...tickers, ...tickers].map((t, i) => (
-                        <Link
-                            key={`${t.symbol}-${i}`}
-                            to={`/terminal?symbol=${encodeURIComponent(t.symbol)}`}
-                            className="nb-marquee-item"
-                        >
-                            <span className="nb-marquee-sym">{t.symbol}</span>
-                            <span className="nb-marquee-price">${t.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                            <span className={`nb-marquee-change ${t.change24h >= 0 ? 'up' : 'down'}`}>
-                                {t.change24h >= 0 ? '▲' : '▼'} {Math.abs(t.change24h).toFixed(2)}%
-                            </span>
-                        </Link>
-                    ))}
+                    {[...tickers, ...tickers].map((t, i) => {
+                        const price = prices[t.symbol] ?? 0;
+                        const change = priceChanges[t.symbol] ?? 0;
+                        return (
+                            <Link
+                                key={`${t.symbol}-${i}`}
+                                to={`/terminal?symbol=${encodeURIComponent(t.symbol)}`}
+                                className="nb-marquee-item"
+                            >
+                                <span className="nb-marquee-sym">{t.symbol}</span>
+                                <span className="nb-marquee-price">${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                <span className={`nb-marquee-change ${change >= 0 ? 'up' : 'down'}`}>
+                                    {change >= 0 ? '▲' : '▼'} {Math.abs(change).toFixed(2)}%
+                                </span>
+                            </Link>
+                        );
+                    })}
                 </div>
             </div>
 

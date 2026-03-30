@@ -5,7 +5,7 @@ import useMarketStore from '../store/useMarketStore';
 import { wsManager } from '../services/websocket';
 import {
   TrendingUp, TrendingDown, Wallet, BarChart3, DollarSign,
-  Activity, ArrowUpRight, ArrowDownRight, X, ExternalLink,
+  ArrowUpRight, ArrowDownRight, X, ExternalLink,
 } from 'lucide-react';
 
 import type { LucideIcon } from 'lucide-react';
@@ -100,7 +100,7 @@ export default function Dashboard() {
         <div className="max-w-[1600px] mx-auto px-6 py-6 flex flex-col gap-6">
 
           {/* ── Row 1: Stat Cards ── */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <StatCard
               label="Portfolio Value"
               value={fmtUsd(portfolio.totalValue)}
@@ -118,18 +118,6 @@ export default function Dashboard() {
               value={fmtUsd(portfolio.realizedPnl + portfolio.unrealizedPnl)}
               icon={BarChart3}
               change={portfolio.totalValue > 0 ? ((portfolio.realizedPnl + portfolio.unrealizedPnl) / portfolio.totalValue) * 100 : 0}
-            />
-            <StatCard
-              label="Bot 1 P&L"
-              value={fmtUsd(0)}
-              icon={TrendingUp}
-              subtitle="Active"
-            />
-            <StatCard
-              label="Bot 2 P&L"
-              value={fmtUsd(0)}
-              icon={Activity}
-              subtitle="Standby"
             />
           </div>
 
