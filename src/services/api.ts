@@ -51,11 +51,18 @@ export interface BotTrade {
 
 export interface BotPortfolio {
     cash_balance: number;
+    initial_capital: number;
     positions: {
         symbol: string;
         qty: number;
         avg_entry_price: number;
     }[];
+}
+
+export interface DepositResponse {
+    bot_id: string;
+    amount: number;
+    new_cash_balance: number;
 }
 
 export async function fetchBotTrades(botId: string): Promise<BotTrade[]> {
@@ -67,6 +74,19 @@ export async function fetchBotTrades(botId: string): Promise<BotTrade[]> {
 export async function fetchBotPortfolio(botId: string): Promise<BotPortfolio> {
     const res = await fetch(`${API_BASE}/api/bots/${botId}/portfolio`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+}
+
+export async function depositFunds(botId: string, amount: number): Promise<DepositResponse> {
+    const res = await fetch(`${API_BASE}/api/bots/${botId}/deposit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount })
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+    }
     return await res.json();
 }
 

@@ -2,8 +2,8 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Navbar } from "./Navbar";
-import { fetchBotPortfolio, fetchBotTrades, fetchBots, type BotPortfolio, type BotTrade, type Bot } from "../services/api";
-import { ArrowLeft, Wallet, Activity, Clock } from "lucide-react";
+import { fetchBotPortfolio, fetchBotTrades, fetchBots, depositFunds, type BotPortfolio, type BotTrade, type Bot } from "../services/api";
+import { ArrowLeft, Wallet, Activity, Clock, DollarSign } from "lucide-react";
 
 export default function BotDetails() {
   const { id } = useParams<{ id: string }>();
@@ -11,6 +11,28 @@ export default function BotDetails() {
   const [portfolio, setPortfolio] = useState<BotPortfolio | null>(null);
   const [trades, setTrades] = useState<BotTrade[]>([]);
   const [loading, setLoading] = useState(true);
+  const [depositAmount, setDepositAmount] = useState("");
+  const [depositing, setDepositing] = useState(false);
+  const [depositError, setDepositError] = useState<string | null>(null);
+
+  const handleDeposit = async () => {
+    if (!id || !depositAmount) return;
+    const amount = parseFloat(depositAmount);
+    if (isNaN(amount) || amount <= 0) {
+      setDepositError("Enter a valid positive amount");
+      return;
+    }
+    setDepositing(true);
+    setDepositError(null);
+    try {
+      await depositFunds(id, amount);
+      setDepositAmount("");
+    } catch (err: any) {
+      setDepositError(err.message);
+    } finally {
+      setDepositing(false);
+    }
+  };
 
   useEffect(() => {
     async function loadData() {
@@ -83,6 +105,37 @@ export default function BotDetails() {
                       <span className="text-text-secondary">Cash Balance</span>
                       <span className="font-mono text-lg text-accent">${portfolio?.cash_balance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                     </div>
+                    <div className="flex justify-between py-2 border-b border-border-subtle/50">
+                      <span className="text-text-secondary">Total Capital</span>
+                      <span className="font-mono text-sm text-text-secondary">
+                        ${portfolio?.initial_capital?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) ?? "100,000.00"}
+                      </span>
+                    </div>
+
+                    {/* Deposit Funds */}
+                    <div className="flex gap-2 items-center mt-2">
+                      <DollarSign size={16} className="text-text-secondary" />
+                      <input
+                        type="number"
+                        min="0"
+                        step="1000"
+                        placeholder="Amount to deposit"
+                        value={depositAmount}
+                        onChange={(e) => setDepositAmount(e.target.value)}
+                        className="flex-1 bg-bg-terminal border border-border-subtle rounded px-3 py-2 text-sm font-mono text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/40 transition-colors"
+                      />
+                      <button
+                        onClick={handleDeposit}
+                        disabled={depositing || !depositAmount}
+                        className="px-4 py-2 rounded text-sm font-semibold bg-accent text-white hover:bg-accent/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                      >
+                        {depositing ? "Depositing..." : "Deposit"}
+                      </button>
+                    </div>
+                    {depositError && (
+                      <p className="text-xs text-red-500 mt-1">{depositError}</p>
+                    )}
+
                     <div className="mt-2">
                       <span className="text-xs text-text-muted uppercase tracking-wider font-semibold">Active Positions</span>
                       {portfolio?.positions.length === 0 ? (
