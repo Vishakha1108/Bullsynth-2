@@ -6,7 +6,7 @@ import { useTheme } from '../store/ThemeContext';
 import { useNavigate } from 'react-router-dom';
 import {
     Menu, BarChart3, BarChart2, RotateCcw,
-    Search, Settings, Maximize2, Minimize2, Sun, Moon, LayoutDashboard
+    Search, Maximize2, Minimize2, Sun, Moon, LayoutDashboard
 } from 'lucide-react';
 
 export default function Header() {
@@ -283,12 +283,6 @@ export default function Header() {
 
                 <div className="tv-header-separator" />
 
-                <button type="button" className="tv-header-btn" title="Search">
-                    <Search size={16} />
-                </button>
-                <button type="button" className="tv-header-btn" title="Settings">
-                    <Settings size={16} />
-                </button>
                 <button type="button" className="tv-header-btn" title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"} onClick={toggleFullscreen}>
                     {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
                 </button>
