@@ -1,16 +1,10 @@
-import { Activity, LogOut, Monitor, UserCircle, ShieldAlert } from "lucide-react";
+import { Activity, Monitor, UserCircle, ShieldAlert } from "lucide-react";
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ModeToggle } from './mode-toggle';
 
 export function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const setUserId = useMarketStore((state) => state.setUserId);
-
-  const handleLogout = () => {
-    setUserId(null);
-    navigate('/');
-  };
 
   return (
     <nav className="dash-navbar w-full h-14 flex items-center justify-between px-8 z-50">
