@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
 import useMarketStore, { INDICATOR_COLORS, INDICATOR_LIBRARY, TIMEFRAMES } from '../store/useMarketStore';
 import { changeTimeframe } from '../services/websocket';
 import { TickerSearch } from './Chart';
@@ -6,8 +6,85 @@ import { useTheme } from '../store/ThemeContext';
 import { useNavigate } from 'react-router-dom';
 import {
     Menu, BarChart3, BarChart2, RotateCcw,
-    Search, Maximize2, Minimize2, Sun, Moon, LayoutDashboard
+    Search, Maximize2, Minimize2, Sun, Moon, LayoutDashboard, X,
+    UserRound, UserPlus, Wallet, ChartNoAxesColumn, Sigma, Bookmark, Trophy, Flame, ShoppingBag
 } from 'lucide-react';
+
+type StaticIndicator = {
+    id: string;
+    label: string;
+    category: string;
+    description: string;
+    color: string;
+};
+
+const TV_HARDCODED_INDICATORS: StaticIndicator[] = [
+    { id: 'wma', label: 'Weighted Moving Average', category: 'Trend', description: 'Weighted average with recent price emphasis', color: '#f97316' },
+    { id: 'hma', label: 'Hull Moving Average', category: 'Trend', description: 'Low-lag moving average smoothing', color: '#c084fc' },
+    { id: 'alma', label: 'Arnaud Legoux Moving Average', category: 'Trend', description: 'Gaussian-weighted adaptive moving average', color: '#22d3ee' },
+    { id: 'tema', label: 'Triple Exponential Moving Average', category: 'Trend', description: 'Triple-smoothed EMA for trend detection', color: '#2dd4bf' },
+    { id: 'dema', label: 'Double Exponential Moving Average', category: 'Trend', description: 'Reduced-lag EMA smoothing', color: '#f43f5e' },
+    { id: 'supertrend', label: 'Supertrend', category: 'Trend', description: 'ATR-based trend following overlay', color: '#4ade80' },
+    { id: 'psar', label: 'Parabolic SAR', category: 'Trend', description: 'Stop-and-reverse trend tracking points', color: '#facc15' },
+    { id: 'ichimoku', label: 'Ichimoku Cloud', category: 'Trend', description: 'Cloud-based support and resistance system', color: '#60a5fa' },
+    { id: 'adx', label: 'Average Directional Index (14)', category: 'Trend', description: 'Trend strength without direction bias', color: '#94a3b8' },
+    { id: 'aroon', label: 'Aroon', category: 'Trend', description: 'Measures trend changes and momentum', color: '#fb7185' },
+
+    { id: 'atr', label: 'Average True Range (14)', category: 'Volatility', description: 'Volatility measurement over 14 periods', color: '#9ca3af' },
+    { id: 'kc', label: 'Keltner Channels', category: 'Volatility', description: 'EMA channel using ATR envelope', color: '#67e8f9' },
+    { id: 'dc', label: 'Donchian Channels (20)', category: 'Volatility', description: 'High-low breakout channel', color: '#86efac' },
+    { id: 'stddev', label: 'Standard Deviation', category: 'Volatility', description: 'Dispersion of prices around average', color: '#a78bfa' },
+    { id: 'chop', label: 'Choppiness Index (14)', category: 'Volatility', description: 'Ranging versus trending market filter', color: '#fda4af' },
+
+    { id: 'obv', label: 'On Balance Volume', category: 'Volume', description: 'Cumulative volume flow indicator', color: '#fde047' },
+    { id: 'ad', label: 'Accumulation/Distribution', category: 'Volume', description: 'Price and volume accumulation pressure', color: '#fbbf24' },
+    { id: 'cmf', label: 'Chaikin Money Flow (20)', category: 'Volume', description: 'Volume-weighted buying and selling pressure', color: '#f59e0b' },
+    { id: 'vo', label: 'Volume Oscillator', category: 'Volume', description: 'Difference between fast and slow volume averages', color: '#eab308' },
+    { id: 'pvt', label: 'Price Volume Trend', category: 'Volume', description: 'Trend line combining price move and volume', color: '#fcd34d' },
+
+    { id: 'stoch', label: 'Stochastic (14, 3, 3)', category: 'Oscillator', description: 'Momentum oscillator for overbought and oversold', color: '#818cf8' },
+    { id: 'stochrsi', label: 'Stochastic RSI (14)', category: 'Oscillator', description: 'RSI transformed into stochastic oscillator', color: '#6366f1' },
+    { id: 'cci', label: 'Commodity Channel Index (20)', category: 'Oscillator', description: 'Deviation of price from statistical mean', color: '#7c3aed' },
+    { id: 'mom', label: 'Momentum (10)', category: 'Oscillator', description: 'Measures price change speed', color: '#2dd4bf' },
+    { id: 'wpr', label: 'Williams %R (14)', category: 'Oscillator', description: 'Momentum oscillator from 0 to -100', color: '#34d399' },
+    { id: 'ao', label: 'Awesome Oscillator', category: 'Oscillator', description: 'Market momentum around median price', color: '#10b981' },
+    { id: 'ppo', label: 'Percentage Price Oscillator', category: 'Oscillator', description: 'EMA momentum as percentage difference', color: '#14b8a6' },
+    { id: 'roc', label: 'Rate of Change (9)', category: 'Oscillator', description: 'Percent change over selected periods', color: '#06b6d4' },
+    { id: 'trix', label: 'TRIX (15)', category: 'Oscillator', description: 'Triple-smoothed momentum oscillator', color: '#0ea5e9' },
+    { id: 'uo', label: 'Ultimate Oscillator', category: 'Oscillator', description: 'Multi-period momentum pressure oscillator', color: '#38bdf8' },
+];
+
+type IndicatorSidebarItem = {
+    label: string;
+    icon: ComponentType<{ size?: number; className?: string }>;
+};
+
+const INDICATOR_SIDEBAR_GROUPS: Array<{ section: string; items: IndicatorSidebarItem[] }> = [
+    {
+        section: 'Personal',
+        items: [
+            { label: 'My scripts', icon: UserRound },
+            { label: 'Invite-only', icon: UserPlus },
+            { label: 'Purchased', icon: Wallet },
+        ],
+    },
+    {
+        section: 'Built-in',
+        items: [
+            { label: 'Technicals', icon: ChartNoAxesColumn },
+            { label: 'Fundamentals', icon: Sigma },
+        ],
+    },
+    {
+        section: 'Community',
+        items: [
+            { label: "Editors' picks", icon: Bookmark },
+            { label: 'Top', icon: Trophy },
+            { label: 'Trending', icon: Flame },
+            { label: 'Store', icon: ShoppingBag },
+        ],
+    },
+];
 
 export default function Header() {
     const navigate = useNavigate();
@@ -25,6 +102,7 @@ export default function Header() {
 
     const [isIndicatorsOpen, setIsIndicatorsOpen] = useState(false);
     const [indicatorQuery, setIndicatorQuery] = useState('');
+    const [activeIndicatorSection, setActiveIndicatorSection] = useState('Technicals');
     const indicatorsRef = useRef<HTMLDivElement>(null);
 
     const [isFullscreen, setIsFullscreen] = useState(false);
@@ -52,26 +130,32 @@ export default function Header() {
     const [isChartTypeOpen, setIsChartTypeOpen] = useState(false);
     const chartTypesRef = useRef<HTMLDivElement>(null);
 
-    const filteredIndicators = useMemo(() => {
-        const query = indicatorQuery.trim().toLowerCase();
-        if (!query) return INDICATOR_LIBRARY;
-
-        return INDICATOR_LIBRARY.filter((indicator) => (
-            indicator.label.toLowerCase().includes(query)
-            || indicator.description.toLowerCase().includes(query)
-            || indicator.category.toLowerCase().includes(query)
-        ));
-    }, [indicatorQuery]);
-
-    // Group filtered indicators by category for better visual hierarchy
-    const groupedIndicators = useMemo(() => {
+    const groupedWorkingIndicators = useMemo(() => {
         const groups: Record<string, typeof INDICATOR_LIBRARY> = {};
-        for (const ind of filteredIndicators) {
+        for (const ind of INDICATOR_LIBRARY) {
             if (!groups[ind.category]) groups[ind.category] = [];
             groups[ind.category].push(ind);
         }
         return groups;
-    }, [filteredIndicators]);
+    }, []);
+
+    const groupedStaticIndicators = useMemo(() => {
+        const query = indicatorQuery.trim().toLowerCase();
+        const filtered = query
+            ? TV_HARDCODED_INDICATORS.filter((indicator) => (
+                indicator.label.toLowerCase().includes(query)
+                || indicator.description.toLowerCase().includes(query)
+                || indicator.category.toLowerCase().includes(query)
+            ))
+            : TV_HARDCODED_INDICATORS;
+
+        const groups: Record<string, StaticIndicator[]> = {};
+        for (const ind of filtered) {
+            if (!groups[ind.category]) groups[ind.category] = [];
+            groups[ind.category].push(ind);
+        }
+        return groups;
+    }, [indicatorQuery]);
 
     useEffect(() => {
         const onOutsideClick = (event: MouseEvent) => {
@@ -180,7 +264,16 @@ export default function Header() {
                     <button
                         type="button"
                         className={`tv-header-btn icon-text ${isIndicatorsOpen ? 'active' : ''}`}
-                        onClick={() => setIsIndicatorsOpen((prev) => !prev)}
+                        onClick={() => {
+                            setIsIndicatorsOpen((prev) => {
+                                const next = !prev;
+                                if (next) {
+                                    setActiveIndicatorSection('Technicals');
+                                    setIndicatorQuery('');
+                                }
+                                return next;
+                            });
+                        }}
                     >
                         <BarChart3 size={16} />
                         <span>Indicators</span>
@@ -193,60 +286,136 @@ export default function Header() {
                         <div className="tv-indicators-modal">
                             <div className="tv-indicators-modal-head">
                                 <div>
-                                    <h3>Indicators</h3>
-                                    <p>{enabledIndicators.length} active</p>
+                                    <h3>Indicators, metrics, and strategies</h3>
                                 </div>
-                                <button
-                                    type="button"
-                                    className="tv-indicators-clear"
-                                    onClick={() => clearIndicators()}
-                                    disabled={enabledIndicators.length === 0}
-                                >
-                                    Clear All
+                                <button type="button" className="tv-indicators-close" onClick={() => setIsIndicatorsOpen(false)}>
+                                    <X size={20} />
                                 </button>
                             </div>
 
-                            <div className="tv-indicators-search-wrap">
-                                <Search size={14} />
-                                <input
-                                    className="tv-indicators-search"
-                                    type="text"
-                                    value={indicatorQuery}
-                                    onChange={(event) => setIndicatorQuery(event.target.value)}
-                                    placeholder="Search indicators"
-                                />
-                            </div>
+                            <div className="tv-indicators-modal-layout">
+                                <aside className="tv-indicators-sidebar">
+                                    {INDICATOR_SIDEBAR_GROUPS.map((group) => (
+                                        <div key={group.section} className="tv-indicators-sidebar-group">
+                                            <div className="tv-indicators-sidebar-title">{group.section}</div>
+                                            {group.items.map((item) => {
+                                                const Icon = item.icon;
+                                                const isActive = activeIndicatorSection === item.label;
+                                                return (
+                                                <button
+                                                    key={item.label}
+                                                    type="button"
+                                                    className={`tv-indicators-sidebar-item ${isActive ? 'active' : ''}`}
+                                                    onClick={() => {
+                                                        setActiveIndicatorSection(item.label);
+                                                        if (item.label !== 'Technicals') {
+                                                            setIndicatorQuery('');
+                                                        }
+                                                    }}
+                                                >
+                                                    <Icon size={20} className="tv-indicators-sidebar-item-icon" />
+                                                    <span>{item.label}</span>
+                                                </button>
+                                                );
+                                            })}
+                                        </div>
+                                    ))}
+                                </aside>
 
-                            <div className="tv-indicators-list styling-scrollbar">
-                                {Object.entries(groupedIndicators).map(([category, indicators]) => (
-                                    <div key={category}>
-                                        <div className="tv-indicator-category-header">{category}</div>
-                                        {indicators.map((indicator) => {
-                                            const checked = enabledIndicators.includes(indicator.id);
-                                            return (
-                                                <label key={indicator.id} className={`tv-indicator-item ${checked ? 'active' : ''}`}>
-                                                    <div className="tv-indicator-item-left">
-                                                        <span
-                                                            className="tv-indicator-color-dot"
-                                                            style={{ background: INDICATOR_COLORS[indicator.id] }}
-                                                        />
-                                                        <div>
-                                                            <span className="tv-indicator-item-label">{indicator.label}</span>
-                                                            <span className="tv-indicator-item-desc">{indicator.description}</span>
-                                                        </div>
+                                <section className="tv-indicators-content">
+                                    {activeIndicatorSection === 'Technicals' ? (
+                                        <>
+                                            <div className="tv-indicators-search-wrap">
+                                                <Search size={20} />
+                                                <input
+                                                    className="tv-indicators-search"
+                                                    type="text"
+                                                    value={indicatorQuery}
+                                                    onChange={(event) => setIndicatorQuery(event.target.value)}
+                                                    placeholder="Search"
+                                                />
+                                            </div>
+
+                                            <div className="tv-indicators-content-toolbar">
+                                                <p>{enabledIndicators.length} active</p>
+                                                <button
+                                                    type="button"
+                                                    className="tv-indicators-clear"
+                                                    onClick={() => clearIndicators()}
+                                                    disabled={enabledIndicators.length === 0}
+                                                >
+                                                    Clear All
+                                                </button>
+                                            </div>
+
+                                            <div className="tv-indicators-list styling-scrollbar">
+                                                {Object.entries(groupedWorkingIndicators).map(([category, indicators]) => (
+                                                    <div key={category}>
+                                                        <div className="tv-indicator-category-header">{category}</div>
+                                                        {indicators.map((indicator) => {
+                                                            const checked = enabledIndicators.includes(indicator.id);
+                                                            return (
+                                                                <label key={indicator.id} className={`tv-indicator-item ${checked ? 'active' : ''}`}>
+                                                                    <div className="tv-indicator-item-left">
+                                                                        <span
+                                                                            className="tv-indicator-color-dot"
+                                                                            style={{ background: INDICATOR_COLORS[indicator.id] }}
+                                                                        />
+                                                                        <div>
+                                                                            <span className="tv-indicator-item-label">{indicator.label}</span>
+                                                                            <span className="tv-indicator-item-desc">{indicator.description}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="tv-indicator-item-right">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={checked}
+                                                                            onChange={(event) => setIndicatorEnabled(indicator.id, event.target.checked)}
+                                                                        />
+                                                                    </div>
+                                                                </label>
+                                                            );
+                                                        })}
                                                     </div>
-                                                    <div className="tv-indicator-item-right">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={checked}
-                                                            onChange={(event) => setIndicatorEnabled(indicator.id, event.target.checked)}
-                                                        />
+                                                ))}
+
+                                                {Object.entries(groupedStaticIndicators).map(([category, indicators]) => (
+                                                    <div key={`static-${category}`}>
+                                                        <div className="tv-indicator-category-header">{category}</div>
+                                                        {indicators.map((indicator) => (
+                                                            <label key={indicator.id} className="tv-indicator-item">
+                                                                <div className="tv-indicator-item-left">
+                                                                    <span
+                                                                        className="tv-indicator-color-dot"
+                                                                        style={{ background: indicator.color }}
+                                                                    />
+                                                                    <div>
+                                                                        <span className="tv-indicator-item-label">{indicator.label}</span>
+                                                                        <span className="tv-indicator-item-desc">{indicator.description}</span>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="tv-indicator-item-right">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={false}
+                                                                        onChange={() => undefined}
+                                                                    />
+                                                                </div>
+                                                            </label>
+                                                        ))}
                                                     </div>
-                                                </label>
-                                            );
-                                        })}
-                                    </div>
-                                ))}
+                                                ))}
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="tv-indicators-empty-state">
+                                            <div className="tv-indicators-empty-logo" />
+                                            <h4>No personal scripts, yet</h4>
+                                            <p>Start creating your own indicators and strategies with Pine Script®, or remix an existing one to make it yours.</p>
+                                            <button type="button" className="tv-indicators-empty-button">Create script</button>
+                                        </div>
+                                    )}
+                                </section>
                             </div>
                         </div>
                     )}
