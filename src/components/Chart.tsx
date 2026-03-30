@@ -221,7 +221,7 @@ function OHLCVOverlay() {
     const o = rawData.open ?? rawData.close ?? 0;
     const h = rawData.high ?? rawData.close ?? 0;
     const l = rawData.low ?? rawData.close ?? 0;
-    const c = rawData.close ?? 0;
+    const c = rawData.close ?? (rawData as any).value ?? 0;
     const v = rawData.volume ?? 0;
 
     const isUp = c >= o;
