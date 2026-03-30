@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
-import { createChart, CandlestickSeries, HistogramSeries, LineSeries, AreaSeries, BaselineSeries, ColorType, CrosshairMode } from 'lightweight-charts';
-import type { ISeriesApi, IChartApi, UTCTimestamp } from 'lightweight-charts';
+import { createChart, createSeriesMarkers, CandlestickSeries, HistogramSeries, LineSeries, AreaSeries, BaselineSeries, ColorType, CrosshairMode } from 'lightweight-charts';
+import type { ISeriesApi, IChartApi, UTCTimestamp, MouseEventParams } from 'lightweight-charts';
 import useMarketStore, { INDICATOR_COLORS, INDICATOR_LIBRARY, TIMEFRAMES } from '../store/useMarketStore';
 import type { Candle } from '../store/useMarketStore';
 import { requestHistory, isSymbolCached } from '../services/websocket';
@@ -18,6 +18,7 @@ import {
     calculateSMA,
     calculateVWAP,
 } from '../lib/indicators';
+import ReplayControls from './ReplayControls';
 
 type IndicatorSeriesBucket = {
     line: ISeriesApi<'Line'>[];
@@ -220,7 +221,7 @@ function OHLCVOverlay() {
     const o = rawData.open ?? rawData.close ?? 0;
     const h = rawData.high ?? rawData.close ?? 0;
     const l = rawData.low ?? rawData.close ?? 0;
-    const c = rawData.close ?? rawData.value ?? 0;
+    const c = rawData.close ?? 0;
     const v = rawData.volume ?? 0;
 
     const isUp = c >= o;
@@ -554,7 +555,7 @@ function Chart() {
         });
 
         chartRef.current = chart;
-        seriesRef.current = { candle: mainSeries as any, volume: volumeSeries };
+        seriesRef.current = { candle: mainSeries as ISeriesApi<"Candlestick"> | ISeriesApi<"Line"> | ISeriesApi<"Area"> | ISeriesApi<"Baseline">, volume: volumeSeries };
 
         // Init with existing candles if component mounts after websocket already received them
         const existingCandles = useMarketStore.getState().candles;
@@ -681,7 +682,7 @@ function Chart() {
         const container = chartContainerRef.current;
         if (!container) return;
 
-        const handleMouseDown = (param: any) => {
+        const handleMouseDown = (param: MouseEventParams) => {
             if (!param.time || !param.point) return;
             const price = seriesRef.current?.candle.coordinateToPrice(param.point.y);
             if (price === null || price === undefined) return;
@@ -691,6 +692,17 @@ function Chart() {
             if (activeTool === 'horzline') {
                 setDrawings([...drawings, { type: 'horzline', points: [{ time, price }] }]);
                 setActiveTool('crosshair'); // Reset after one click
+                return;
+            }
+
+            if (activeTool === 'replay') {
+                const state = useMarketStore.getState();
+                const startIndex = state.candles.findIndex(c => c.time >= time);
+                if (startIndex > -1) {
+                    state.startReplay(startIndex, [...state.candles]);
+                } else {
+                    state.startReplay(0, [...state.candles]);
+                }
                 return;
             }
 
@@ -753,11 +765,10 @@ function Chart() {
                 line.setData(sortedPoints.map(p => ({ time: p.time as UTCTimestamp, value: p.price })));
                 drawingSeriesRef.current.push(line);
             } else if (d.type === 'text') {
-                // Use markers for text labels
-                const candleSeries = seriesRef.current?.candle as any;
-                if (candleSeries && typeof candleSeries.setMarkers === 'function') {
-                    candleSeries.setMarkers([
-                        ...(candleSeries.markers?.() || []),
+                // Use markers for text labels (v5 API: createSeriesMarkers)
+                const candleSeries = seriesRef.current?.candle;
+                if (candleSeries && d.points[0]) {
+                    createSeriesMarkers(candleSeries, [
                         {
                             time: d.points[0].time as UTCTimestamp,
                             position: 'aboveBar',
@@ -950,6 +961,7 @@ function Chart() {
                     <OHLCVOverlay />
                     <IndicatorsOverlay />
                     <div ref={chartContainerRef} className="chart-canvas" />
+                    <ReplayControls />
                 </div>
             </div>
         </div>

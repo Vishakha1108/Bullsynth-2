@@ -12,7 +12,6 @@ import { List, BookOpen, Bot } from 'lucide-react';
 import BotPanel from './BotPanel';
 
 export default function Terminal() {
-    const [activeBottomTab, setActiveBottomTab] = useState<string | null>(null);
     const [sidebarTab, setSidebarTab] = useState<'watchlist' | 'orderbook' | 'bot'>('orderbook');
     const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
     const [searchParams] = useSearchParams();
@@ -45,13 +44,6 @@ export default function Terminal() {
                         <Chart />
                     </div>
 
-                    {/* Bottom panel (expandable like TradingView) */}
-                    {activeBottomTab && (
-                        <div className="h-[200px] border-t border-border-subtle bg-bg-terminal flex flex-col min-h-0">
-                            {activeBottomTab === 'orderbook' && <OrderBook />}
-                            {activeBottomTab === 'trading' && <RightPanel />}
-                        </div>
-                    )}
                 </div>
 
                 {/* Collapsible Right Area Container */}
@@ -124,7 +116,7 @@ export default function Terminal() {
             </div>
 
             {/* Bottom Status Bar (like TradingView) */}
-            <BottomBar activeTab={activeBottomTab} setActiveTab={setActiveBottomTab} />
+            <BottomBar />
         </div>
     );
 }

@@ -68,6 +68,28 @@ export type IndicatorId =
     | 'rsi14'
     | 'macd';
 
+export interface DrawingPoint {
+    time: number;
+    price: number;
+}
+
+export interface Drawing {
+    type: string;
+    points: DrawingPoint[];
+    text?: string;
+}
+
+export interface BotConfig {
+    spread?: number;
+    size?: number;
+    maxPosition?: number;
+    activeSymbol?: string;
+    strategy?: string;
+    riskLevel?: string;
+    timeframe?: string;
+    [key: string]: string | number | boolean | undefined;
+}
+
 export interface IndicatorDefinition {
     id: IndicatorId;
     label: string;
@@ -111,6 +133,7 @@ export const TIMEFRAMES = [
     { label: '20s', seconds: 20 },
     { label: '1m', seconds: 60 },
     { label: '5m', seconds: 300 },
+    { label: '10m', seconds: 600 },
 ] as const;
 
 function normalizeCandleTime(time: number): number {
@@ -160,7 +183,7 @@ interface MarketState {
     chartType: string;
     watchlist: string[];
     activeTool: string;
-    drawings: any[];
+    drawings: Drawing[];
     prices: Record<string, number>;
     priceChanges: Record<string, number>;
 
@@ -169,9 +192,17 @@ interface MarketState {
     openOrders: Order[];
     wsConnected: boolean;
 
+    // Replay State
+    isReplayMode: boolean;
+    replayCandles: Candle[];
+    replayIndex: number;
+    replaySpeed: number; // updates per second (e.g. 1, 3, 5)
+    isReplaying: boolean;
+    _savedFullHistory?: Candle[];
+    
     // Bot State
     botStatus: Record<string, 'running' | 'stopped' | 'standby'>;
-    botConfigs: Record<string, any>;
+    botConfigs: Record<string, BotConfig>;
     setTimeframe: (seconds: number) => void;
     setCurrentSymbol: (symbol: string) => void;
     setSymbols: (symbols: string[]) => void;
@@ -197,10 +228,17 @@ interface MarketState {
     removeFromWatchlist: (symbol: string) => void;
     setPrice: (symbol: string, price: number, change?: number) => void;
     setActiveTool: (tool: string) => void;
-    setDrawings: (drawings: any[]) => void;
+    setDrawings: (drawings: Drawing[]) => void;
     clearDrawings: () => void;
     setBotStatus: (botId: string, status: 'running' | 'stopped' | 'standby') => void;
-    updateBotConfig: (botId: string, config: any) => void;
+    updateBotConfig: (botId: string, config: Partial<BotConfig>) => void;
+
+    // Replay Actions
+    startReplay: (startIndex: number, allCandles: Candle[]) => void;
+    stopReplay: () => void;
+    setIsReplaying: (playing: boolean) => void;
+    stepReplay: () => void;
+    setReplaySpeed: (speed: number) => void;
 }
 
 const PORTFOLIO_STORAGE_KEY = 'synthetic_bull_portfolio';
@@ -259,6 +297,12 @@ const useMarketStore = create<MarketState>((set) => ({
     openOrders: [],
     wsConnected: false,
 
+    isReplayMode: false,
+    replayCandles: [],
+    replayIndex: 0,
+    replaySpeed: 1,
+    isReplaying: false,
+
     botStatus: {
         'market_maker': 'stopped',
         'alpha_bot': 'standby'
@@ -292,6 +336,8 @@ const useMarketStore = create<MarketState>((set) => ({
     setCrosshairData: (data) => set({ crosshairData: data }),
 
     setCandlesData: (candles, latestCandle = null) => set((state) => {
+        if (state.isReplayMode) return state; // Ignore live history updates during replay
+
         const source = candles || state.candles;
         const safeCandles = sanitizeCandles(source).slice(-2000);
         const safeLatest = latestCandle
@@ -308,6 +354,8 @@ const useMarketStore = create<MarketState>((set) => ({
     }),
 
     setLatestCandle: (candle: Candle) => set((state) => {
+        if (state.isReplayMode) return state; // Ignore live websocket updates during replay
+
         const normalizedCandle = { ...candle, time: normalizeCandleTime(candle.time) };
         const updatedCandles = [...state.candles];
         const lastCandle = updatedCandles.length > 0 ? updatedCandles[updatedCandles.length - 1] : null;
@@ -447,6 +495,77 @@ const useMarketStore = create<MarketState>((set) => ({
             [botId]: { ...state.botConfigs[botId], ...config }
         }
     })),
+
+    // Replay implementaton
+    startReplay: (startIndex, allCandles) => set((state) => ({
+        isReplayMode: true,
+        isReplaying: false,
+        replayIndex: 0,
+        // The user wants it to play from the beginning of history up to the point they clicked (X)
+        replayCandles: allCandles.slice(0, startIndex + 1),
+        // Start visible chart with just the first candle (or empty)
+        candles: allCandles.length > 0 ? [allCandles[0]] : [],
+        latestCandle: allCandles.length > 0 ? allCandles[0] : null,
+        // Save the full history so we can restore it when replay closes!
+        _savedFullHistory: allCandles,
+        historySequence: state.historySequence + 1,
+        activeTool: 'crosshair', // reset tool
+    })),
+
+    stopReplay: () => set((state) => {
+        if (!state.isReplayMode) return state; // Safety guard if we cancel before clicking the chart
+
+        // Restore full history so the chart doesn't break, and is ready for another replay or live mode
+        const restoredCandles = state._savedFullHistory || [];
+        return {
+            isReplayMode: false,
+            isReplaying: false,
+            replayCandles: [],
+            replayIndex: 0,
+            candles: restoredCandles,
+            latestCandle: restoredCandles[restoredCandles.length - 1] || null,
+            _savedFullHistory: undefined,
+            historySequence: state.historySequence + 1,
+        };
+    }),
+
+    setIsReplaying: (playing) => set((state) => {
+        if (playing && state.isReplayMode && state.replayIndex >= state.replayCandles.length - 1) {
+            // Auto-restart from the beginning if they hit play at the end!
+            return {
+                isReplaying: true,
+                replayIndex: 0,
+                candles: state.replayCandles.length > 0 ? [state.replayCandles[0]] : [],
+                latestCandle: state.replayCandles.length > 0 ? state.replayCandles[0] : null,
+                historySequence: state.historySequence + 1, // trigger full chart refresh
+            };
+        }
+        return { isReplaying: playing };
+    }),
+
+    stepReplay: () => set((state) => {
+        if (!state.isReplayMode) return state;
+        const nextIndex = state.replayIndex + 1;
+        
+        if (nextIndex >= state.replayCandles.length) {
+            // End of replay data
+            return { isReplaying: false, replayIndex: nextIndex - 1 };
+        }
+
+        const nextCandle = state.replayCandles[nextIndex];
+        const updatedCandles = [...state.candles, nextCandle];
+        if (updatedCandles.length > 2000) updatedCandles.shift();
+
+        return {
+            replayIndex: nextIndex,
+            candles: updatedCandles,
+            latestCandle: nextCandle,
+            lastPrice: nextCandle.close,
+            prices: { ...state.prices, [state.currentSymbol]: nextCandle.close }
+        };
+    }),
+
+    setReplaySpeed: (speed) => set({ replaySpeed: speed }),
 }));
 
 export default useMarketStore;

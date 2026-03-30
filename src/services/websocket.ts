@@ -44,6 +44,11 @@ useMarketStore.subscribe((state, prevState) => {
             requestHistory();
         }
     }
+
+    if (prevState.isReplayMode && !state.isReplayMode) {
+        // Fresh re-fetch required to bridge the time gap created during Replay
+        requestHistory(state.currentSymbol);
+    }
 });
 
 export function changeTimeframe(seconds: number) {
