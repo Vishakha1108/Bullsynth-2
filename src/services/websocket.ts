@@ -293,6 +293,10 @@ class WSManager {
 
                 if (msgType === 'error') {
                     console.warn('Server error:', msg.message);
+                    const isUnknownType = msg.message?.toLowerCase().includes('unknown message type');
+                    if (!isUnknownType) {
+                        state.addNotification(msg.message || 'An unknown error occurred', 'error');
+                    }
                     return;
                 }
             } catch {
