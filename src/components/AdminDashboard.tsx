@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Navbar } from './Navbar';
 import { fetchBots, createBot, type Bot } from '../services/api';
-import { Check, Copy, Plus, Server, ShieldAlert, Cpu } from 'lucide-react';
+import { Check, Copy, Plus, Server, ShieldAlert, Cpu } from 'lucide-react'; 
+import { Link } from 'react-router-dom';
 
 export default function AdminDashboard() {
   const [bots, setBots] = useState<Bot[]>([]);
@@ -126,7 +127,11 @@ export default function AdminDashboard() {
                             {bot.id}
                           </code>
                         </td>
-                        <td className="px-6 py-4 font-medium text-text-primary">{bot.name}</td>
+                        <td className="px-6 py-4 font-medium text-text-primary">
+                          <Link to={`/admin/dashboard/bot/${bot.id}`} className="hover:text-accent hover:underline flex items-center gap-2 transition-colors">
+                            {bot.name}
+                          </Link>
+                        </td>
                         <td className="px-6 py-4">
                           <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium border ${
                             bot.status === 'active' 

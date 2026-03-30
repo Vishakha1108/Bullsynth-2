@@ -38,3 +38,35 @@ export async function createBot(name: string): Promise<Bot> {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
 }
+
+export interface BotTrade {
+    id: string;
+    bot_id: string;
+    symbol: string;
+    side: string;
+    price: number;
+    qty: number;
+    timestamp: string;
+}
+
+export interface BotPortfolio {
+    cash_balance: number;
+    positions: {
+        symbol: string;
+        qty: number;
+        avg_entry_price: number;
+    }[];
+}
+
+export async function fetchBotTrades(botId: string): Promise<BotTrade[]> {
+    const res = await fetch(`${API_BASE}/api/bots/${botId}/trades`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+}
+
+export async function fetchBotPortfolio(botId: string): Promise<BotPortfolio> {
+    const res = await fetch(`${API_BASE}/api/bots/${botId}/portfolio`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+}
+
