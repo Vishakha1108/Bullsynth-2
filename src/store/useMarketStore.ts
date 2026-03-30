@@ -203,6 +203,34 @@ interface MarketState {
     updateBotConfig: (botId: string, config: any) => void;
 }
 
+const PORTFOLIO_STORAGE_KEY = 'synthetic_bull_portfolio';
+
+const initialPortfolio: Portfolio = (() => {
+    if (typeof window === 'undefined') return {
+        cash: 100000,
+        holdings: [],
+        realizedPnl: 0,
+        unrealizedPnl: 0,
+        totalValue: 100000,
+    };
+
+    const saved = localStorage.getItem(PORTFOLIO_STORAGE_KEY);
+    if (saved) {
+        try {
+            return JSON.parse(saved);
+        } catch (e) {
+            console.error('Failed to parse portfolio from localStorage', e);
+        }
+    }
+    return {
+        cash: 100000,
+        holdings: [],
+        realizedPnl: 0,
+        unrealizedPnl: 0,
+        totalValue: 100000,
+    };
+})();
+
 const useMarketStore = create<MarketState>((set) => ({
     candles: [],
     latestCandle: null,
@@ -227,13 +255,7 @@ const useMarketStore = create<MarketState>((set) => ({
     priceChanges: {},
     historySequence: 0,
 
-    portfolio: {
-        cash: 100000,
-        holdings: [],
-        realizedPnl: 0,
-        unrealizedPnl: 0,
-        totalValue: 100000,
-    },
+    portfolio: initialPortfolio,
     openOrders: [],
     wsConnected: false,
 
@@ -260,12 +282,13 @@ const useMarketStore = create<MarketState>((set) => ({
     setSymbols: (symbols) => set({ symbols }),
     setTickers: (tickers) => set({ tickers }),
     setUserId: (uid) => set({ userId: uid }),
-    resetSymbolData: () => set({
+    resetSymbolData: () => set((state) => ({
         candles: [],
         latestCandle: null,
         orderBook: { bids: [], asks: [] },
         recentTrades: [],
-    }),
+        historySequence: state.historySequence + 1,
+    })),
     setCrosshairData: (data) => set({ crosshairData: data }),
 
     setCandlesData: (candles, latestCandle = null) => set((state) => {
@@ -334,7 +357,43 @@ const useMarketStore = create<MarketState>((set) => ({
     addOrder: (order) => set((state) => ({ openOrders: [...state.openOrders, order] })),
     removeOrder: (orderId) => set((state) => ({ openOrders: state.openOrders.filter((o) => o.order_id !== orderId) })),
     setOpenOrders: (orders) => set({ openOrders: orders }),
-    setPortfolio: (p) => set({ portfolio: p }),
+    setPortfolio: (p) => {
+        set((state) => {
+            // Check if incoming portfolio is the default "reset" state (100k cash, no holdings, no P&L)
+            const isServerReset = p.holdings.length === 0 && p.cash === 100000 && p.realizedPnl === 0 && p.unrealizedPnl === 0;
+            const hasLocalData = state.portfolio.holdings.length > 0;
+
+            if (isServerReset && hasLocalData) {
+                console.log('Preserving local holdings - server appears to have reset');
+                return { portfolio: state.portfolio };
+            }
+
+            // Merge holdings: Keep existing ones if they aren't in the incoming update
+            const mergedHoldings = [...p.holdings];
+            const incomingAssets = new Set(p.holdings.map(h => h.asset));
+
+            for (const localH of state.portfolio.holdings) {
+                if (!incomingAssets.has(localH.asset)) {
+                    mergedHoldings.push(localH);
+                }
+            }
+
+            // Recalculate totals based on merged holdings
+            const totalMarketValue = mergedHoldings.reduce((sum, h) => sum + h.marketValue, 0);
+            const totalUnrealizedPnl = mergedHoldings.reduce((sum, h) => sum + h.unrealizedPnl, 0);
+            const updatedTotalValue = p.cash + totalMarketValue;
+
+            const updatedPortfolio = {
+                ...p,
+                holdings: mergedHoldings,
+                unrealizedPnl: totalUnrealizedPnl,
+                totalValue: updatedTotalValue
+            };
+
+            localStorage.setItem(PORTFOLIO_STORAGE_KEY, JSON.stringify(updatedPortfolio));
+            return { portfolio: updatedPortfolio };
+        });
+    },
 
     toggleIndicator: (indicatorId) => set((state) => ({
         enabledIndicators: state.enabledIndicators.includes(indicatorId)
