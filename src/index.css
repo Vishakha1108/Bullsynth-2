@@ -1741,6 +1741,13 @@
   justify-content: space-between;
 }
 
+.nb-navbar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .nb-logo {
   display: flex;
   align-items: center;
@@ -1764,6 +1771,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  justify-content: flex-end;
 }
 
 .nb-nav-link {
