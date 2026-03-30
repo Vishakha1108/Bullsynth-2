@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
-import { createChart, CandlestickSeries, HistogramSeries, LineSeries, AreaSeries, BaselineSeries, ColorType, CrosshairMode } from 'lightweight-charts';
-import type { ISeriesApi, IChartApi, UTCTimestamp } from 'lightweight-charts';
+import { createChart, createSeriesMarkers, CandlestickSeries, HistogramSeries, LineSeries, AreaSeries, BaselineSeries, ColorType, CrosshairMode } from 'lightweight-charts';
+import type { ISeriesApi, IChartApi, UTCTimestamp, MouseEventParams } from 'lightweight-charts';
 import useMarketStore, { INDICATOR_COLORS, INDICATOR_LIBRARY, TIMEFRAMES } from '../store/useMarketStore';
 import type { Candle } from '../store/useMarketStore';
 import { requestHistory, isSymbolCached } from '../services/websocket';
@@ -18,6 +18,7 @@ import {
     calculateSMA,
     calculateVWAP,
 } from '../lib/indicators';
+import ReplayControls from './ReplayControls';
 
 type IndicatorSeriesBucket = {
     line: ISeriesApi<'Line'>[];
@@ -345,6 +346,7 @@ function Chart() {
     const historySequence = useMarketStore(s => s.historySequence);
     const enabledIndicators = useMarketStore((s) => s.enabledIndicators);
     const chartType = useMarketStore(s => s.chartType);
+    const currentSymbol = useMarketStore(s => s.currentSymbol);
     const setCrosshairData = useMarketStore(s => s.setCrosshairData);
     const activeTool = useMarketStore(s => s.activeTool);
     const setActiveTool = useMarketStore(s => s.setActiveTool);
@@ -360,6 +362,7 @@ function Chart() {
     const drawingSeriesRef = useRef<ISeriesApi<"Line">[]>([]);
 
     const indicatorSeriesRef = useRef<IndicatorSeriesBucket>({ line: [], histogram: [] });
+    const lastSymbolRef = useRef<string>('');
 
     const removeAllIndicatorSeries = useCallback(() => {
         if (!chartRef.current) return;
@@ -552,7 +555,7 @@ function Chart() {
         });
 
         chartRef.current = chart;
-        seriesRef.current = { candle: mainSeries as any, volume: volumeSeries };
+        seriesRef.current = { candle: mainSeries as ISeriesApi<"Candlestick"> | ISeriesApi<"Line"> | ISeriesApi<"Area"> | ISeriesApi<"Baseline">, volume: volumeSeries };
 
         // Init with existing candles if component mounts after websocket already received them
         const existingCandles = useMarketStore.getState().candles;
@@ -606,7 +609,8 @@ function Chart() {
 
         // Scroll to latest candle — prevents "replay from start" on initial load
         chartRef.current?.timeScale().scrollToRealTime();
-    }, [historySequence, formatCandleData]);
+        lastSymbolRef.current = currentSymbol;
+    }, [historySequence, formatCandleData, currentSymbol]);
 
     // Shortcuts implementation
     useEffect(() => {
@@ -678,7 +682,7 @@ function Chart() {
         const container = chartContainerRef.current;
         if (!container) return;
 
-        const handleMouseDown = (param: any) => {
+        const handleMouseDown = (param: MouseEventParams) => {
             if (!param.time || !param.point) return;
             const price = seriesRef.current?.candle.coordinateToPrice(param.point.y);
             if (price === null || price === undefined) return;
@@ -688,6 +692,17 @@ function Chart() {
             if (activeTool === 'horzline') {
                 setDrawings([...drawings, { type: 'horzline', points: [{ time, price }] }]);
                 setActiveTool('crosshair'); // Reset after one click
+                return;
+            }
+
+            if (activeTool === 'replay') {
+                const state = useMarketStore.getState();
+                const startIndex = state.candles.findIndex(c => c.time >= time);
+                if (startIndex > -1) {
+                    state.startReplay(startIndex, [...state.candles]);
+                } else {
+                    state.startReplay(0, [...state.candles]);
+                }
                 return;
             }
 
@@ -731,10 +746,12 @@ function Chart() {
                     lastValueVisible: false,
                     priceLineVisible: false,
                 });
-                line.setData([
-                    { time: candles[0]?.time as UTCTimestamp, value: d.points[0].price },
-                    { time: candles[candles.length - 1]?.time as UTCTimestamp, value: d.points[0].price },
-                ]);
+                if (candles.length > 0 && d.points[0]) {
+                    line.setData([
+                        { time: candles[0].time as UTCTimestamp, value: d.points[0].price },
+                        { time: candles[candles.length - 1].time as UTCTimestamp, value: d.points[0].price },
+                    ]);
+                }
                 drawingSeriesRef.current.push(line);
             } else if (d.type === 'trendline' || d.type === 'ray') {
                 const line = chart.addSeries(LineSeries, {
@@ -748,11 +765,10 @@ function Chart() {
                 line.setData(sortedPoints.map(p => ({ time: p.time as UTCTimestamp, value: p.price })));
                 drawingSeriesRef.current.push(line);
             } else if (d.type === 'text') {
-                // Use markers for text labels
-                const candleSeries = seriesRef.current?.candle as any;
-                if (candleSeries && typeof candleSeries.setMarkers === 'function') {
-                    candleSeries.setMarkers([
-                        ...(candleSeries.markers?.() || []),
+                // Use markers for text labels (v5 API: createSeriesMarkers)
+                const candleSeries = seriesRef.current?.candle;
+                if (candleSeries && d.points[0]) {
+                    createSeriesMarkers(candleSeries, [
                         {
                             time: d.points[0].time as UTCTimestamp,
                             position: 'aboveBar',
@@ -770,16 +786,26 @@ function Chart() {
     // Real-time updates
     const latestCandle = useMarketStore(s => s.latestCandle);
     useEffect(() => {
-        if (!seriesRef.current || !latestCandle) return;
+        if (!seriesRef.current || !latestCandle || !chartRef.current) return;
 
-        const formatted = formatCandleData(latestCandle);
-        seriesRef.current.candle.update(formatted);
-        seriesRef.current.volume.update({
-            time: latestCandle.time as UTCTimestamp,
-            value: latestCandle.volume,
-            color: latestCandle.close >= latestCandle.open ? 'rgba(38, 166, 154, 0.5)' : 'rgba(239, 83, 80, 0.5)',
-        });
-    }, [latestCandle, formatCandleData]);
+        // Safety: Only update if the chart is already showing data for the current symbol
+        // and if it's not in the middle of being cleared/reset.
+        if (lastSymbolRef.current !== currentSymbol || candles.length === 0) {
+            return;
+        }
+
+        try {
+            const formatted = formatCandleData(latestCandle);
+            seriesRef.current.candle.update(formatted);
+            seriesRef.current.volume.update({
+                time: latestCandle.time as UTCTimestamp,
+                value: latestCandle.volume,
+                color: latestCandle.close >= latestCandle.open ? 'rgba(38, 166, 154, 0.5)' : 'rgba(239, 83, 80, 0.5)',
+            });
+        } catch (e) {
+            console.warn('Silent chart update failure:', e);
+        }
+    }, [latestCandle, formatCandleData, currentSymbol, candles.length]);
 
     // Recalculate and redraw indicator series whenever candles or enabled indicators change
     useEffect(() => {
@@ -935,6 +961,7 @@ function Chart() {
                     <OHLCVOverlay />
                     <IndicatorsOverlay />
                     <div ref={chartContainerRef} className="chart-canvas" />
+                    <ReplayControls />
                 </div>
             </div>
         </div>

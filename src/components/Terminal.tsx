@@ -8,12 +8,13 @@ import Watchlist from './Watchlist';
 import RightPanel from './RightPanel';
 import BottomBar from './BottomBar.tsx';
 import useMarketStore from '../store/useMarketStore';
-import { List, BookOpen, Bot } from 'lucide-react';
+import { List, BookOpen, Bot, Wallet } from 'lucide-react';
+import Portfolio from './Portfolio';
 import BotPanel from './BotPanel';
+import NotificationContainer from './Notification';
 
 export default function Terminal() {
-    const [activeBottomTab, setActiveBottomTab] = useState<string | null>(null);
-    const [sidebarTab, setSidebarTab] = useState<'watchlist' | 'orderbook' | 'bot'>('orderbook');
+    const [sidebarTab, setSidebarTab] = useState<'portfolio' | 'watchlist' | 'orderbook' | 'bot'>('orderbook');
     const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
     const [searchParams] = useSearchParams();
     const setCurrentSymbol = useMarketStore((state) => state.setCurrentSymbol);
@@ -45,19 +46,13 @@ export default function Terminal() {
                         <Chart />
                     </div>
 
-                    {/* Bottom panel (expandable like TradingView) */}
-                    {activeBottomTab && (
-                        <div className="h-[200px] border-t border-border-subtle bg-bg-terminal flex flex-col min-h-0">
-                            {activeBottomTab === 'orderbook' && <OrderBook />}
-                            {activeBottomTab === 'trading' && <RightPanel />}
-                        </div>
-                    )}
                 </div>
 
                 {/* Collapsible Right Area Container */}
                 <div className={`overflow-hidden transition-[width] duration-300 ease-in-out border-l border-border-subtle bg-bg-terminal flex flex-col ${isRightPanelOpen ? 'w-[320px]' : 'w-0 border-none'}`}>
                     {/* Top Section: Information View */}
-                    <div className={`min-h-0 overflow-hidden flex flex-col min-w-[320px] ${sidebarTab === 'orderbook' ? 'flex-none border-b border-border-subtle' : 'flex-1'}`}>
+                    <div className={`min-h-0 overflow-hidden flex flex-col min-w-[320px] ${(sidebarTab === 'orderbook' || sidebarTab === 'portfolio') ? 'flex-none border-b border-border-subtle' : 'flex-1'}`}>
+                        {sidebarTab === 'portfolio' && <Portfolio onClose={() => setIsRightPanelOpen(false)} />}
                         {sidebarTab === 'watchlist' && <Watchlist onClose={() => setIsRightPanelOpen(false)} />}
                         {sidebarTab === 'orderbook' && <OrderBook onClose={() => setIsRightPanelOpen(false)} />}
                         {sidebarTab === 'bot' && <BotPanel onClose={() => setIsRightPanelOpen(false)} />}
@@ -73,6 +68,22 @@ export default function Terminal() {
 
                 {/* Thin Far-Right Icon Toolbar (Always visible) */}
                 <div className="w-[56px] bg-bg-terminal border-l border-border-subtle flex flex-col items-center py-4 gap-4 flex-none z-10 transition-colors">
+                    <button
+                        className={`w-12 h-14 rounded flex flex-col items-center justify-center gap-[2px] transition-all cursor-pointer ${sidebarTab === 'portfolio' && isRightPanelOpen ? 'bg-border-subtle text-text-primary shadow-inner' : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated'}`}
+                        onClick={() => {
+                            if (sidebarTab === 'portfolio' && isRightPanelOpen) {
+                                setIsRightPanelOpen(false);
+                            } else {
+                                setSidebarTab('portfolio');
+                                setIsRightPanelOpen(true);
+                            }
+                        }}
+                        title="Portfolio"
+                    >
+                        <Wallet size={18} />
+                        <span className="text-[9px] font-medium leading-[1]">Portfolio</span>
+                    </button>
+
                     <button
                         className={`w-12 h-14 rounded flex flex-col items-center justify-center gap-[2px] transition-all cursor-pointer ${sidebarTab === 'watchlist' && isRightPanelOpen ? 'bg-border-subtle text-text-primary shadow-inner' : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated'}`}
                         onClick={() => {
@@ -124,7 +135,10 @@ export default function Terminal() {
             </div>
 
             {/* Bottom Status Bar (like TradingView) */}
-            <BottomBar activeTab={activeBottomTab} setActiveTab={setActiveBottomTab} />
+            <BottomBar />
+
+            {/* Notifications */}
+            <NotificationContainer />
         </div>
     );
 }

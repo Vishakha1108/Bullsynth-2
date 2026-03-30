@@ -1474,6 +1474,28 @@
   background: #f06664;
 }
 
+.tv-trade-submit:disabled {
+  background: #2a2e39 !important;
+  color: #4c525e !important;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+@keyframes slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out forwards;
+}
+
 
 /* ═══════════════════════════════════════════════════════════════════════════
    TRADINGVIEW-STYLE PORTFOLIO
@@ -1741,6 +1763,13 @@
   justify-content: space-between;
 }
 
+.nb-navbar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .nb-logo {
   display: flex;
   align-items: center;
@@ -1764,6 +1793,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  justify-content: flex-end;
 }
 
 .nb-nav-link {

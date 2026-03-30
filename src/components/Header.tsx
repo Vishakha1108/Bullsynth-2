@@ -5,8 +5,8 @@ import { TickerSearch } from './Chart';
 import { useTheme } from '../store/ThemeContext';
 import { useNavigate } from 'react-router-dom';
 import {
-    Menu, BarChart3, BarChart2, Bell, RotateCcw,
-    Search, Settings, ChevronDown, Maximize2, Sun, Moon, LayoutDashboard
+    Menu, BarChart3, BarChart2, RotateCcw,
+    Search, Maximize2, Minimize2, Sun, Moon, LayoutDashboard
 } from 'lucide-react';
 
 export default function Header() {
@@ -18,10 +18,34 @@ export default function Header() {
     const enabledIndicators = useMarketStore((state) => state.enabledIndicators);
     const setIndicatorEnabled = useMarketStore((state) => state.setIndicatorEnabled);
     const clearIndicators = useMarketStore((state) => state.clearIndicators);
+    const activeTool = useMarketStore(state => state.activeTool);
+    const setActiveTool = useMarketStore(state => state.setActiveTool);
+    const isReplayMode = useMarketStore(state => state.isReplayMode);
+    const stopReplay = useMarketStore(state => state.stopReplay);
 
     const [isIndicatorsOpen, setIsIndicatorsOpen] = useState(false);
     const [indicatorQuery, setIndicatorQuery] = useState('');
     const indicatorsRef = useRef<HTMLDivElement>(null);
+
+    const [isFullscreen, setIsFullscreen] = useState(false);
+
+    useEffect(() => {
+        const onFullscreenChange = () => {
+            setIsFullscreen(!!document.fullscreenElement);
+        };
+        document.addEventListener('fullscreenchange', onFullscreenChange);
+        return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
+    }, []);
+
+    const toggleFullscreen = () => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch((err) => {
+                console.error(`Error attempting to enable fullscreen: ${err.message}`);
+            });
+        } else if (document.exitFullscreen) {
+            document.exitFullscreen();
+        }
+    };
 
     const chartType = useMarketStore((state) => state.chartType);
     const setChartType = useMarketStore((state) => state.setChartType);
@@ -105,9 +129,6 @@ export default function Header() {
                             {tf.label}
                         </button>
                     ))}
-                    <button type="button" className="tv-header-tf-btn p-1">
-                        <ChevronDown size={14} />
-                    </button>
                 </div>
 
                 <div className="tv-header-separator" />
@@ -121,6 +142,7 @@ export default function Header() {
                         style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
                     >
                         <BarChart2 size={16} />
+                        <span>Charts</span>
                     </button>
 
                     {isChartTypeOpen && (
@@ -230,14 +252,20 @@ export default function Header() {
                     )}
                 </div>
 
-                <div className="tv-header-separator" />
 
-                <button type="button" className="tv-header-btn icon-text">
-                    <Bell size={16} />
-                    <span>Alert</span>
-                </button>
 
-                <button type="button" className="tv-header-btn icon-text">
+                <button 
+                    type="button" 
+                    className={`tv-header-btn icon-text ${activeTool === 'replay' || isReplayMode ? 'active !text-[#2962ff]' : ''}`}
+                    onClick={() => {
+                        if (isReplayMode || activeTool === 'replay') {
+                            stopReplay();
+                            setActiveTool('crosshair');
+                        } else {
+                            setActiveTool('replay');
+                        }
+                    }}
+                >
                     <RotateCcw size={16} />
                     <span>Replay</span>
                 </button>
@@ -255,14 +283,8 @@ export default function Header() {
 
                 <div className="tv-header-separator" />
 
-                <button type="button" className="tv-header-btn" title="Search">
-                    <Search size={16} />
-                </button>
-                <button type="button" className="tv-header-btn" title="Settings">
-                    <Settings size={16} />
-                </button>
-                <button type="button" className="tv-header-btn" title="Fullscreen">
-                    <Maximize2 size={16} />
+                <button type="button" className="tv-header-btn" title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"} onClick={toggleFullscreen}>
+                    {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
                 </button>
 
                 <div className="tv-header-separator" />

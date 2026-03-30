@@ -44,6 +44,11 @@ useMarketStore.subscribe((state, prevState) => {
             requestHistory();
         }
     }
+
+    if (prevState.isReplayMode && !state.isReplayMode) {
+        // Fresh re-fetch required to bridge the time gap created during Replay
+        requestHistory(state.currentSymbol);
+    }
 });
 
 export function changeTimeframe(seconds: number) {
@@ -288,6 +293,10 @@ class WSManager {
 
                 if (msgType === 'error') {
                     console.warn('Server error:', msg.message);
+                    const isUnknownType = msg.message?.toLowerCase().includes('unknown message type');
+                    if (!isUnknownType) {
+                        state.addNotification(msg.message || 'An unknown error occurred', 'error');
+                    }
                     return;
                 }
             } catch {

@@ -31,22 +31,19 @@ export default function LandingPage() {
                         <TrendingUp size={22} />
                         <span>NEXTBULL</span>
                     </Link>
-                    <div className="nb-nav-links">
-                        <Link to="/terminal" className="nb-nav-link">Terminal</Link>
-                        <Link to="/user/dashboard" className="nb-nav-link">Dashboard</Link>
-                    </div>
-                    <div className="nb-nav-actions">
-                        {userId ? (
-                            <button onClick={handleLogout} className="nb-nav-signin flex items-center gap-2">
-                                <LogOut size={16} />
-                                Logout
-                            </button>
-                        ) : (
-                            <>
-                                <Link to="/terminal" className="nb-nav-signin">Sign in</Link>
-                                <Link to="/terminal" className="nb-nav-signup">Sign up</Link>
-                            </>
-                        )}
+                    <div className="nb-navbar-right">
+                        <div className="nb-nav-links">
+                            <Link to="/terminal" className="nb-nav-link">Terminal</Link>
+                            <Link to="/user/dashboard" className="nb-nav-link">Dashboard</Link>
+                        </div>
+                        <div className="nb-nav-actions">
+                            {userId ? (
+                                <button onClick={handleLogout} className="nb-nav-signin flex items-center gap-2">
+                                    <LogOut size={16} />
+                                    Logout
+                                </button>
+                            ) : null}
+                        </div>
                     </div>
                 </div>
             </nav>
