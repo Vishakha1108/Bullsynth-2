@@ -11,6 +11,15 @@ export interface Trade {
     seller?: string;
 }
 
+export interface Alert {
+    id: string;
+    symbol: string;
+    targetPrice: number;
+    type: 'crossing' | 'above' | 'below';
+    active: boolean;
+    createdAt: number;
+}
+
 export interface Order {
     order_id: number;
     symbol: string;
@@ -203,6 +212,10 @@ interface MarketState {
     // Bot State
     botStatus: Record<string, 'running' | 'stopped' | 'standby'>;
     botConfigs: Record<string, BotConfig>;
+
+    // Alert State
+    alerts: Alert[];
+    
     setTimeframe: (seconds: number) => void;
     setCurrentSymbol: (symbol: string) => void;
     setSymbols: (symbols: string[]) => void;
@@ -228,10 +241,15 @@ interface MarketState {
     removeFromWatchlist: (symbol: string) => void;
     setPrice: (symbol: string, price: number, change?: number) => void;
     setActiveTool: (tool: string) => void;
-    setDrawings: (drawings: Drawing[]) => void;
+    setDrawings: (drawings: Drawing[] | ((prev: Drawing[]) => Drawing[])) => void;
     clearDrawings: () => void;
     setBotStatus: (botId: string, status: 'running' | 'stopped' | 'standby') => void;
     updateBotConfig: (botId: string, config: Partial<BotConfig>) => void;
+
+    // Alert Actions
+    addAlert: (alert: Omit<Alert, 'id' | 'active' | 'createdAt'>) => void;
+    removeAlert: (id: string) => void;
+    checkAlerts: (symbol: string, currentPrice: number) => void;
 
     // Replay Actions
     startReplay: (startIndex: number, allCandles: Candle[]) => void;
@@ -344,6 +362,8 @@ const useMarketStore = create<MarketState>((set) => ({
             ? { ...latestCandle, time: normalizeCandleTime(latestCandle.time) }
             : safeCandles[safeCandles.length - 1] || state.latestCandle;
 
+        useMarketStore.getState().checkAlerts(state.currentSymbol, safeLatest.close);
+
         return {
             candles: safeCandles,
             latestCandle: safeLatest,
@@ -384,6 +404,51 @@ const useMarketStore = create<MarketState>((set) => ({
             lastPrice: normalizedCandle.close,
             prices: { ...state.prices, [state.currentSymbol]: normalizedCandle.close }
         };
+    }),
+
+    // Alert logic implementation
+    alerts: [],
+    addAlert: (alertData) => set((state) => ({
+        alerts: [
+            ...state.alerts,
+            {
+                ...alertData,
+                id: Math.random().toString(36).substr(2, 9),
+                active: true,
+                createdAt: Date.now()
+            }
+        ]
+    })),
+    removeAlert: (id) => set((state) => ({
+        alerts: state.alerts.filter(a => a.id !== id)
+    })),
+    checkAlerts: (symbol, currentPrice) => set((state) => {
+        const triggeredAlerts = state.alerts.filter(alert => {
+            if (!alert.active || alert.symbol !== symbol) return false;
+            
+            // Logic for "crossing" is simplified for trial: trigger if price is near target
+            if (alert.type === 'crossing') {
+                return (Math.abs(currentPrice - alert.targetPrice) / alert.targetPrice) < 0.0005;
+            }
+            if (alert.type === 'above') return currentPrice >= alert.targetPrice;
+            if (alert.type === 'below') return currentPrice <= alert.targetPrice;
+            return false;
+        });
+
+        if (triggeredAlerts.length > 0) {
+            triggeredAlerts.forEach(a => {
+                window.dispatchEvent(new CustomEvent('show-toast', { 
+                    detail: `ALERT: ${a.symbol} ${a.type} ${a.targetPrice} (Current: ${currentPrice.toFixed(2)})` 
+                }));
+            });
+            
+            // Deactivate triggered alerts
+            const triggeredIds = new Set(triggeredAlerts.map(a => a.id));
+            return {
+                alerts: state.alerts.map(a => triggeredIds.has(a.id) ? { ...a, active: false } : a)
+            };
+        }
+        return state;
     }),
 
     clearCandles: () => set((state) => ({ candles: [], latestCandle: null, historySequence: state.historySequence + 1 })),
@@ -470,6 +535,8 @@ const useMarketStore = create<MarketState>((set) => ({
         const nextPrices = { ...state.prices, [symbol]: price };
         const nextChanges = change !== undefined ? { ...state.priceChanges, [symbol]: change } : state.priceChanges;
 
+        useMarketStore.getState().checkAlerts(symbol, price);
+
         if (symbol === state.currentSymbol) {
             return {
                 prices: nextPrices,
@@ -482,7 +549,9 @@ const useMarketStore = create<MarketState>((set) => ({
     }),
 
     setActiveTool: (tool) => set({ activeTool: tool }),
-    setDrawings: (drawings) => set({ drawings }),
+    setDrawings: (drawingsOrFn) => set((state) => ({
+        drawings: typeof drawingsOrFn === 'function' ? (drawingsOrFn as any)(state.drawings) : drawingsOrFn
+    })),
     clearDrawings: () => set({ drawings: [] }),
 
     setBotStatus: (botId, status) => set((state) => ({
