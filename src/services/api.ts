@@ -90,3 +90,22 @@ export async function depositFunds(botId: string, amount: number): Promise<Depos
     return await res.json();
 }
 
+export interface PnLDataPoint {
+    timestamp: number;
+    pnl: number;
+    equity: number;
+}
+
+export interface BotPnLData {
+    bot_id: string;
+    current_pnl: number;
+    total_equity: number;
+    history: PnLDataPoint[];
+}
+
+export async function fetchBotPnL(botId: string, period: string = '1d'): Promise<BotPnLData> {
+    const res = await fetch(`${API_BASE}/api/bots/${botId}/pnl?period=${period}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+}
+

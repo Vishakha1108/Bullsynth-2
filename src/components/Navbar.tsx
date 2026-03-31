@@ -1,7 +1,6 @@
 import { Activity, Monitor, UserCircle, ShieldAlert } from "lucide-react";
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ModeToggle } from './mode-toggle';
-import useMarketStore from '../store/useMarketStore';
 
 export function Navbar() {
   const navigate = useNavigate();

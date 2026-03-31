@@ -4,6 +4,57 @@ import {
     ShieldCheck, Activity
 } from 'lucide-react';
 import useMarketStore from '../store/useMarketStore';
+import { useBotPolling } from '../hooks/useBotPolling';
+import type { Position, Regime } from '../services/botsApi';
+
+function fmtUsd(value: number): string {
+    return value.toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
+}
+
+function fmtPctRatio(value: number): string {
+    return `${(value * 100).toFixed(2)}%`;
+}
+
+function fmtNum(value: number, digits = 2): string {
+    return value.toLocaleString('en-US', {
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits,
+    });
+}
+
+function positionClasses(position: Position): string {
+    if (position === 'LONG') return 'bg-bull/15 text-bull border-bull/30';
+    if (position === 'SHORT') return 'bg-bear/15 text-bear border-bear/30';
+    return 'bg-bg-elevated text-text-secondary border-border-subtle';
+}
+
+function regimeClasses(regime: Regime): string {
+    if (regime === 'trending') return 'bg-blue-500/15 text-blue-400 border-blue-500/30';
+    if (regime === 'mean_reverting') return 'bg-amber-500/15 text-amber-400 border-amber-500/30';
+    return 'bg-purple-500/15 text-purple-400 border-purple-500/30';
+}
+
+function StatusChip({ label, className }: { label: string; className: string }) {
+    return (
+        <span className={`inline-flex items-center rounded-full px-2 py-0.5 border text-[10px] font-bold uppercase tracking-wide ${className}`}>
+            {label}
+        </span>
+    );
+}
+
+function MetricCard({ label, value }: { label: string; value: string }) {
+    return (
+        <div className="bg-bg-elevated/60 p-2.5 rounded-lg border border-border-subtle">
+            <div className="text-[9px] text-text-secondary uppercase font-bold tracking-tight">{label}</div>
+            <div className="text-sm font-mono font-bold mt-0.5 text-text-primary">{value}</div>
+        </div>
+    );
+}
 
 export default function BotPanel({ onClose }: { onClose?: () => void }) {
     const {
@@ -14,6 +65,7 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
         currentSymbol,
         prices
     } = useMarketStore();
+    const { alpha, marketMaker } = useBotPolling();
 
     const [selectedBotId, setSelectedBotId] = useState<'market_maker' | 'alpha_bot'>('market_maker');
 
@@ -38,6 +90,11 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
     const config = botConfigs[selectedBotId];
     const status = botStatus[selectedBotId];
     const currentPrice = prices[currentSymbol] || 0;
+
+    const selectedLiveState = selectedBotId === 'alpha_bot' ? alpha : marketMaker;
+
+    const alphaPnlPositive = (alpha.status?.pnl ?? 0) >= 0;
+    const mmPnlPositive = (marketMaker.status?.pnl ?? 0) >= 0;
 
     const handleToggleBot = () => {
         if (status === 'running') {
@@ -84,12 +141,20 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center justify-between">
                                         <span className={`text-sm font-bold ${selectedBotId === bot.id ? 'text-text-primary' : 'text-text-secondary'}`}>{bot.name}</span>
-                                        {botStatus[bot.id] === 'running' && (
-                                            <div className="flex items-center gap-1">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-bull animate-pulse" />
-                                                <span className="text-[9px] font-bold uppercase text-bull">Live</span>
-                                            </div>
-                                        )}
+                                        <div className="flex items-center gap-1.5">
+                                            {(bot.id === 'alpha_bot' ? alpha.isDisconnected : marketMaker.isDisconnected) && (
+                                                <StatusChip label="Disconnected" className="bg-bear/15 text-bear border-bear/30" />
+                                            )}
+                                            {(bot.id === 'alpha_bot' ? alpha.isStale : marketMaker.isStale) && (
+                                                <StatusChip label="Stale" className="bg-amber-500/15 text-amber-400 border-amber-500/30" />
+                                            )}
+                                            {botStatus[bot.id] === 'running' && (
+                                                <div className="flex items-center gap-1">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-bull animate-pulse" />
+                                                    <span className="text-[9px] font-bold uppercase text-bull">Live</span>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                     <p className="text-[11px] text-text-secondary line-clamp-2 mt-0.5 leading-relaxed">{bot.description}</p>
                                 </div>
@@ -100,6 +165,47 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
 
                 {/* Divider */}
                 <div className="h-px bg-border-subtle mx-1" />
+
+                {/* Live Top Cards */}
+                <div className="flex flex-col gap-3">
+                    <div className="flex items-center gap-2">
+                        <Activity size={14} className="text-text-secondary" />
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Live Bot Status</label>
+                    </div>
+
+                    <div className="bg-bg-elevated/30 p-3 rounded-xl border border-border-subtle/50 flex flex-col gap-2.5">
+                        <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-text-secondary">Alpha Bot</span>
+                            <div className="flex items-center gap-1.5">
+                                {alpha.status?.halted && <StatusChip label="Halted" className="bg-bear/15 text-bear border-bear/30" />}
+                                {alpha.status && <StatusChip label={alpha.status.position} className={positionClasses(alpha.status.position)} />}
+                                {alpha.status?.regime && <StatusChip label={alpha.status.regime} className={regimeClasses(alpha.status.regime)} />}
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                            <MetricCard label="Equity" value={alpha.status ? fmtUsd(alpha.status.equity) : '—'} />
+                            <MetricCard label="PnL" value={alpha.status ? `${alphaPnlPositive ? '+' : ''}${fmtUsd(alpha.status.pnl)}` : '—'} />
+                            <MetricCard label="Position" value={alpha.status?.position ?? '—'} />
+                            <MetricCard label="Regime" value={alpha.status?.regime ?? '—'} />
+                        </div>
+                    </div>
+
+                    <div className="bg-bg-elevated/30 p-3 rounded-xl border border-border-subtle/50 flex flex-col gap-2.5">
+                        <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-text-secondary">Market Maker</span>
+                            <div className="flex items-center gap-1.5">
+                                {marketMaker.status?.halted && <StatusChip label="Halted" className="bg-bear/15 text-bear border-bear/30" />}
+                                {marketMaker.status && <StatusChip label={marketMaker.status.position} className={positionClasses(marketMaker.status.position)} />}
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                            <MetricCard label="Equity" value={marketMaker.status ? fmtUsd(marketMaker.status.equity) : '—'} />
+                            <MetricCard label="PnL" value={marketMaker.status ? `${mmPnlPositive ? '+' : ''}${fmtUsd(marketMaker.status.pnl)}` : '—'} />
+                            <MetricCard label="Position" value={marketMaker.status?.position ?? '—'} />
+                            <MetricCard label="Holdings" value={marketMaker.status ? fmtNum(marketMaker.status.holdings, 4) : '—'} />
+                        </div>
+                    </div>
+                </div>
 
                 {/* Configuration Area */}
                 <div className="flex flex-col gap-4">
@@ -210,26 +316,34 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
                     </div>
                 </div>
 
-                {/* Stats / Performance Preview */}
+                {/* KPI Row */}
                 <div className="flex flex-col gap-3 mt-auto">
                     <div className="flex items-center gap-2">
                         <Activity size={14} className="text-text-secondary" />
-                        <label className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Bot Performance</label>
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Selected Bot KPIs</label>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                        <div className="bg-bg-elevated p-2.5 rounded-lg border border-border-subtle">
-                            <div className="text-[9px] text-text-secondary uppercase font-bold tracking-tight">Today's P&L</div>
-                            <div className={`text-sm font-mono font-bold mt-0.5 ${status === 'running' ? 'text-bull' : 'text-text-secondary'}`}>
-                                {status === 'running' ? '+$124.50' : '$0.00'}
-                            </div>
-                        </div>
-                        <div className="bg-bg-elevated p-2.5 rounded-lg border border-border-subtle">
-                            <div className="text-[9px] text-text-secondary uppercase font-bold tracking-tight">Total Trades</div>
-                            <div className="text-sm font-mono font-bold mt-0.5 text-text-primary">
-                                {status === 'running' ? '42' : '0'}
-                            </div>
-                        </div>
+                        {selectedBotId === 'alpha_bot' ? (
+                            <>
+                                <MetricCard label="Trades" value={alpha.status ? String(alpha.status.trades) : '—'} />
+                                <MetricCard label="Win Rate" value={alpha.status ? fmtPctRatio(alpha.status.winRate) : '—'} />
+                                <MetricCard label="Sharpe" value={alpha.status ? fmtNum(alpha.status.sharpe, 2) : '—'} />
+                                <MetricCard label="Max DD" value={alpha.status ? fmtPctRatio(alpha.status.maxDrawdown) : '—'} />
+                            </>
+                        ) : (
+                            <>
+                                <MetricCard label="Total Fills" value={marketMaker.status ? String(marketMaker.status.totalFills) : '—'} />
+                                <MetricCard label="Fill Balance" value={marketMaker.status ? fmtPctRatio(marketMaker.status.fillBalance) : '—'} />
+                                <MetricCard label="Max DD" value={marketMaker.status ? fmtPctRatio(marketMaker.status.maxDrawdown) : '—'} />
+                                <MetricCard label="Bid / Ask" value={marketMaker.status ? `${marketMaker.status.bidFills}/${marketMaker.status.askFills}` : '—'} />
+                            </>
+                        )}
                     </div>
+                    {(selectedLiveState.statusError || selectedLiveState.healthError) && (
+                        <p className="text-[10px] text-text-secondary font-mono opacity-70">
+                            {selectedLiveState.isDisconnected ? 'API disconnected. Retrying in background.' : 'Transient API error. Showing last known data.'}
+                        </p>
+                    )}
                 </div>
             </div>
 

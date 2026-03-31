@@ -71,3 +71,17 @@ export default defineConfig([
   },
 ])
 ```
+
+## Bot API integration (polling)
+
+The bot sidebar integrates two polling APIs:
+
+- Alpha bot: `VITE_ALPHA_API_BASE` (default `http://localhost:3001`)
+- Market Maker bot: `VITE_MM_API_BASE` (default `http://localhost:3002`)
+
+Polling cadence used by the frontend:
+
+- `/bot/status`: every 1s
+- `/health`: every 8s
+
+If a bot status request fails briefly, the UI keeps last-known data and marks it stale. If a bot becomes unreachable, that bot card shows `Disconnected` while the other bot keeps rendering.
