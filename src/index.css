@@ -2913,6 +2913,27 @@
   background: rgba(42, 46, 57, 0.3);
 }
 
+/* ── Enhanced Dashboard Text Visibility ─────────────────────────────────── */
+.dash-card {
+  color: #d1d4dc;
+}
+
+.dash-table-row {
+  color: #d1d4dc;
+}
+
+.dash-table-header {
+  color: #d1d4dc;
+}
+
+.dash-section-header {
+  color: #d1d4dc;
+}
+
+.dash-footer {
+  color: #d1d4dc;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    LIGHT MODE OVERRIDES  (.light on <html>)
    ═══════════════════════════════════════════════════════════════════════════ */

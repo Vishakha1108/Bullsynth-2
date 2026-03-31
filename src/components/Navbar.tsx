@@ -30,7 +30,7 @@ export function Navbar() {
           onClick={() => navigate('/user/dashboard')}
           className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider rounded transition-all cursor-pointer ${
             location.pathname === '/user/dashboard' 
-              ? 'bg-accent/10 text-accent border border-accent/20' 
+              ? 'bg-accent text-white border border-accent' 
               : 'text-text-secondary hover:text-text-primary dash-nav-btn'
           }`}
         >
@@ -41,7 +41,7 @@ export function Navbar() {
           onClick={() => navigate('/terminal')}
           className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider rounded transition-all cursor-pointer ${
             location.pathname === '/terminal' 
-              ? 'bg-accent/10 text-accent border border-accent/20' 
+              ? 'bg-accent text-white border border-accent' 
               : 'text-text-secondary hover:text-text-primary dash-nav-btn'
           }`}
         >
@@ -52,7 +52,7 @@ export function Navbar() {
           onClick={() => navigate('/admin/dashboard')}
           className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider rounded transition-all cursor-pointer ${
             location.pathname === '/admin/dashboard' 
-              ? 'bg-accent/10 text-accent border border-accent/20' 
+              ? 'bg-accent text-white border border-accent' 
               : 'text-text-secondary hover:text-text-primary dash-nav-btn'
           }`}
         >
