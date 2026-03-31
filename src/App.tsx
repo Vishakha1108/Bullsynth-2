@@ -5,11 +5,13 @@ import Dashboard from './components/Dashboard';
 import AdminDashboard from './components/AdminDashboard';
 import BotDetails from './components/BotDetails';
 import { ThemeProvider } from './store/ThemeContext';
+import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 
 function App() {
   return (
     <ThemeProvider>
       <BrowserRouter>
+        <KeyboardShortcutsModal />
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/terminal" element={<Terminal />} />

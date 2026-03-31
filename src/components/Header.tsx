@@ -105,6 +105,9 @@ export default function Header() {
     const [activeIndicatorSection, setActiveIndicatorSection] = useState('Technicals');
     const indicatorsRef = useRef<HTMLDivElement>(null);
 
+    const [isTimeframeOpen, setIsTimeframeOpen] = useState(false);
+    const timeframeRef = useRef<HTMLDivElement>(null);
+
     const [isFullscreen, setIsFullscreen] = useState(false);
 
     useEffect(() => {
@@ -165,21 +168,45 @@ export default function Header() {
             if (!chartTypesRef.current?.contains(event.target as Node)) {
                 setIsChartTypeOpen(false);
             }
+            if (!timeframeRef.current?.contains(event.target as Node)) {
+                setIsTimeframeOpen(false);
+            }
         };
 
-        const onEscape = (event: KeyboardEvent) => {
+        const handleShortcuts = (event: KeyboardEvent) => {
             if (event.key === 'Escape') {
                 setIsIndicatorsOpen(false);
                 setIsChartTypeOpen(false);
             }
+
+            // Toggle indicators menu with '/'
+            if (event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
+                // Don't trigger if user is typing in an input or textarea
+                if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
+
+                event.preventDefault();
+                setIsIndicatorsOpen((prev) => !prev);
+            }
+
+            // Quick Search (Ctrl + K)
+            if (event.key.toLowerCase() === 'k' && (event.ctrlKey || event.metaKey)) {
+                event.preventDefault();
+                window.dispatchEvent(new CustomEvent('open-ticker-search'));
+            }
+
+            // Alert (Alt + A)
+            if (event.key.toLowerCase() === 'a' && event.altKey) {
+                event.preventDefault();
+                window.dispatchEvent(new CustomEvent('open-alert-dialog'));
+            }
         };
 
         document.addEventListener('mousedown', onOutsideClick);
-        document.addEventListener('keydown', onEscape);
+        document.addEventListener('keydown', handleShortcuts);
 
         return () => {
             document.removeEventListener('mousedown', onOutsideClick);
-            document.removeEventListener('keydown', onEscape);
+            document.removeEventListener('keydown', handleShortcuts);
         };
     }, []);
 
@@ -188,8 +215,8 @@ export default function Header() {
             {/* Left section */}
             <div className="tv-header-left">
                 {/* Menu / Logo */}
-                <button type="button" className="tv-header-btn" title="Menu">
-                    <Menu size={18} />
+                <button type="button" className="tv-header-btn text-white" title="Menu">
+                    <Menu size={21} />
                 </button>
 
                 <div className="tv-header-separator" />
@@ -201,18 +228,44 @@ export default function Header() {
 
                 <div className="tv-header-separator mx-1" />
 
-                {/* Timeframe selector */}
-                <div className="flex items-center gap-1 px-1">
-                    {TIMEFRAMES.map(tf => (
-                        <button
-                            type="button"
-                            key={tf.seconds}
-                            className={`tv-header-tf-btn ${timeframe === tf.seconds ? 'active' : ''}`}
-                            onClick={() => changeTimeframe(tf.seconds)}
-                        >
-                            {tf.label}
-                        </button>
-                    ))}
+                {/* Timeframe selector Dropdown */}
+                <div className="tv-timeframe-wrap" ref={timeframeRef} style={{ position: 'relative' }}>
+                    <button
+                        type="button"
+                        className={`tv-header-btn icon-text ${isTimeframeOpen ? 'active' : ''}`}
+                        onClick={() => setIsTimeframeOpen((prev) => !prev)}
+                        style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: '60px' }}
+                    >
+                        <span style={{ fontWeight: 600, color: 'white', fontSize: '14px' }}>{TIMEFRAMES.find(t => t.seconds === timeframe)?.label || '1m'}</span>
+                        <ChevronDown size={20} className={`transition-transform duration-200 ${isTimeframeOpen ? 'rotate-180 text-[#2962FF]' : 'text-white'}`} />
+                    </button>
+
+                    {isTimeframeOpen && (
+                        <div className="tv-dropdown-menu" style={{
+                            position: 'absolute', top: '100%', left: 0, marginTop: '8px',
+                            background: theme === 'dark' ? '#1e222d' : '#ffffff',
+                            border: `1px solid ${theme === 'dark' ? '#2a2e39' : '#e0e3eb'}`,
+                            borderRadius: '6px', zIndex: 100, display: 'flex', flexDirection: 'column',
+                            minWidth: '120px', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                        }}>
+                            {TIMEFRAMES.map((tf) => (
+                                <button
+                                    key={tf.seconds}
+                                    style={{
+                                        padding: '10px 16px', textAlign: 'left',
+                                        background: timeframe === tf.seconds ? (theme === 'dark' ? '#2a2e39' : '#f0f3fa') : 'transparent',
+                                        color: timeframe === tf.seconds ? '#2962FF' : (theme === 'dark' ? '#d1d4dc' : '#131722'),
+                                        border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: timeframe === tf.seconds ? 600 : 400
+                                    }}
+                                    onClick={() => { changeTimeframe(tf.seconds); setIsTimeframeOpen(false); }}
+                                    onMouseEnter={e => e.currentTarget.style.background = theme === 'dark' ? '#2a2e39' : '#f0f3fa'}
+                                    onMouseLeave={e => e.currentTarget.style.background = timeframe === tf.seconds ? (theme === 'dark' ? '#2a2e39' : '#f0f3fa') : 'transparent'}
+                                >
+                                    {tf.label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 <div className="tv-header-separator" />
@@ -221,12 +274,11 @@ export default function Header() {
                 <div className="tv-chart-types-wrap" ref={chartTypesRef} style={{ position: 'relative' }}>
                     <button
                         type="button"
-                        className={`tv-header-btn icon-text ${isChartTypeOpen ? 'active' : ''}`}
+                        className={`tv-header-btn ${isChartTypeOpen ? 'active' : ''}`}
                         onClick={() => setIsChartTypeOpen((prev) => !prev)}
-                        style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                        title="Chart Type"
                     >
-                        <BarChart2 size={16} />
-                        <span>Charts</span>
+                        <CandlestickTypeIcon size={20} />
                     </button>
 
                     {isChartTypeOpen && (
@@ -275,8 +327,11 @@ export default function Header() {
                             });
                         }}
                     >
-                        <BarChart3 size={16} />
-                        <span>Indicators</span>
+                        <div className="flex items-baseline gap-[1px] text-white">
+                            <span className="text-[18px] font-serif italic font-bold">f</span>
+                            <span className="text-[12px] font-bold">x</span>
+                        </div>
+                        <span style={{ marginLeft: '4px', color: 'white' }}>Indicators</span>
                         {enabledIndicators.length > 0 && (
                             <span className="tv-indicators-count">{enabledIndicators.length}</span>
                         )}
@@ -425,7 +480,7 @@ export default function Header() {
 
                 <button 
                     type="button" 
-                    className={`tv-header-btn icon-text ${activeTool === 'replay' || isReplayMode ? 'active !text-[#2962ff]' : ''}`}
+                    className={`tv-header-btn icon-text ${activeTool === 'replay' || isReplayMode ? 'active !text-[#2962ff]' : 'text-white'}`}
                     onClick={() => {
                         if (isReplayMode || activeTool === 'replay') {
                             stopReplay();
@@ -435,8 +490,8 @@ export default function Header() {
                         }
                     }}
                 >
-                    <RotateCcw size={16} />
-                    <span>Replay</span>
+                    <RotateCcw size={21} />
+                    <span className="text-white">Replay</span>
                 </button>
             </div>
 
@@ -444,7 +499,7 @@ export default function Header() {
             <div className="tv-header-right">
                 {/* Price info strip */}
                 <div className="tv-price-strip">
-                    <span className="tv-price-value">${currentPrice.toFixed(2)}</span>
+                    <span className="tv-price-value text-white">${currentPrice.toFixed(2)}</span>
                     <span className={`tv-price-change ${priceChange24h >= 0 ? 'up' : 'down'}`}>
                         {priceChange24h >= 0 ? '+' : ''}{priceChange24h.toFixed(2)}%
                     </span>
@@ -452,31 +507,48 @@ export default function Header() {
 
                 <div className="tv-header-separator" />
 
-                <button type="button" className="tv-header-btn" title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"} onClick={toggleFullscreen}>
-                    {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                <button type="button" className="tv-header-btn icon-text text-white" title="Quick Search (Ctrl+K)" onClick={() => window.dispatchEvent(new CustomEvent('open-ticker-search'))}>
+                    <Search size={21} />
+                    <span>Quick Search</span>
+                </button>
+
+                <button 
+                    type="button" 
+                    className="tv-header-btn icon-text text-white" 
+                    title="Create Alert (Alt+A)"
+                    onClick={() => window.dispatchEvent(new CustomEvent('open-alert-dialog'))}
+                >
+                    <Bell size={21} />
+                    <span>Alert</span>
+                </button>
+
+                <div className="tv-header-separator" />
+
+                <button type="button" className="tv-header-btn text-white" title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"} onClick={toggleFullscreen}>
+                    {isFullscreen ? <Minimize2 size={21} /> : <Maximize2 size={21} />}
                 </button>
 
                 <div className="tv-header-separator" />
 
                 <button
                     type="button"
-                    className="tv-header-btn icon-text"
+                    className="tv-header-btn icon-text text-white"
                     title="Dashboard"
                     onClick={() => navigate('/user/dashboard')}
                 >
-                    <LayoutDashboard size={16} />
+                    <LayoutDashboard size={21} />
                     <span>Dashboard</span>
                 </button>
 
                 <div className="tv-header-separator" />
 
                 <button
-                    className="tv-theme-toggle"
+                    className="tv-theme-toggle text-white"
                     onClick={toggleTheme}
                     title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
                     aria-label="Toggle theme"
                 >
-                    {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+                    {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
                 </button>
             </div>
         </header>
