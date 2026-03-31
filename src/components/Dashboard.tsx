@@ -31,8 +31,8 @@ function StatCard({ label, value, icon: Icon, change, subtitle }: {
   return (
     <div className="dash-card p-5 flex flex-col gap-3 group">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-text-primary">{label}</span>
-        <div className="w-8 h-8 rounded-md dash-icon-bg flex items-center justify-center text-text-primary group-hover:text-accent transition-colors">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">{label}</span>
+        <div className="w-8 h-8 rounded-md dash-icon-bg flex items-center justify-center text-text-secondary group-hover:text-accent transition-colors">
           <Icon size={16} />
         </div>
       </div>
@@ -124,13 +124,13 @@ export default function Dashboard() {
           {/* ── Row 2: Holdings Table ── */}
           <div className="dash-card overflow-hidden">
             <div className="px-5 py-4 dash-section-header flex items-center justify-between">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-text-primary">Holdings</h2>
-              <span className="text-[10px] font-mono text-text-primary">{portfolio.holdings.length} positions</span>
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Holdings</h2>
+              <span className="text-[10px] font-mono text-text-secondary">{portfolio.holdings.length} positions</span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-[10px] font-semibold uppercase tracking-wider text-text-primary dash-table-header">
+                  <tr className="text-[10px] font-semibold uppercase tracking-wider text-text-secondary dash-table-header">
                     <th className="text-left px-5 py-3">Asset</th>
                     <th className="text-right px-5 py-3">Qty</th>
                     <th className="text-right px-5 py-3">Avg Price</th>
@@ -144,7 +144,7 @@ export default function Dashboard() {
                 <tbody>
                   {portfolio.holdings.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="text-center py-12 text-text-primary text-xs uppercase tracking-wider">
+                      <td colSpan={8} className="text-center py-12 text-text-secondary text-xs uppercase tracking-wider">
                         No holdings yet — start trading
                       </td>
                     </tr>
@@ -178,7 +178,7 @@ export default function Dashboard() {
                           <td className="text-right px-5 py-3">
                             <button
                               onClick={() => navigate(`/terminal?symbol=${h.asset}`)}
-                              className="text-text-primary hover:text-accent transition-colors cursor-pointer"
+                              className="text-text-secondary hover:text-accent transition-colors cursor-pointer"
                               title="Trade"
                             >
                               <ExternalLink size={14} />
@@ -199,16 +199,16 @@ export default function Dashboard() {
             {/* Market Overview (3 cols) */}
             <div className="lg:col-span-3 dash-card overflow-hidden flex flex-col">
               <div className="px-5 py-4 dash-section-header flex items-center justify-between">
-                <h2 className="text-xs font-semibold uppercase tracking-wider text-text-primary">Market Overview</h2>
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Market Overview</h2>
                 <div className="flex items-center gap-2">
                   <div className={`w-1.5 h-1.5 rounded-full ${wsConnected ? 'bg-bull' : 'bg-bear'}`} />
-                  <span className="text-[10px] font-mono text-text-primary">{wsConnected ? 'Live' : 'Offline'}</span>
+                  <span className="text-[10px] font-mono text-text-secondary">{wsConnected ? 'Live' : 'Offline'}</span>
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto styling-scrollbar max-h-[360px]">
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 dash-thead z-10">
-                    <tr className="text-[10px] font-semibold uppercase tracking-wider text-text-primary dash-table-header">
+                    <tr className="text-[10px] font-semibold uppercase tracking-wider text-text-secondary dash-table-header">
                       <th className="text-left px-5 py-2.5">Symbol</th>
                       <th className="text-right px-5 py-2.5">Price</th>
                       <th className="text-right px-5 py-2.5">Change</th>
@@ -239,13 +239,13 @@ export default function Dashboard() {
                               {item.change >= 0 ? '+' : ''}{fmt(item.change)}%
                             </span>
                           ) : (
-                            <span className="text-text-primary text-xs">—</span>
+                            <span className="text-text-secondary text-xs">—</span>
                           )}
                         </td>
                         <td className="text-right px-5 py-3">
                           <button
                             onClick={() => navigate(`/terminal?symbol=${item.symbol}`)}
-                            className="text-[10px] font-semibold uppercase tracking-wider text-text-primary hover:text-accent transition-colors cursor-pointer"
+                            className="text-[10px] font-semibold uppercase tracking-wider text-text-secondary hover:text-accent transition-colors cursor-pointer"
                           >
                             Trade
                           </button>
@@ -260,12 +260,12 @@ export default function Dashboard() {
             {/* Open Orders (2 cols) */}
             <div className="lg:col-span-2 dash-card overflow-hidden flex flex-col">
               <div className="px-5 py-4 dash-section-header flex items-center justify-between">
-                <h2 className="text-xs font-semibold uppercase tracking-wider text-text-primary">Open Orders</h2>
-                <span className="text-[10px] font-mono text-text-primary">{openOrders.length} active</span>
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Open Orders</h2>
+                <span className="text-[10px] font-mono text-text-secondary">{openOrders.length} active</span>
               </div>
               <div className="flex-1 overflow-y-auto styling-scrollbar max-h-[360px]">
                 {openOrders.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-16 text-text-primary">
+                  <div className="flex flex-col items-center justify-center py-16 text-text-secondary">
                     <BarChart3 size={24} className="mb-3 opacity-40" />
                     <span className="text-xs uppercase tracking-wider">No open orders</span>
                   </div>
@@ -279,14 +279,14 @@ export default function Dashboard() {
                           </span>
                           <div>
                             <div className="font-semibold text-sm text-text-primary">{order.symbol}</div>
-                            <div className="text-[10px] text-text-primary font-mono">
+                            <div className="text-[10px] text-text-secondary font-mono">
                               {fmt(order.remainingQty, 4)} / {fmt(order.qty, 4)} @ {fmtUsd(order.price)}
                             </div>
                           </div>
                         </div>
                         <button
                           onClick={() => handleCancelOrder(order.order_id)}
-                          className="w-7 h-7 rounded-md flex items-center justify-center text-text-primary hover:text-bear hover:bg-bear/10 transition-all cursor-pointer"
+                          className="w-7 h-7 rounded-md flex items-center justify-center text-text-secondary hover:text-bear hover:bg-bear/10 transition-all cursor-pointer"
                           title="Cancel order"
                         >
                           <X size={14} />
@@ -304,10 +304,10 @@ export default function Dashboard() {
 
       {/* Footer */}
       <footer className="dash-footer px-6 py-3 flex items-center justify-between shrink-0">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-text-primary">&copy; 2026 NEXTBULL</span>
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-text-secondary">&copy; 2026 NEXTBULL</span>
         <div className="flex items-center gap-2">
           <div className={`w-1.5 h-1.5 rounded-full ${wsConnected ? 'bg-bull' : 'bg-bear'}`} />
-          <span className="text-[10px] font-mono text-text-primary">{wsConnected ? 'Connected' : 'Disconnected'}</span>
+          <span className="text-[10px] font-mono text-text-secondary">{wsConnected ? 'Connected' : 'Disconnected'}</span>
         </div>
       </footer>
     </div>
