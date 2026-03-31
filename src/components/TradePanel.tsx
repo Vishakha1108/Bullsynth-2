@@ -10,6 +10,12 @@ export default function TradePanel() {
 
     const lastPrice = useMarketStore(state => state.lastPrice);
     const currentSymbol = useMarketStore(state => state.currentSymbol);
+    const holdings = useMarketStore(state => state.portfolio.holdings);
+
+    const availableQty = useMemo(() => {
+        const h = holdings.find(item => item.asset === currentSymbol);
+        return h ? h.qty : 0;
+    }, [holdings, currentSymbol]);
 
     const bestBid = useMarketStore(state => state.orderBook.bids[0]?.price || 0);
     const bestAsk = useMarketStore(state => state.orderBook.asks[0]?.price || 0);
@@ -27,7 +33,9 @@ export default function TradePanel() {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!qty || parseFloat(qty) <= 0) return;
+        const numericQty = parseFloat(qty);
+        if (!qty || numericQty <= 0) return;
+        if (side === 'SELL' && numericQty > availableQty) return;
         if (type === 'limit' && (!price || parseFloat(price) <= 0)) return;
 
         wsManager.send({
@@ -38,6 +46,21 @@ export default function TradePanel() {
             price: type === 'limit' ? parseFloat(price) : undefined,
             qty: parseFloat(qty)
         });
+
+        const numericPrice = parseFloat(price);
+        const isMarketable = type === 'market' || (
+            type === 'limit' && (
+                (side === 'BUY' && numericPrice >= bestAsk && bestAsk > 0) ||
+                (side === 'SELL' && numericPrice <= bestBid && bestBid > 0)
+            )
+        );
+
+        useMarketStore.getState().addNotification(
+            !isMarketable
+                ? `Order for ${qty} ${currentSymbol} added to OPEN ORDER`
+                : `${side} order for ${qty} ${currentSymbol} executed successfully`,
+            'success'
+        );
 
         setQty('');
     };
@@ -96,7 +119,14 @@ export default function TradePanel() {
                 )}
 
                 <div className="tv-trade-field">
-                    <label>Amount</label>
+                    <div className="flex justify-between items-center mb-1">
+                        <label className="m-0">Quantity</label>
+                        {side === 'SELL' && (
+                            <span className="text-[10px] text-text-secondary">
+                                Available: <span className="text-text-primary font-mono">{availableQty}</span>
+                            </span>
+                        )}
+                    </div>
                     <div className="tv-trade-input-wrap">
                         <input
                             type="number"
@@ -119,6 +149,7 @@ export default function TradePanel() {
                 <button
                     type="submit"
                     className={`tv-trade-submit ${side === 'BUY' ? 'buy' : 'sell'}`}
+                    disabled={side === 'SELL' && (parseFloat(qty) > availableQty || !qty || parseFloat(qty) <= 0)}
                 >
                     {side} {currentSymbol}
                 </button>

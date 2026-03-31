@@ -11,6 +11,7 @@ import useMarketStore from '../store/useMarketStore';
 import { List, BookOpen, Bot, Wallet } from 'lucide-react';
 import Portfolio from './Portfolio';
 import BotPanel from './BotPanel';
+import NotificationContainer from './Notification';
 
 export default function Terminal() {
     const [sidebarTab, setSidebarTab] = useState<'portfolio' | 'watchlist' | 'orderbook' | 'bot'>('orderbook');
@@ -135,6 +136,9 @@ export default function Terminal() {
 
             {/* Bottom Status Bar (like TradingView) */}
             <BottomBar />
+
+            {/* Notifications */}
+            <NotificationContainer />
         </div>
     );
 }

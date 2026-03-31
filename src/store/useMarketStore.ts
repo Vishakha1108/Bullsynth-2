@@ -212,9 +212,9 @@ interface MarketState {
     // Bot State
     botStatus: Record<string, 'running' | 'stopped' | 'standby'>;
     botConfigs: Record<string, BotConfig>;
-
-    // Alert State
-    alerts: Alert[];
+    
+    // Notification State
+    notifications: { id: string; message: string; type: 'success' | 'error' | 'info' }[];
     
     setTimeframe: (seconds: number) => void;
     setCurrentSymbol: (symbol: string) => void;
@@ -257,6 +257,10 @@ interface MarketState {
     setIsReplaying: (playing: boolean) => void;
     stepReplay: () => void;
     setReplaySpeed: (speed: number) => void;
+
+    // Notification Actions
+    addNotification: (message: string, type?: 'success' | 'error' | 'info') => void;
+    removeNotification: (id: string) => void;
 }
 
 const PORTFOLIO_STORAGE_KEY = 'synthetic_bull_portfolio';
@@ -338,6 +342,8 @@ const useMarketStore = create<MarketState>((set) => ({
             timeframe: '5m'
         }
     },
+
+    notifications: [],
 
     setTimeframe: (seconds) => set({ timeframe: seconds }),
     setCurrentSymbol: (symbol) => set({ currentSymbol: symbol }),
@@ -635,6 +641,14 @@ const useMarketStore = create<MarketState>((set) => ({
     }),
 
     setReplaySpeed: (speed) => set({ replaySpeed: speed }),
+
+    addNotification: (message, type = 'info') => set((state) => ({
+        notifications: [...state.notifications, { id: Math.random().toString(36).substr(2, 9), message, type }]
+    })),
+
+    removeNotification: (id) => set((state) => ({
+        notifications: state.notifications.filter((n) => n.id !== id)
+    })),
 }));
 
 export default useMarketStore;
