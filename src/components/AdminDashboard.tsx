@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Navbar } from './Navbar';
 import { fetchBots, createBot, type Bot } from '../services/api';
-import { Check, Copy, Plus, Server, ShieldAlert, Cpu } from 'lucide-react'; 
+import { Check, Copy, Plus, Server, Cpu } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function AdminDashboard() {
@@ -55,16 +55,6 @@ export default function AdminDashboard() {
       
       <main className="flex-1 overflow-y-auto p-8 flex justify-center">
         <div className="w-full max-w-5xl flex flex-col gap-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight text-text-primary flex items-center gap-3">
-                <ShieldAlert className="text-accent" size={28} />
-                Admin Dashboard
-              </h1>
-              <p className="text-text-secondary mt-1 text-sm">Manage autonomous bots and generate API tokens.</p>
-            </div>
-          </div>
-
           {error && <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 rounded text-sm">{error}</div>}
 
           {/* Top Panel - Create Bot */}

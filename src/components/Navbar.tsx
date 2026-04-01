@@ -101,7 +101,7 @@ export function Navbar() {
           }`}
         >
           <ShieldAlert className="w-3.5 h-3.5" />
-          Admin
+          Bots Dashboard
         </button>
       </div>
       <div className="flex items-center gap-4">

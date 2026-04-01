@@ -29,6 +29,7 @@ export default function LandingPage() {
                         <div className="nb-nav-links">
                             <Link to="/terminal" className="nb-nav-link">Terminal</Link>
                             <Link to="/user/dashboard" className="nb-nav-link">Dashboard</Link>
+                            <Link to="/admin/dashboard" className="nb-nav-link">Bots Dashboard</Link>
                         </div>
                     </div>
                 </div>
@@ -81,6 +82,10 @@ export default function LandingPage() {
                         </Link>
                         <Link to="/user/dashboard" className="nb-cta-secondary">
                             View Dashboard
+                            <ArrowRight size={16} />
+                        </Link>
+                        <Link to="/admin/dashboard" className="nb-cta-secondary">
+                            Bots Dashboard
                             <ArrowRight size={16} />
                         </Link>
                     </div>
