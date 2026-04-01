@@ -95,7 +95,6 @@ export default function Header() {
     const currentPrice = useMarketStore((state) => state.lastPrice);
     const timeframe = useMarketStore((state) => state.timeframe);
     const priceChange24h = useMarketStore((state) => state.priceChange24h);
-    const priceChanges = useMarketStore((state) => state.priceChanges);
     const enabledIndicators = useMarketStore((state) => state.enabledIndicators);
     const setIndicatorEnabled = useMarketStore((state) => state.setIndicatorEnabled);
     const clearIndicators = useMarketStore((state) => state.clearIndicators);
@@ -692,8 +691,8 @@ export default function Header() {
                 {/* Price info strip */}
                 <div className="tv-price-strip">
                     <span className="tv-price-value">${currentPrice.toFixed(2)}</span>
-                    <span className={`tv-price-change ${livePriceChange >= 0 ? 'up' : 'down'}`}>
-                        {livePriceChange >= 0 ? '+' : ''}{livePriceChange.toFixed(2)}%
+                    <span className={`tv-price-change ${priceChange24h >= 0 ? 'up' : 'down'}`}>
+                        {priceChange24h >= 0 ? '+' : ''}{priceChange24h.toFixed(2)}%
                     </span>
                 </div>
 
