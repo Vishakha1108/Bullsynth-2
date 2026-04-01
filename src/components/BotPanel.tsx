@@ -1,378 +1,397 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
-    X, Zap, Cpu, Play, Square, Settings2, BarChart3,
-    ShieldCheck, Activity
+  X,
+  Bot,
+  Play,
+  Square,
+  Search,
+  Circle,
+  CheckCircle2,
+  BarChart3,
 } from 'lucide-react';
-import useMarketStore from '../store/useMarketStore';
-import { useBotPolling } from '../hooks/useBotPolling';
-import type { Position, Regime } from '../services/botsApi';
+import {
+  fetchBots,
+  fetchBotKPI,
+  fetchBotPortfolio,
+  fetchBotSessions,
+  startLapSession,
+  stopLapSession,
+  type Bot as AdminBot,
+  type BotKPIResponse,
+  type BotSession,
+  type BotPortfolio,
+} from '../services/api';
 
-function fmtUsd(value: number): string {
-    return value.toLocaleString('en-US', {
-        style: 'currency',
-        currency: 'USD',
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-    });
+const POLL_MS = 3000;
+
+function fmt(value: number, digits = 2): string {
+  return value.toLocaleString('en-US', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
 }
 
-function fmtPctRatio(value: number): string {
-    return `${(value * 100).toFixed(2)}%`;
+function usd(value: number): string {
+  const sign = value >= 0 ? '+' : '-';
+  return `${sign}$${fmt(Math.abs(value))}`;
 }
 
-function fmtNum(value: number, digits = 2): string {
-    return value.toLocaleString('en-US', {
-        minimumFractionDigits: digits,
-        maximumFractionDigits: digits,
-    });
+function pctRatio(value: number): string {
+  return `${fmt(value * 100)}%`;
 }
 
-function positionClasses(position: Position): string {
-    if (position === 'LONG') return 'bg-bull/15 text-bull border-bull/30';
-    if (position === 'SHORT') return 'bg-bear/15 text-bear border-bear/30';
-    return 'bg-bg-elevated text-text-secondary border-border-subtle';
+function parseErrorMessage(err: unknown): string {
+  if (!(err instanceof Error)) return 'Request failed';
+  return err.message;
 }
 
-function regimeClasses(regime: Regime): string {
-    if (regime === 'trending') return 'bg-blue-500/15 text-blue-400 border-blue-500/30';
-    if (regime === 'mean_reverting') return 'bg-amber-500/15 text-amber-400 border-amber-500/30';
-    return 'bg-purple-500/15 text-purple-400 border-purple-500/30';
+function findActiveLapSession(sessions: BotSession[]): BotSession | null {
+  return sessions.find((s) => s.session_type === 'lap' && s.status === 'active') ?? null;
 }
 
-function StatusChip({ label, className }: { label: string; className: string }) {
-    return (
-        <span className={`inline-flex items-center rounded-full px-2 py-0.5 border text-[10px] font-bold uppercase tracking-wide ${className}`}>
-            {label}
-        </span>
-    );
+function Metric({ label, value, positive }: { label: string; value: string; positive?: boolean }) {
+  const color = positive === undefined ? 'text-text-primary' : positive ? 'text-bull' : 'text-bear';
+  return (
+    <div className="bg-bg-elevated/60 p-2.5 rounded-lg border border-border-subtle">
+      <div className="text-[9px] text-text-secondary uppercase font-bold tracking-tight">{label}</div>
+      <div className={`text-sm font-mono font-bold mt-0.5 ${color}`}>{value}</div>
+    </div>
+  );
 }
 
-function MetricCard({ label, value }: { label: string; value: string }) {
-    return (
-        <div className="bg-bg-elevated/60 p-2.5 rounded-lg border border-border-subtle">
-            <div className="text-[9px] text-text-secondary uppercase font-bold tracking-tight">{label}</div>
-            <div className="text-sm font-mono font-bold mt-0.5 text-text-primary">{value}</div>
-        </div>
-    );
-}
+type BotRuntime = {
+  kpi: BotKPIResponse | null;
+  portfolio: BotPortfolio | null;
+  sessionId: string | null;
+  error: string | null;
+};
 
 export default function BotPanel({ onClose }: { onClose?: () => void }) {
-    const {
-        botStatus,
-        botConfigs,
-        setBotStatus,
-        updateBotConfig,
-        currentSymbol,
-        prices
-    } = useMarketStore();
-    const { alpha, marketMaker } = useBotPolling();
+  const [bots, setBots] = useState<AdminBot[]>([]);
+  const [query, setQuery] = useState('');
+  const [selectedBotIds, setSelectedBotIds] = useState<string[]>([]);
+  const [running, setRunning] = useState(false);
+  const [loadingBots, setLoadingBots] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [panelError, setPanelError] = useState<string | null>(null);
+  const [runtimeByBot, setRuntimeByBot] = useState<Record<string, BotRuntime>>({});
 
-    const [selectedBotId, setSelectedBotId] = useState<'market_maker' | 'alpha_bot'>('market_maker');
+  const selectedSet = useMemo(() => new Set(selectedBotIds), [selectedBotIds]);
 
-    const bots = [
-        {
-            id: 'market_maker' as const,
-            name: 'Market Maker Bot',
-            description: 'Provides liquidity by placing bid/ask orders around current price.',
-            icon: Cpu,
-            color: '#2962ff'
-        },
-        {
-            id: 'alpha_bot' as const,
-            name: 'Alpha Bot',
-            description: 'Advanced momentum-based strategy for high-volatility breakouts.',
-            icon: Zap,
-            color: '#f7931a'
-        }
-    ];
+  const visibleBots = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return bots;
+    return bots.filter((b) => b.name.toLowerCase().includes(q) || b.id.toLowerCase().includes(q));
+  }, [bots, query]);
 
-    const currentBot = bots.find(b => b.id === selectedBotId)!;
-    const config = botConfigs[selectedBotId];
-    const status = botStatus[selectedBotId];
-    const currentPrice = prices[currentSymbol] || 0;
+  const loadBots = async () => {
+    setLoadingBots(true);
+    try {
+      const list = await fetchBots();
+      setBots(list);
+      setPanelError(null);
+      setSelectedBotIds((prev) => prev.filter((id) => list.some((b) => b.id === id)));
+    } catch (err) {
+      setPanelError(parseErrorMessage(err));
+    } finally {
+      setLoadingBots(false);
+    }
+  };
 
-    const selectedLiveState = selectedBotId === 'alpha_bot' ? alpha : marketMaker;
+  useEffect(() => {
+    void loadBots();
+  }, []);
 
-    const alphaPnlPositive = (alpha.status?.pnl ?? 0) >= 0;
-    const mmPnlPositive = (marketMaker.status?.pnl ?? 0) >= 0;
+  const loadRuntime = async (botId: string, sessionId: string | null) => {
+    try {
+      const [kpi, portfolio] = await Promise.all([
+        fetchBotKPI(botId, sessionId ?? undefined),
+        fetchBotPortfolio(botId),
+      ]);
+      return { kpi, portfolio, error: null };
+    } catch (err) {
+      return {
+        kpi: null,
+        portfolio: null,
+        error: parseErrorMessage(err),
+      };
+    }
+  };
 
-    const handleToggleBot = () => {
-        if (status === 'running') {
-            setBotStatus(selectedBotId, 'stopped');
-        } else {
-            setBotStatus(selectedBotId, 'running');
-        }
-    };
+  const refreshSelectedRuntime = async () => {
+    if (selectedBotIds.length === 0) return;
 
-    return (
-        <div className="flex flex-col h-full bg-bg-terminal text-text-primary font-sans border-l border-border-subtle">
-            {/* Header */}
-            <div className="flex items-center justify-between px-3 py-2 border-b border-border-subtle bg-bg-elevated">
-                <div className="flex items-center gap-2">
-                    <BarChart3 size={14} className="text-accent" />
-                    <span className="text-xs font-bold uppercase tracking-wider">Trading Bots</span>
-                </div>
-                {onClose && (
-                    <button onClick={onClose} className="p-1 hover:bg-border-subtle rounded transition-colors cursor-pointer">
-                        <X size={16} className="text-text-secondary" />
-                    </button>
-                )}
-            </div>
-
-            {/* Content Container */}
-            <div className="flex-1 overflow-y-auto styling-scrollbar flex flex-col p-4 gap-6">
-
-                {/* Bot Selector */}
-                <div className="flex flex-col gap-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Select Strategy</label>
-                    <div className="grid grid-cols-1 gap-2">
-                        {bots.map((bot) => (
-                            <button
-                                key={bot.id}
-                                onClick={() => setSelectedBotId(bot.id)}
-                                className={`flex items-start gap-3 p-3 rounded-lg border transition-all cursor-pointer text-left ${selectedBotId === bot.id
-                                    ? 'bg-accent/5 border-accent'
-                                    : 'bg-bg-elevated/50 border-border-subtle hover:border-text-secondary/30'
-                                    }`}
-                            >
-                                <div className={`p-2 rounded-md ${selectedBotId === bot.id ? 'bg-accent text-white' : 'bg-border-subtle text-text-secondary'}`}>
-                                    <bot.icon size={18} />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center justify-between">
-                                        <span className={`text-sm font-bold ${selectedBotId === bot.id ? 'text-text-primary' : 'text-text-secondary'}`}>{bot.name}</span>
-                                        <div className="flex items-center gap-1.5">
-                                            {(bot.id === 'alpha_bot' ? alpha.isDisconnected : marketMaker.isDisconnected) && (
-                                                <StatusChip label="Disconnected" className="bg-bear/15 text-bear border-bear/30" />
-                                            )}
-                                            {(bot.id === 'alpha_bot' ? alpha.isStale : marketMaker.isStale) && (
-                                                <StatusChip label="Stale" className="bg-amber-500/15 text-amber-400 border-amber-500/30" />
-                                            )}
-                                            {botStatus[bot.id] === 'running' && (
-                                                <div className="flex items-center gap-1">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-bull animate-pulse" />
-                                                    <span className="text-[9px] font-bold uppercase text-bull">Live</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <p className="text-[11px] text-text-secondary line-clamp-2 mt-0.5 leading-relaxed">{bot.description}</p>
-                                </div>
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Divider */}
-                <div className="h-px bg-border-subtle mx-1" />
-
-                {/* Live Top Cards */}
-                <div className="flex flex-col gap-3">
-                    <div className="flex items-center gap-2">
-                        <Activity size={14} className="text-text-secondary" />
-                        <label className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Live Bot Status</label>
-                    </div>
-
-                    <div className="bg-bg-elevated/30 p-3 rounded-xl border border-border-subtle/50 flex flex-col gap-2.5">
-                        <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-bold uppercase tracking-wider text-text-secondary">Alpha Bot</span>
-                            <div className="flex items-center gap-1.5">
-                                {alpha.status?.halted && <StatusChip label="Halted" className="bg-bear/15 text-bear border-bear/30" />}
-                                {alpha.status && <StatusChip label={alpha.status.position} className={positionClasses(alpha.status.position)} />}
-                                {alpha.status?.regime && <StatusChip label={alpha.status.regime} className={regimeClasses(alpha.status.regime)} />}
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                            <MetricCard label="Equity" value={alpha.status ? fmtUsd(alpha.status.equity) : '—'} />
-                            <MetricCard label="PnL" value={alpha.status ? `${alphaPnlPositive ? '+' : ''}${fmtUsd(alpha.status.pnl)}` : '—'} />
-                            <MetricCard label="Position" value={alpha.status?.position ?? '—'} />
-                            <MetricCard label="Regime" value={alpha.status?.regime ?? '—'} />
-                        </div>
-                    </div>
-
-                    <div className="bg-bg-elevated/30 p-3 rounded-xl border border-border-subtle/50 flex flex-col gap-2.5">
-                        <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-bold uppercase tracking-wider text-text-secondary">Market Maker</span>
-                            <div className="flex items-center gap-1.5">
-                                {marketMaker.status?.halted && <StatusChip label="Halted" className="bg-bear/15 text-bear border-bear/30" />}
-                                {marketMaker.status && <StatusChip label={marketMaker.status.position} className={positionClasses(marketMaker.status.position)} />}
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                            <MetricCard label="Equity" value={marketMaker.status ? fmtUsd(marketMaker.status.equity) : '—'} />
-                            <MetricCard label="PnL" value={marketMaker.status ? `${mmPnlPositive ? '+' : ''}${fmtUsd(marketMaker.status.pnl)}` : '—'} />
-                            <MetricCard label="Position" value={marketMaker.status?.position ?? '—'} />
-                            <MetricCard label="Holdings" value={marketMaker.status ? fmtNum(marketMaker.status.holdings, 4) : '—'} />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Configuration Area */}
-                <div className="flex flex-col gap-4">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Settings2 size={14} className="text-text-secondary" />
-                            <label className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Configuration</label>
-                        </div>
-                        <div className="text-[10px] font-mono text-text-secondary bg-bg-elevated px-1.5 py-0.5 rounded border border-border-subtle">
-                            {currentSymbol} @ {currentPrice > 0 ? `$${currentPrice.toFixed(2)}` : '0.00'}
-                        </div>
-                    </div>
-
-                    <div className="flex flex-col gap-4 bg-bg-elevated/30 p-4 rounded-xl border border-border-subtle/50">
-                        {selectedBotId === 'market_maker' ? (
-                            <>
-                                <div className="flex flex-col gap-1.5">
-                                    <div className="flex justify-between">
-                                        <label className="text-[11px] font-semibold text-text-secondary">Bid/Ask Spread (%)</label>
-                                        <span className="text-[11px] font-mono font-bold text-accent">{config.spread}%</span>
-                                    </div>
-                                    <input
-                                        type="range" min="0.01" max="1" step="0.01"
-                                        value={config.spread}
-                                        onChange={e => updateBotConfig('market_maker', { spread: parseFloat(e.target.value) })}
-                                        className="w-full h-1 bg-border-subtle rounded-lg appearance-none cursor-pointer accent-accent"
-                                    />
-                                    <div className="flex justify-between items-center text-[9px] text-text-secondary font-mono">
-                                        <span>Tight</span>
-                                        <span>Wide</span>
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-3 mt-1">
-                                    <div className="flex flex-col gap-1.5">
-                                        <label className="text-[11px] font-semibold text-text-secondary">Order Size</label>
-                                        <div className="relative">
-                                            <input
-                                                type="number"
-                                                value={config.size}
-                                                onChange={e => updateBotConfig('market_maker', { size: parseInt(e.target.value) || 0 })}
-                                                className="w-full bg-bg-elevated border border-border-subtle rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-accent"
-                                            />
-                                            <span className="absolute right-2 top-1.5 text-[10px] text-text-secondary">UNIT</span>
-                                        </div>
-                                    </div>
-                                    <div className="flex flex-col gap-1.5">
-                                        <label className="text-[11px] font-semibold text-text-secondary">Risk Limit</label>
-                                        <div className="relative">
-                                            <input
-                                                type="number"
-                                                value={config.maxPosition}
-                                                onChange={e => updateBotConfig('market_maker', { maxPosition: parseInt(e.target.value) || 0 })}
-                                                className="w-full bg-bg-elevated border border-border-subtle rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-accent"
-                                            />
-                                            <span className="absolute right-2 top-1.5 text-[10px] text-text-secondary">USD</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </>
-                        ) : (
-                            <>
-                                <div className="flex flex-col gap-1.5">
-                                    <label className="text-[11px] font-semibold text-text-secondary">Strategy Logic</label>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {['Trend Following', 'Mean Reversion'].map(s => (
-                                            <button
-                                                key={s}
-                                                onClick={() => updateBotConfig('alpha_bot', { strategy: s })}
-                                                className={`py-2 px-1 rounded text-[10px] font-bold border transition-all ${config.strategy === s ? 'bg-accent/10 border-accent text-accent' : 'bg-bg-elevated border-border-subtle text-text-secondary opacity-60'}`}
-                                            >
-                                                {s}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div className="flex flex-col gap-1.5 mt-2">
-                                    <label className="text-[11px] font-semibold text-text-secondary">Risk Profile</label>
-                                    <div className="flex items-center gap-1.5">
-                                        {['Low', 'Medium', 'High'].map(r => (
-                                            <button
-                                                key={r}
-                                                onClick={() => updateBotConfig('alpha_bot', { riskLevel: r })}
-                                                className={`flex-1 py-1.5 rounded text-[10px] font-bold border transition-all ${config.riskLevel === r ? 'bg-accent/10 border-accent text-accent' : 'bg-bg-elevated border-border-subtle text-text-secondary opacity-60'}`}
-                                            >
-                                                {r}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div className="flex flex-col gap-1.5 mt-2">
-                                    <label className="text-[11px] font-semibold text-text-secondary">Signal Timeframe</label>
-                                    <select
-                                        value={config.timeframe}
-                                        onChange={e => updateBotConfig('alpha_bot', { timeframe: e.target.value })}
-                                        className="w-full bg-bg-elevated border border-border-subtle rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-accent"
-                                    >
-                                        <option>1m</option>
-                                        <option>5m</option>
-                                        <option>15m</option>
-                                        <option>1h</option>
-                                    </select>
-                                </div>
-                            </>
-                        )}
-                    </div>
-                </div>
-
-                {/* KPI Row */}
-                <div className="flex flex-col gap-3 mt-auto">
-                    <div className="flex items-center gap-2">
-                        <Activity size={14} className="text-text-secondary" />
-                        <label className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Selected Bot KPIs</label>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                        {selectedBotId === 'alpha_bot' ? (
-                            <>
-                                <MetricCard label="Trades" value={alpha.status ? String(alpha.status.trades) : '—'} />
-                                <MetricCard label="Win Rate" value={alpha.status ? fmtPctRatio(alpha.status.winRate) : '—'} />
-                                <MetricCard label="Sharpe" value={alpha.status ? fmtNum(alpha.status.sharpe, 2) : '—'} />
-                                <MetricCard label="Max DD" value={alpha.status ? fmtPctRatio(alpha.status.maxDrawdown) : '—'} />
-                            </>
-                        ) : (
-                            <>
-                                <MetricCard label="Total Fills" value={marketMaker.status ? String(marketMaker.status.totalFills) : '—'} />
-                                <MetricCard label="Fill Balance" value={marketMaker.status ? fmtPctRatio(marketMaker.status.fillBalance) : '—'} />
-                                <MetricCard label="Max DD" value={marketMaker.status ? fmtPctRatio(marketMaker.status.maxDrawdown) : '—'} />
-                                <MetricCard label="Bid / Ask" value={marketMaker.status ? `${marketMaker.status.bidFills}/${marketMaker.status.askFills}` : '—'} />
-                            </>
-                        )}
-                    </div>
-                    {(selectedLiveState.statusError || selectedLiveState.healthError) && (
-                        <p className="text-[10px] text-text-secondary font-mono opacity-70">
-                            {selectedLiveState.isDisconnected ? 'API disconnected. Retrying in background.' : 'Transient API error. Showing last known data.'}
-                        </p>
-                    )}
-                </div>
-            </div>
-
-            {/* Action Footer */}
-            <div className="p-4 border-t border-border-subtle bg-bg-elevated">
-                <button
-                    onClick={handleToggleBot}
-                    className={`w-full py-3 rounded-xl flex items-center justify-center gap-2 font-bold text-sm transition-all shadow-lg active:scale-95 cursor-pointer ${status === 'running'
-                        ? 'bg-bear hover:bg-bear/90 text-white shadow-bear/20'
-                        : 'bg-accent hover:bg-accent/90 text-white shadow-accent/20'
-                        }`}
-                >
-                    {status === 'running' ? (
-                        <>
-                            <Square size={16} fill="currentColor" />
-                            <span>Stop Trading Bot</span>
-                        </>
-                    ) : (
-                        <>
-                            <Play size={16} fill="currentColor" />
-                            <span>Start {currentBot.name}</span>
-                        </>
-                    )}
-                </button>
-                <div className="flex items-center justify-center gap-1.5 mt-3 opacity-60">
-                    <ShieldCheck size={12} className="text-bull" />
-                    <span className="text-[10px] font-medium text-text-secondary uppercase tracking-tight">Enterprise Risk Monitoring Active</span>
-                </div>
-            </div>
-        </div>
+    const entries = await Promise.all(
+      selectedBotIds.map(async (botId) => {
+        const current = runtimeByBot[botId];
+        const sessionId = running ? current?.sessionId ?? null : null;
+        const next = await loadRuntime(botId, sessionId);
+        return [
+          botId,
+          {
+            kpi: next.kpi,
+            portfolio: next.portfolio,
+            sessionId,
+            error: next.error,
+          } as BotRuntime,
+        ] as const;
+      })
     );
+
+    setRuntimeByBot((prev) => {
+      const copy = { ...prev };
+      for (const [botId, runtime] of entries) {
+        copy[botId] = runtime;
+      }
+      return copy;
+    });
+  };
+
+  useEffect(() => {
+    void refreshSelectedRuntime();
+    const t = setInterval(() => {
+      void refreshSelectedRuntime();
+    }, POLL_MS);
+    return () => clearInterval(t);
+  }, [selectedBotIds, running]);
+
+  const toggleSelected = (botId: string) => {
+    if (running) return;
+    setSelectedBotIds((prev) =>
+      prev.includes(botId) ? prev.filter((id) => id !== botId) : [...prev, botId]
+    );
+  };
+
+  const handleStart = async () => {
+    if (selectedBotIds.length === 0) {
+      setPanelError('Select at least one bot to compare.');
+      return;
+    }
+
+    setActionLoading(true);
+    setPanelError(null);
+
+    const sessionMap: Record<string, string | null> = {};
+
+    for (const botId of selectedBotIds) {
+      try {
+        const started = await startLapSession(botId);
+        sessionMap[botId] = started.id;
+      } catch {
+        try {
+          const sessions = await fetchBotSessions(botId);
+          const activeLap = findActiveLapSession(sessions);
+          sessionMap[botId] = activeLap?.id ?? null;
+        } catch {
+          sessionMap[botId] = null;
+        }
+      }
+    }
+
+    const nextRuntime: Record<string, BotRuntime> = { ...runtimeByBot };
+
+    for (const botId of selectedBotIds) {
+      const sessionId = sessionMap[botId] ?? null;
+      const loaded = await loadRuntime(botId, sessionId);
+      nextRuntime[botId] = {
+        kpi: loaded.kpi,
+        portfolio: loaded.portfolio,
+        sessionId,
+        error: loaded.error,
+      };
+    }
+
+    setRuntimeByBot(nextRuntime);
+    setRunning(true);
+    setActionLoading(false);
+  };
+
+  const handleStop = async () => {
+    setActionLoading(true);
+
+    await Promise.all(
+      selectedBotIds.map(async (botId) => {
+        try {
+          await stopLapSession(botId);
+        } catch {
+          // Ignore stop race conditions (already stopped or no active lap).
+        }
+      })
+    );
+
+    setRunning(false);
+
+    const nextRuntime: Record<string, BotRuntime> = { ...runtimeByBot };
+    for (const botId of selectedBotIds) {
+      const loaded = await loadRuntime(botId, null);
+      nextRuntime[botId] = {
+        kpi: loaded.kpi,
+        portfolio: loaded.portfolio,
+        sessionId: null,
+        error: loaded.error,
+      };
+    }
+
+    setRuntimeByBot(nextRuntime);
+    setActionLoading(false);
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-bg-terminal text-text-primary font-sans border-l border-border-subtle">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-border-subtle bg-bg-elevated">
+        <div className="flex items-center gap-2">
+          <BarChart3 size={14} className="text-accent" />
+          <span className="text-xs font-bold uppercase tracking-wider">Bot Compare</span>
+          {running && <span className="text-[10px] font-bold text-bull uppercase">Live Session</span>}
+        </div>
+        {onClose && (
+          <button onClick={onClose} className="p-1 hover:bg-border-subtle rounded transition-colors cursor-pointer">
+            <X size={16} className="text-text-secondary" />
+          </button>
+        )}
+      </div>
+
+      <div className="flex-1 overflow-y-auto styling-scrollbar flex flex-col p-4 gap-4">
+        <div className="flex items-center gap-2 bg-bg-elevated/40 border border-border-subtle rounded-lg px-3 py-2">
+          <Search size={14} className="text-text-secondary" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search bots by name or id"
+            className="bg-transparent w-full text-sm text-text-primary placeholder:text-text-secondary outline-none"
+          />
+        </div>
+
+        <div className="text-[10px] text-text-secondary uppercase tracking-widest font-semibold">
+          Step 1: Select Bots ({selectedBotIds.length} selected)
+        </div>
+
+        <div className="grid grid-cols-1 gap-2">
+          {loadingBots ? (
+            <div className="text-xs text-text-secondary italic p-3">Loading bots...</div>
+          ) : visibleBots.length === 0 ? (
+            <div className="text-xs text-text-secondary italic p-3">No bots found.</div>
+          ) : (
+            visibleBots.map((bot) => {
+              const selected = selectedSet.has(bot.id);
+              return (
+                <button
+                  key={bot.id}
+                  onClick={() => toggleSelected(bot.id)}
+                  disabled={running}
+                  className={`p-3 rounded-lg border text-left transition-colors ${
+                    selected
+                      ? 'bg-accent/10 border-accent text-text-primary'
+                      : 'bg-bg-elevated/40 border-border-subtle text-text-secondary hover:text-text-primary hover:border-text-secondary/40'
+                  } ${running ? 'cursor-not-allowed opacity-90' : 'cursor-pointer'}`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Bot size={14} className="shrink-0" />
+                      <span className="font-semibold truncate text-sm">{bot.name}</span>
+                    </div>
+                    {selected ? <CheckCircle2 size={14} className="text-accent shrink-0" /> : <Circle size={14} className="shrink-0" />}
+                  </div>
+                  <div className="text-[10px] mt-1 font-mono truncate">{bot.id}</div>
+                </button>
+              );
+            })
+          )}
+        </div>
+
+        {panelError && (
+          <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+            {panelError}
+          </div>
+        )}
+
+        <div className="text-[10px] text-text-secondary uppercase tracking-widest font-semibold mt-1">
+          Step 2: Start Compare Session
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={handleStart}
+            disabled={running || actionLoading || selectedBotIds.length === 0}
+            className="py-2 rounded-lg border border-accent bg-accent/15 text-accent font-semibold text-xs flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          >
+            <Play size={13} />
+            Start
+          </button>
+          <button
+            onClick={handleStop}
+            disabled={!running || actionLoading}
+            className="py-2 rounded-lg border border-bear bg-bear/15 text-bear font-semibold text-xs flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          >
+            <Square size={13} />
+            Stop
+          </button>
+        </div>
+
+        <div className="h-px bg-border-subtle my-1" />
+
+        <div className="flex items-center justify-between">
+          <div className="text-[10px] text-text-secondary uppercase tracking-widest font-semibold">Compared Bots KPI</div>
+          <span className="text-[10px] text-text-secondary font-mono">{running ? 'Live polling' : 'Overall scope'}</span>
+        </div>
+
+        {selectedBotIds.length === 0 ? (
+          <div className="text-xs text-text-secondary italic">Select bots and press Start to compare KPI side-by-side.</div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {selectedBotIds.map((botId) => {
+              const bot = bots.find((b) => b.id === botId);
+              const runtime = runtimeByBot[botId];
+              const kpi = runtime?.kpi;
+              const pf = runtime?.portfolio;
+
+              return (
+                <div key={botId} className="bg-bg-elevated/30 p-3 rounded-xl border border-border-subtle/60 flex flex-col gap-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-bold uppercase tracking-wider text-text-primary truncate">
+                        {bot?.name ?? botId}
+                      </div>
+                      <div className="text-[10px] text-text-secondary font-mono truncate">{botId}</div>
+                    </div>
+                    <span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded border ${
+                      running ? 'bg-bull/10 border-bull/20 text-bull' : 'bg-bg-elevated border-border-subtle text-text-secondary'
+                    }`}>
+                      {running ? 'Session' : 'Overall'}
+                    </span>
+                  </div>
+
+                  {runtime?.error && (
+                    <div className="text-[10px] text-red-400 bg-red-500/10 border border-red-500/20 rounded px-2 py-1">
+                      {runtime.error}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <Metric label="Realized PnL" value={kpi ? usd(kpi.realized_pnl) : '—'} positive={kpi ? kpi.realized_pnl >= 0 : undefined} />
+                    <Metric label="Win Rate" value={kpi ? pctRatio(kpi.win_rate) : '—'} positive={kpi ? kpi.win_rate >= 0.5 : undefined} />
+                    <Metric label="Sharpe" value={kpi ? fmt(kpi.sharpe_ratio) : '—'} positive={kpi ? kpi.sharpe_ratio >= 1 : undefined} />
+                    <Metric label="Max DD" value={kpi ? pctRatio(kpi.max_drawdown) : '—'} positive={false} />
+                    <Metric label="Closed Trades" value={kpi ? String(kpi.total_trades) : '—'} />
+                    <Metric label="Cash" value={pf ? `$${fmt(pf.cash_balance)}` : '—'} />
+                  </div>
+
+                  {running && (
+                    <div className="text-[10px] text-text-secondary font-mono">
+                      session: {runtime?.sessionId ?? 'not-found'}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="p-3 border-t border-border-subtle bg-bg-elevated/70 flex items-center justify-between">
+        <div className="text-[10px] text-text-secondary uppercase tracking-wider font-semibold">API Source</div>
+        <div className="text-[10px] text-accent font-mono">Admin API</div>
+      </div>
+    </div>
+  );
 }
