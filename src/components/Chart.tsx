@@ -1434,10 +1434,21 @@ function Chart() {
     useEffect(() => {
         if (!seriesRef.current || !latestCandle || !chartRef.current) return;
 
-        // Safety: Only update if the chart is already showing data for the current symbol
-        // and if it's not in the middle of being cleared/reset.
-        if (lastSymbolRef.current !== currentSymbol || candles.length === 0) {
+        if (candles.length === 0) {
             return;
+        }
+
+        // Bootstrap the visible series from current store candles if initial data
+        // arrived through live candle messages before a history-sequence sync.
+        if (lastSymbolRef.current !== currentSymbol) {
+            seriesRef.current.candle.setData(candles.map(formatCandleData));
+            seriesRef.current.volume.setData(candles.map(c => ({
+                time: c.time as UTCTimestamp,
+                value: c.volume,
+                color: c.close >= c.open ? 'rgba(38, 166, 154, 0.5)' : 'rgba(239, 83, 80, 0.5)',
+            })));
+            lastSymbolRef.current = currentSymbol;
+            chartRef.current.timeScale().scrollToRealTime();
         }
 
         try {
