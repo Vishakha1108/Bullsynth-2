@@ -238,7 +238,10 @@ Response:
                         tickLine={{ stroke: theme === 'dark' ? '#2a2e39' : '#d9dde5' }}
                       />
                       <Tooltip
-                        formatter={(value: number) => [`$${value.toFixed(2)}`, 'PnL']}
+                        formatter={(value) => {
+                          const numeric = typeof value === 'number' ? value : Number(value);
+                          return [Number.isFinite(numeric) ? `$${numeric.toFixed(2)}` : String(value ?? ''), 'PnL'];
+                        }}
                         labelFormatter={(label) => `Time: ${label}`}
                         contentStyle={{
                           backgroundColor: theme === 'dark' ? '#171b26' : '#ffffff',

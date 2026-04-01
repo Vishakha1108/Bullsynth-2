@@ -3,11 +3,9 @@ import { createChart, CandlestickSeries, HistogramSeries, LineSeries, AreaSeries
 import type { ISeriesApi, IChartApi, UTCTimestamp, MouseEventParams } from 'lightweight-charts';
 import useMarketStore, { INDICATOR_COLORS, INDICATOR_LIBRARY, TIMEFRAMES } from '../store/useMarketStore';
 import type { Candle } from '../store/useMarketStore';
-import { requestHistory, isSymbolCached } from '../services/websocket';
+import { requestHistory, requestCompareHistory, isSymbolCached } from '../services/websocket';
 import { useTheme } from '../store/ThemeContext';
-import {
-    Search, Plus, X, Star
-} from 'lucide-react';
+import { Search, X, Star, Bell } from 'lucide-react';
 import {
     calculateBollingerBands,
     calculateEMA,
@@ -15,6 +13,36 @@ import {
     calculateRSI,
     calculateSMA,
     calculateVWAP,
+    calculateWMA,
+    calculateHMA,
+    calculateALMA,
+    calculateTEMA,
+    calculateDEMA,
+    calculateATR,
+    calculateSupertrend,
+    calculateParabolicSAR,
+    calculateIchimoku,
+    calculateADX,
+    calculateAroon,
+    calculateKeltnerChannels,
+    calculateDonchianChannels,
+    calculateStdDev,
+    calculateChoppinessIndex,
+    calculateOBV,
+    calculateAD,
+    calculateCMF,
+    calculateVolumeOscillator,
+    calculatePVT,
+    calculateStochastic,
+    calculateStochRSI,
+    calculateCCI,
+    calculateMomentum,
+    calculateWilliamsR,
+    calculateAwesomeOscillator,
+    calculatePPO,
+    calculateROC,
+    calculateTRIX,
+    calculateUltimateOscillator,
 } from '../lib/indicators';
 import ReplayControls from './ReplayControls';
 import { ChartToolbar } from './ChartToolbar';
@@ -63,10 +91,11 @@ export function TickerSearch() {
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            // Ctrl + K to toggle
+            // Ctrl/Cmd + K always opens symbol search.
             if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
                 e.preventDefault();
-                setIsOpen(prev => !prev);
+                setMode('search');
+                setIsOpen(true);
                 return;
             }
 
@@ -175,8 +204,9 @@ export function TickerSearch() {
                 addCompareSymbol(symbol);
                 if (!isSymbolCached(symbol)) {
                     requestHistory(symbol);
+                    requestCompareHistory(symbol);
                 } else {
-                    requestHistory(symbol); // Still request to populate candles
+                    requestCompareHistory(symbol);
                 }
             }
         } else {
@@ -199,20 +229,7 @@ export function TickerSearch() {
     }, [isOpen, closeSearch]);
 
     return (
-        <div className="ticker-search-container">
-            <button
-                className="ticker-search-trigger"
-                title="Compare Symbol"
-                onClick={() => { setMode('compare'); setIsOpen(true); }}
-            >
-                <div className="flex items-center gap-2">
-                    <span className="ticker-symbol">{currentSymbol}</span>
-                    <div className="w-5 h-5 rounded-full border border-border-subtle flex items-center justify-center hover:bg-bg-elevated transition-colors ml-1">
-                        <Plus size={14} className="text-text-secondary" />
-                    </div>
-                </div>
-            </button>
-
+        <>
             {isOpen && (
                 <div className="tv-modal-overlay" onClick={() => closeSearch()}>
                     <div className="tv-modal-content" onClick={e => e.stopPropagation()}>
@@ -301,7 +318,7 @@ export function TickerSearch() {
                     </div>
                 </div>
             )}
-        </div>
+        </>
     );
 }
 
@@ -446,6 +463,8 @@ function Chart() {
     const [screenshotFlash, setScreenshotFlash] = useState(false);
     const [toastMessage, setToastMessage] = useState<string | null>(null);
     const [alertModalOpen, setAlertModalOpen] = useState(false);
+    const [activeTrigger, setActiveTrigger] = useState<any | null>(null);
+    const [drawingsHidden, setDrawingsHidden] = useState(false);
 
     useEffect(() => {
         const handleToast = (e: CustomEvent) => {
@@ -455,13 +474,18 @@ function Chart() {
         const handleAlertEvent = () => {
             setAlertModalOpen(true);
         };
+        const handleTrigger = (e: any) => {
+            setActiveTrigger(e.detail);
+        };
 
         window.addEventListener('show-toast', handleToast as EventListener);
         window.addEventListener('open-alert-dialog', handleAlertEvent);
+        window.addEventListener('alert-triggered', handleTrigger);
 
         return () => {
             window.removeEventListener('show-toast', handleToast as EventListener);
             window.removeEventListener('open-alert-dialog', handleAlertEvent);
+            window.removeEventListener('alert-triggered', handleTrigger);
         };
     }, []);
 
@@ -489,6 +513,7 @@ function Chart() {
     useEffect(() => {
         if (!chartRef.current) return;
         const p = theme === 'dark' ? DARK_CHART : LIGHT_CHART;
+        const showAxisCrosshair = ['crosshair', 'dot', 'arrow'].includes(activeTool);
         chartRef.current.applyOptions({
             layout: {
                 background: { type: ColorType.Solid, color: p.bg },
@@ -499,7 +524,7 @@ function Chart() {
                 horzLines: { color: p.gridLine },
             },
             crosshair: {
-                mode: activeTool !== 'crosshair' ? CrosshairMode.Hidden : CrosshairMode.Normal,
+                mode: showAxisCrosshair ? CrosshairMode.Normal : CrosshairMode.Hidden,
                 vertLine: {
                     color: p.crosshair,
                     labelBackgroundColor: p.crosshairLabel,
@@ -579,8 +604,6 @@ function Chart() {
                 mainSeries = chart.addSeries(LineSeries, {
                     color: '#2962FF',
                     lineWidth: 2,
-                    priceLineVisible: false,
-                    lastValueVisible: false,
                 });
                 break;
             case 'Area':
@@ -589,8 +612,6 @@ function Chart() {
                     bottomColor: 'rgba(41, 98, 255, 0)',
                     lineColor: '#2962FF',
                     lineWidth: 2,
-                    priceLineVisible: false,
-                    lastValueVisible: false,
                 });
                 break;
             case 'Baseline':
@@ -603,8 +624,6 @@ function Chart() {
                     bottomFillColor2: 'rgba(239, 83, 80, 0.28)',
                     bottomLineColor: 'rgba(239, 83, 80, 1)',
                     lineWidth: 2,
-                    priceLineVisible: false,
-                    lastValueVisible: false,
                 });
                 break;
             case 'Hollow candles':
@@ -701,6 +720,7 @@ function Chart() {
         return () => {
             resizeObserver.disconnect();
             removeAllIndicatorSeries();
+            compareSeriesMapRef.current = {};
             chart.remove();
             chartRef.current = null;
             seriesRef.current = null;
@@ -738,8 +758,6 @@ function Chart() {
     useEffect(() => {
         if (!chartRef.current) return;
         const chart = chartRef.current;
-        
-        chart.priceScale('right').applyOptions({ mode: PriceScaleMode.Normal });
 
         // Remove detached series
         Object.keys(compareSeriesMapRef.current).forEach(sym => {
@@ -751,6 +769,13 @@ function Chart() {
             }
         });
 
+        // Switch main scale to percentage mode when comparing, normal otherwise
+        if (compareSymbols.length > 0) {
+            chart.priceScale('right').applyOptions({ mode: PriceScaleMode.Percentage });
+        } else {
+            chart.priceScale('right').applyOptions({ mode: PriceScaleMode.Normal });
+        }
+
         const compareColors = ['#f59e0b', '#8b5cf6', '#ec4899', '#10b981', '#3b82f6'];
 
         // Add or update series
@@ -760,7 +785,7 @@ function Chart() {
                 series = chart.addSeries(LineSeries, {
                     color: compareColors[idx % compareColors.length],
                     lineWidth: 2,
-                    priceScaleId: 'right', // Render onto the main scale to align perfectly with percentage mode
+                    priceScaleId: 'right',
                     title: sym,
                 });
                 compareSeriesMapRef.current[sym] = series;
@@ -768,11 +793,7 @@ function Chart() {
 
             const compareCandlesData = compareCandles[sym];
             if (compareCandlesData && compareCandlesData.length > 0) {
-                const mainStart = candles.length > 0 ? candles[0].close : 1;
-                const compareStart = compareCandlesData[0].close;
-                const multiplier = compareStart !== 0 ? mainStart / compareStart : 1;
-
-                const lineData = compareCandlesData.map(c => ({ time: c.time as UTCTimestamp, value: c.close * multiplier }));
+                const lineData = compareCandlesData.map(c => ({ time: c.time as UTCTimestamp, value: c.close }));
                 // Eliminate duplicates by time
                 const deduped: { time: UTCTimestamp, value: number }[] = [];
                 for (const point of lineData) {
@@ -786,7 +807,7 @@ function Chart() {
             }
         });
 
-    }, [compareSymbols, compareCandles, theme, candles]);
+    }, [compareSymbols, compareCandles, theme, candles, chartType]);
 
     // Shortcuts and Custom Events implementation
     useEffect(() => {
@@ -826,12 +847,45 @@ function Chart() {
         window.addEventListener('reset-chart-view', handleResetChart);
 
         const handleKeyDown = (e: KeyboardEvent) => {
-            // Don't trigger shortcuts if user is typing in an input
-            if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
+            // Don't trigger shortcuts if user is typing in an editable control
+            const activeEl = document.activeElement as HTMLElement | null;
+            if (
+                activeEl?.tagName === 'INPUT'
+                || activeEl?.tagName === 'TEXTAREA'
+                || activeEl?.tagName === 'SELECT'
+                || activeEl?.isContentEditable
+            ) {
+                return;
+            }
 
             const isAlt = e.altKey;
             const isCtrl = e.ctrlKey || e.metaKey;
             const key = e.key.toLowerCase();
+
+            // Let the shortcuts modal own keyboard input while it is open.
+            if (document.querySelector('[data-keyboard-shortcuts-modal="true"]')) {
+                if (key !== 'escape') return;
+            }
+
+            const cycleWatchlistSymbol = (direction: 1 | -1) => {
+                const state = useMarketStore.getState();
+                const symbols = (state.watchlist.length > 0 ? state.watchlist : state.symbols).filter(Boolean);
+                if (symbols.length < 2) return;
+
+                const idx = symbols.indexOf(state.currentSymbol);
+                const baseIndex = idx === -1 ? 0 : idx;
+                const nextIndex = (baseIndex + direction + symbols.length) % symbols.length;
+                const nextSymbol = symbols[nextIndex];
+
+                if (!nextSymbol || nextSymbol === state.currentSymbol) return;
+
+                state.setCurrentSymbol(nextSymbol);
+                state.clearCandles();
+                if (!isSymbolCached(nextSymbol)) {
+                    requestHistory(nextSymbol);
+                }
+                window.dispatchEvent(new CustomEvent('show-toast', { detail: `Switched to ${nextSymbol}` }));
+            };
 
             // Alt + T: Trendline
             if (isAlt && key === 't') {
@@ -844,17 +898,54 @@ function Chart() {
                 e.stopPropagation();
                 if (currentCrosshairRef.current) {
                     const currentDrawings = useMarketStore.getState().drawings;
-                    setDrawings([...currentDrawings, { type: 'ray', points: [{ time: currentCrosshairRef.current.time, price: currentCrosshairRef.current.price }] }]);
+                    setDrawings([...currentDrawings, { type: 'horizontal_line', points: [{ time: currentCrosshairRef.current.time, price: currentCrosshairRef.current.price }] }]);
                     setActiveTool('crosshair'); // Reset actively immediately
                 } else {
-                    setActiveTool('ray'); // Fallback to tool selection if mouse is outside chart
+                    setActiveTool('horizontal_line'); // Fallback to tool selection if mouse is outside chart
                 }
+            }
+            // Alt + V: Vertical Line
+            else if (isAlt && key === 'v') {
+                e.preventDefault();
+                e.stopPropagation();
+                if (currentCrosshairRef.current) {
+                    const currentDrawings = useMarketStore.getState().drawings;
+                    setDrawings([...currentDrawings, { type: 'vertical_line', points: [{ time: currentCrosshairRef.current.time, price: currentCrosshairRef.current.price }] }]);
+                    setActiveTool('crosshair');
+                } else {
+                    setActiveTool('vertical_line');
+                }
+            }
+            // Alt + L: Add Alert
+            else if (isAlt && key === 'l') {
+                e.preventDefault();
+                window.dispatchEvent(new CustomEvent('open-alert-dialog'));
             }
             // Alt + C: Clear All
             else if (isAlt && key === 'c') {
                 e.preventDefault();
                 clearDrawings();
                 window.dispatchEvent(new CustomEvent('reset-chart-view'));
+            }
+            // Ctrl + H: Hide/Show drawings
+            else if (isCtrl && key === 'h') {
+                e.preventDefault();
+                e.stopPropagation();
+                setDrawingsHidden((prev) => {
+                    const next = !prev;
+                    window.dispatchEvent(new CustomEvent('show-toast', { detail: next ? 'Drawings hidden' : 'Drawings shown' }));
+                    return next;
+                });
+            }
+            // Space / Shift+Space: Watchlist navigation
+            else if ((e.code === 'Space' || e.key === ' ') && !isAlt && !isCtrl && !e.metaKey) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (e.shiftKey) {
+                    cycleWatchlistSymbol(-1);
+                } else {
+                    cycleWatchlistSymbol(1);
+                }
             }
             // T: Text
             else if (key === 't' && !isAlt && !isCtrl) {
@@ -1002,7 +1093,11 @@ function Chart() {
 
         const lineDataFromValues = (values: Array<number | null>) => (
             values
-                .map((value, idx) => (value == null ? null : { time: candles[idx].time as UTCTimestamp, value }))
+                .map((value, idx) => {
+                    const candle = candles[idx];
+                    if (value == null || !candle) return null;
+                    return { time: candle.time as UTCTimestamp, value };
+                })
                 .filter((point): point is { time: UTCTimestamp; value: number } => point !== null)
         );
 
@@ -1132,6 +1227,326 @@ function Chart() {
             addLineIndicator(signalLine);
             addHistogramIndicator(histogram);
         }
+
+        // --- WMA ---
+        if (enabledIndicators.includes('wma')) {
+            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.wma, lineWidth: 1, priceLineVisible: false, lastValueVisible: true });
+            series.setData(lineDataFromValues(calculateWMA(closeValues, 20)));
+            addLineIndicator(series);
+        }
+
+        // --- HMA ---
+        if (enabledIndicators.includes('hma')) {
+            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.hma, lineWidth: 1, priceLineVisible: false, lastValueVisible: true });
+            series.setData(lineDataFromValues(calculateHMA(closeValues, 20)));
+            addLineIndicator(series);
+        }
+
+        // --- ALMA ---
+        if (enabledIndicators.includes('alma')) {
+            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.alma, lineWidth: 1, priceLineVisible: false, lastValueVisible: true });
+            series.setData(lineDataFromValues(calculateALMA(closeValues, 20)));
+            addLineIndicator(series);
+        }
+
+        // --- TEMA ---
+        if (enabledIndicators.includes('tema')) {
+            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.tema, lineWidth: 1, priceLineVisible: false, lastValueVisible: true });
+            series.setData(lineDataFromValues(calculateTEMA(closeValues, 20)));
+            addLineIndicator(series);
+        }
+
+        // --- DEMA ---
+        if (enabledIndicators.includes('dema')) {
+            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.dema, lineWidth: 1, priceLineVisible: false, lastValueVisible: true });
+            series.setData(lineDataFromValues(calculateDEMA(closeValues, 20)));
+            addLineIndicator(series);
+        }
+
+        // --- Supertrend ---
+        if (enabledIndicators.includes('supertrend')) {
+            const st = calculateSupertrend(candles, 10, 3);
+            const data = st.supertrend
+                .map((value, idx) => value == null ? null : {
+                    time: candles[idx].time as UTCTimestamp,
+                    value,
+                    color: st.direction[idx] === 1 ? '#4ade80' : '#ef4444',
+                })
+                .filter((p): p is { time: UTCTimestamp; value: number; color: string } => p !== null);
+            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.supertrend, lineWidth: 2, priceLineVisible: false, lastValueVisible: true });
+            series.setData(data);
+            addLineIndicator(series);
+        }
+
+        // --- Parabolic SAR ---
+        if (enabledIndicators.includes('psar')) {
+            const sarValues = calculateParabolicSAR(candles);
+            const series = chart.addSeries(LineSeries, {
+                color: INDICATOR_COLORS.psar,
+                lineWidth: 1,
+                pointMarkersVisible: true,
+                pointMarkersRadius: 2,
+                priceLineVisible: false,
+                lastValueVisible: false,
+            });
+            series.setData(lineDataFromValues(sarValues));
+            addLineIndicator(series);
+        }
+
+        // --- Ichimoku Cloud ---
+        if (enabledIndicators.includes('ichimoku')) {
+            const ich = calculateIchimoku(candles);
+            const tenkanS = chart.addSeries(LineSeries, { color: '#2962FF', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+            const kijunS = chart.addSeries(LineSeries, { color: '#E91E63', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+            const senkouAS = chart.addSeries(LineSeries, { color: '#4CAF50', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+            const senkouBS = chart.addSeries(LineSeries, { color: '#FF5722', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+            const chikouS = chart.addSeries(LineSeries, { color: '#9C27B0', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false });
+
+            tenkanS.setData(lineDataFromValues(ich.tenkan));
+            kijunS.setData(lineDataFromValues(ich.kijun));
+            senkouAS.setData(lineDataFromValues(ich.senkouA));
+            senkouBS.setData(lineDataFromValues(ich.senkouB));
+            chikouS.setData(lineDataFromValues(ich.chikou));
+
+            addLineIndicator(tenkanS);
+            addLineIndicator(kijunS);
+            addLineIndicator(senkouAS);
+            addLineIndicator(senkouBS);
+            addLineIndicator(chikouS);
+        }
+
+        // --- ADX ---
+        if (enabledIndicators.includes('adx')) {
+            const adxResult = calculateADX(candles, 14);
+            const scaleId = 'adx';
+            const adxS = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.adx, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: false });
+            const plusS = chart.addSeries(LineSeries, { color: '#4ade80', lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: false });
+            const minusS = chart.addSeries(LineSeries, { color: '#ef4444', lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: false });
+            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
+            adxS.setData(lineDataFromValues(adxResult.adx));
+            plusS.setData(lineDataFromValues(adxResult.plusDI));
+            minusS.setData(lineDataFromValues(adxResult.minusDI));
+            addLineIndicator(adxS);
+            addLineIndicator(plusS);
+            addLineIndicator(minusS);
+        }
+
+        // --- Aroon ---
+        if (enabledIndicators.includes('aroon')) {
+            const aroonResult = calculateAroon(candles, 25);
+            const scaleId = 'aroon';
+            const upS = chart.addSeries(LineSeries, { color: '#4ade80', lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: false });
+            const downS = chart.addSeries(LineSeries, { color: '#ef4444', lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: false });
+            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
+            upS.setData(lineDataFromValues(aroonResult.aroonUp));
+            downS.setData(lineDataFromValues(aroonResult.aroonDown));
+            addLineIndicator(upS);
+            addLineIndicator(downS);
+        }
+
+        // --- ATR ---
+        if (enabledIndicators.includes('atr')) {
+            const scaleId = 'atr';
+            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.atr, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
+            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
+            series.setData(lineDataFromValues(calculateATR(candles, 14)));
+            addLineIndicator(series);
+        }
+
+        // --- Keltner Channels ---
+        if (enabledIndicators.includes('kc')) {
+            const kc = calculateKeltnerChannels(candles);
+            const upperS = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.kc, lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false });
+            const middleS = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.kc, lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+            const lowerS = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.kc, lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false });
+            upperS.setData(lineDataFromValues(kc.upper));
+            middleS.setData(lineDataFromValues(kc.middle));
+            lowerS.setData(lineDataFromValues(kc.lower));
+            addLineIndicator(upperS);
+            addLineIndicator(middleS);
+            addLineIndicator(lowerS);
+        }
+
+        // --- Donchian Channels ---
+        if (enabledIndicators.includes('dc')) {
+            const dc = calculateDonchianChannels(candles);
+            const upperS = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.dc, lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false });
+            const middleS = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.dc, lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+            const lowerS = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.dc, lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false });
+            upperS.setData(lineDataFromValues(dc.upper));
+            middleS.setData(lineDataFromValues(dc.middle));
+            lowerS.setData(lineDataFromValues(dc.lower));
+            addLineIndicator(upperS);
+            addLineIndicator(middleS);
+            addLineIndicator(lowerS);
+        }
+
+        // --- Standard Deviation ---
+        if (enabledIndicators.includes('stddev')) {
+            const scaleId = 'stddev';
+            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.stddev, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
+            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
+            series.setData(lineDataFromValues(calculateStdDev(closeValues, 20)));
+            addLineIndicator(series);
+        }
+
+        // --- Choppiness Index ---
+        if (enabledIndicators.includes('chop')) {
+            const scaleId = 'chop';
+            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.chop, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
+            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
+            series.setData(lineDataFromValues(calculateChoppinessIndex(candles, 14)));
+            addLineIndicator(series);
+        }
+
+        // --- OBV ---
+        if (enabledIndicators.includes('obv')) {
+            const scaleId = 'obv';
+            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.obv, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
+            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
+            series.setData(lineDataFromValues(calculateOBV(candles)));
+            addLineIndicator(series);
+        }
+
+        // --- Accumulation/Distribution ---
+        if (enabledIndicators.includes('ad')) {
+            const scaleId = 'ad';
+            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.ad, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
+            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
+            series.setData(lineDataFromValues(calculateAD(candles)));
+            addLineIndicator(series);
+        }
+
+        // --- CMF ---
+        if (enabledIndicators.includes('cmf')) {
+            const scaleId = 'cmf';
+            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.cmf, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
+            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
+            series.setData(lineDataFromValues(calculateCMF(candles, 20)));
+            addLineIndicator(series);
+        }
+
+        // --- Volume Oscillator ---
+        if (enabledIndicators.includes('vo')) {
+            const scaleId = 'vo';
+            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.vo, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
+            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
+            series.setData(lineDataFromValues(calculateVolumeOscillator(candles)));
+            addLineIndicator(series);
+        }
+
+        // --- PVT ---
+        if (enabledIndicators.includes('pvt')) {
+            const scaleId = 'pvt';
+            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.pvt, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
+            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
+            series.setData(lineDataFromValues(calculatePVT(candles)));
+            addLineIndicator(series);
+        }
+
+        // --- Stochastic ---
+        if (enabledIndicators.includes('stoch')) {
+            const stochResult = calculateStochastic(candles, 14, 3, 3);
+            const scaleId = 'stoch';
+            const kS = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.stoch, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: false });
+            const dS = chart.addSeries(LineSeries, { color: '#fb7185', lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: false });
+            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
+            kS.setData(lineDataFromValues(stochResult.k));
+            dS.setData(lineDataFromValues(stochResult.d));
+            addLineIndicator(kS);
+            addLineIndicator(dS);
+        }
+
+        // --- Stochastic RSI ---
+        if (enabledIndicators.includes('stochrsi')) {
+            const stochRSIResult = calculateStochRSI(closeValues, 14, 14, 3, 3);
+            const scaleId = 'stochrsi';
+            const kS = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.stochrsi, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: false });
+            const dS = chart.addSeries(LineSeries, { color: '#fb7185', lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: false });
+            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
+            kS.setData(lineDataFromValues(stochRSIResult.k));
+            dS.setData(lineDataFromValues(stochRSIResult.d));
+            addLineIndicator(kS);
+            addLineIndicator(dS);
+        }
+
+        // --- CCI ---
+        if (enabledIndicators.includes('cci')) {
+            const scaleId = 'cci';
+            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.cci, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
+            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
+            series.setData(lineDataFromValues(calculateCCI(candles, 20)));
+            addLineIndicator(series);
+        }
+
+        // --- Momentum ---
+        if (enabledIndicators.includes('mom')) {
+            const scaleId = 'mom';
+            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.mom, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
+            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
+            series.setData(lineDataFromValues(calculateMomentum(closeValues, 10)));
+            addLineIndicator(series);
+        }
+
+        // --- Williams %R ---
+        if (enabledIndicators.includes('wpr')) {
+            const scaleId = 'wpr';
+            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.wpr, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
+            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
+            series.setData(lineDataFromValues(calculateWilliamsR(candles, 14)));
+            addLineIndicator(series);
+        }
+
+        // --- Awesome Oscillator ---
+        if (enabledIndicators.includes('ao')) {
+            const scaleId = 'ao';
+            const aoValues = calculateAwesomeOscillator(candles);
+            const histogram = chart.addSeries(HistogramSeries, { priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: false });
+            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
+            histogram.setData(
+                aoValues
+                    .map((value, idx) => value == null ? null : { time: candles[idx].time as UTCTimestamp, value, color: value >= 0 ? 'rgba(38,166,154,0.7)' : 'rgba(239,83,80,0.7)' })
+                    .filter((p): p is { time: UTCTimestamp; value: number; color: string } => p !== null)
+            );
+            addHistogramIndicator(histogram);
+        }
+
+        // --- PPO ---
+        if (enabledIndicators.includes('ppo')) {
+            const scaleId = 'ppo';
+            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.ppo, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
+            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
+            series.setData(lineDataFromValues(calculatePPO(closeValues)));
+            addLineIndicator(series);
+        }
+
+        // --- ROC ---
+        if (enabledIndicators.includes('roc')) {
+            const scaleId = 'roc';
+            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.roc, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
+            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
+            series.setData(lineDataFromValues(calculateROC(closeValues, 9)));
+            addLineIndicator(series);
+        }
+
+        // --- TRIX ---
+        if (enabledIndicators.includes('trix')) {
+            const scaleId = 'trix';
+            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.trix, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
+            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
+            series.setData(lineDataFromValues(calculateTRIX(closeValues, 15)));
+            addLineIndicator(series);
+        }
+
+        // --- Ultimate Oscillator ---
+        if (enabledIndicators.includes('uo')) {
+            const scaleId = 'uo';
+            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.uo, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
+            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
+            series.setData(lineDataFromValues(calculateUltimateOscillator(candles)));
+            addLineIndicator(series);
+        }
+
     }, [addHistogramIndicator, addLineIndicator, candles, enabledIndicators, removeAllIndicatorSeries]);
 
     return (
@@ -1144,7 +1559,7 @@ function Chart() {
                     <OHLCVOverlay />
                     <CompareOverlay />
                     <IndicatorsOverlay />
-                    <DrawingOverlay chartRef={chartRef} seriesRef={seriesRef} />
+                    <DrawingOverlay chartRef={chartRef} seriesRef={seriesRef} hideDrawings={drawingsHidden} />
                     <div
                         ref={chartContainerRef}
                         className={`chart-canvas ${screenshotFlash ? 'animate-flash' : ''} ${activeTool === 'arrow' ? 'cursor-arrow' :
@@ -1154,6 +1569,23 @@ function Chart() {
                     />
 
                     {alertModalOpen && <AlertModal onClose={() => setAlertModalOpen(false)} />}
+
+                    {activeTrigger && (
+                        <div className="absolute inset-0 bg-black/60 z-[300] flex items-center justify-center">
+                            <div className="bg-bg-elevated p-8 rounded-xl border-2 border-bull text-center shadow-2xl shadow-bull/20 text-text-primary min-w-[350px]">
+                                <div className="text-bull mb-4 flex justify-center">
+                                    <Bell size={48} className="animate-bounce" />
+                                </div>
+                                <h2 className="text-3xl font-bold mb-3">Alert Triggered!</h2>
+                                <p className="text-xl mb-6">
+                                    <span className="font-bold text-white">{activeTrigger.symbol}</span> has {activeTrigger.type === 'crossing' ? 'crossed' : activeTrigger.type} <span className="font-bold text-white">${activeTrigger.targetPrice.toFixed(2)}</span>!
+                                </p>
+                                <button className="tv-alert-cta text-lg w-full" onClick={() => setActiveTrigger(null)}>
+                                    Acknowledge
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
                     {toastMessage && (
                         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-[#2962ff] text-white text-sm font-medium rounded-lg shadow-lg z-[200]">

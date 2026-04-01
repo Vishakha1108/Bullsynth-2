@@ -1,14 +1,20 @@
 import { Link } from 'react-router-dom';
+import { useEffect } from 'react';
 import {
     TrendingUp, BarChart3, ArrowUpDown, Activity, Zap, Globe,
     Brain, Users, Shield, LineChart, Sparkles, ArrowRight
 } from 'lucide-react';
 import useMarketStore from '../store/useMarketStore';
+import { wsManager } from '../services/websocket';
 
 export default function LandingPage() {
     const tickers = useMarketStore((state) => state.tickers);
     const prices = useMarketStore((state) => state.prices);
     const priceChanges = useMarketStore((state) => state.priceChanges);
+
+    useEffect(() => {
+        wsManager.connect();
+    }, []);
 
     return (
         <div className="nb-landing">
