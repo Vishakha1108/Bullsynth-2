@@ -14,6 +14,7 @@ import {
     calculateMACD,
     calculateRSI,
     calculateSMA,
+    executeCustomIndicatorScript,
     calculateVWAP,
 } from '../lib/indicators';
 import ReplayControls from './ReplayControls';
@@ -377,7 +378,9 @@ function CompareOverlay() {
 
 function IndicatorsOverlay() {
     const enabledIndicators = useMarketStore((s) => s.enabledIndicators);
-    if (!enabledIndicators.length) return null;
+    const customIndicatorScripts = useMarketStore((s) => s.customIndicatorScripts);
+    const enabledCustomScripts = customIndicatorScripts.filter((script) => script.enabled);
+    if (!enabledIndicators.length && !enabledCustomScripts.length) return null;
 
     const labels = INDICATOR_LIBRARY.reduce<Record<string, string>>((acc, item) => {
         acc[item.id] = item.label;
@@ -389,6 +392,11 @@ function IndicatorsOverlay() {
             {enabledIndicators.map((id) => (
                 <span key={id} className="chart-indicator-tag" style={{ borderColor: INDICATOR_COLORS[id] }}>
                     {labels[id] || id.toUpperCase()}
+                </span>
+            ))}
+            {enabledCustomScripts.map((script) => (
+                <span key={script.id} className="chart-indicator-tag" style={{ borderColor: '#2962ff' }}>
+                    {script.name}
                 </span>
             ))}
         </div>
@@ -431,6 +439,7 @@ function Chart() {
     const candles = useMarketStore(s => s.candles);
     const historySequence = useMarketStore(s => s.historySequence);
     const enabledIndicators = useMarketStore((s) => s.enabledIndicators);
+    const customIndicatorScripts = useMarketStore((s) => s.customIndicatorScripts);
     const chartType = useMarketStore(s => s.chartType);
     const currentSymbol = useMarketStore(s => s.currentSymbol);
     const setCrosshairData = useMarketStore(s => s.setCrosshairData);
@@ -468,6 +477,7 @@ function Chart() {
     const currentCrosshairRef = useRef<{ time: number, price: number } | null>(null);
 
     const indicatorSeriesRef = useRef<IndicatorSeriesBucket>({ line: [], histogram: [] });
+    const customIndicatorErrorRef = useRef<Record<string, string>>({});
     const lastSymbolRef = useRef<string>('');
 
     const removeAllIndicatorSeries = useCallback(() => {
@@ -995,7 +1005,7 @@ function Chart() {
         if (!chartRef.current) return;
 
         removeAllIndicatorSeries();
-        if (!candles.length || enabledIndicators.length === 0) return;
+        if (!candles.length || (enabledIndicators.length === 0 && !customIndicatorScripts.some((script) => script.enabled))) return;
 
         const chart = chartRef.current;
         const closeValues = candles.map((candle) => candle.close);
@@ -1132,7 +1142,53 @@ function Chart() {
             addLineIndicator(signalLine);
             addHistogramIndicator(histogram);
         }
-    }, [addHistogramIndicator, addLineIndicator, candles, enabledIndicators, removeAllIndicatorSeries]);
+
+        customIndicatorScripts
+            .filter((script) => script.enabled)
+            .forEach((script) => {
+                try {
+                    const result = executeCustomIndicatorScript(script.source, candles);
+
+                    result.plots.forEach((plot) => {
+                        if (plot.style === 'histogram') {
+                            const series = chart.addSeries(HistogramSeries, {
+                                priceLineVisible: false,
+                                lastValueVisible: true,
+                            });
+
+                            series.setData(
+                                lineDataFromValues(plot.values).map((point) => ({
+                                    ...point,
+                                    color: plot.color || '#2962ff',
+                                }))
+                            );
+                            addHistogramIndicator(series);
+                            return;
+                        }
+
+                        const series = chart.addSeries(LineSeries, {
+                            color: plot.color || '#2962ff',
+                            lineWidth: plot.lineWidth || 2,
+                            priceLineVisible: false,
+                            lastValueVisible: true,
+                        });
+
+                        series.setData(lineDataFromValues(plot.values));
+                        addLineIndicator(series);
+                    });
+
+                    delete customIndicatorErrorRef.current[script.id];
+                } catch (err) {
+                    const message = err instanceof Error ? err.message : 'Unknown script error';
+                    if (customIndicatorErrorRef.current[script.id] !== message) {
+                        customIndicatorErrorRef.current[script.id] = message;
+                        window.dispatchEvent(new CustomEvent('show-toast', {
+                            detail: `Script \"${script.name}\" failed: ${message}`,
+                        }));
+                    }
+                }
+            });
+    }, [addHistogramIndicator, addLineIndicator, candles, customIndicatorScripts, enabledIndicators, removeAllIndicatorSeries]);
 
     return (
         <div className="chart-root">

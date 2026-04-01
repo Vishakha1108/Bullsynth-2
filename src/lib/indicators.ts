@@ -6,6 +6,20 @@ export interface MacdResult {
     histogram: Array<number | null>;
 }
 
+export type CustomIndicatorPlotStyle = 'line' | 'histogram';
+
+export interface CustomIndicatorPlot {
+    label: string;
+    values: Array<number | null>;
+    color?: string;
+    lineWidth?: 1 | 2 | 3 | 4;
+    style?: CustomIndicatorPlotStyle;
+}
+
+export interface CustomIndicatorResult {
+    plots: CustomIndicatorPlot[];
+}
+
 export function calculateSMA(values: number[], period: number): Array<number | null> {
     const result: Array<number | null> = Array(values.length).fill(null);
     if (period <= 0) return result;
@@ -145,4 +159,75 @@ export function calculateMACD(values: number[], fastPeriod = 12, slowPeriod = 26
         signal,
         histogram,
     };
+}
+
+export function executeCustomIndicatorScript(source: string, candles: Candle[]): CustomIndicatorResult {
+    const open = candles.map((c) => c.open);
+    const high = candles.map((c) => c.high);
+    const low = candles.map((c) => c.low);
+    const close = candles.map((c) => c.close);
+    const volume = candles.map((c) => c.volume);
+
+    const sandboxFn = new Function(
+        'ctx',
+        `
+        "use strict";
+        const { candles, open, high, low, close, volume, sma, sub, ema, rsi, vwap, bb, macd } = ctx;
+        ${source}
+        `,
+    );
+
+    let result: CustomIndicatorResult;
+    try {
+        result = sandboxFn({
+            candles,
+            open,
+            high,
+            low,
+            close,
+            volume,
+            sma: calculateSMA,
+            sub: calculateSMA,
+            ema: calculateEMA,
+            rsi: calculateRSI,
+            vwap: () => calculateVWAP(candles),
+            bb: (period = 20, stdMultiplier = 2) => calculateBollingerBands(close, period, stdMultiplier),
+            macd: (fastPeriod = 12, slowPeriod = 26, signalPeriod = 9) => calculateMACD(close, fastPeriod, slowPeriod, signalPeriod),
+        }) as CustomIndicatorResult;
+    } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        if (msg.includes('sub is not defined')) {
+            throw new Error('Unknown helper "sub". Use sma(values, period) for Simple Moving Average.');
+        }
+        throw error;
+    }
+
+    if (!result || !Array.isArray(result.plots)) {
+        throw new Error('Script must return: { plots: [...] }');
+    }
+
+    const plots = result.plots.map((plot) => {
+        if (!plot || !Array.isArray(plot.values)) {
+            throw new Error(`Invalid plot \"${plot?.label || 'Unnamed'}\": values must be an array`);
+        }
+
+        const normalizedValues: Array<number | null> = Array(candles.length).fill(null);
+        const src = plot.values.slice(0, candles.length);
+        for (let i = 0; i < src.length; i += 1) {
+            const value = src[i];
+            normalizedValues[i] = typeof value === 'number' && Number.isFinite(value) ? value : null;
+        }
+
+        return {
+            label: plot.label || 'Custom Plot',
+            values: normalizedValues,
+            color: plot.color,
+            lineWidth: plot.lineWidth === 1 || plot.lineWidth === 2 || plot.lineWidth === 3 || plot.lineWidth === 4
+                ? plot.lineWidth
+                : 2,
+            style: plot.style || 'line',
+        };
+    });
+
+    return { plots };
 }

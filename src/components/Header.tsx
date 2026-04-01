@@ -8,7 +8,7 @@ import {
     Menu, RotateCcw,
     Search, Maximize2, Minimize2, Sun, Moon, LayoutDashboard, X,
     UserRound, UserPlus, Wallet, ChartNoAxesColumn, Sigma, Bookmark, Trophy, Flame, ShoppingBag, ChevronDown,
-    Bell, CandlestickChart as CandlestickTypeIcon, Home, HelpCircle, Zap, Keyboard, Globe
+    Bell, CandlestickChart as CandlestickTypeIcon, Home, HelpCircle, Zap, Keyboard, Globe, Trash2
 } from 'lucide-react';
 
 type StaticIndicator = {
@@ -87,6 +87,49 @@ const INDICATOR_SIDEBAR_GROUPS: Array<{ section: string; items: IndicatorSidebar
     },
 ];
 
+const SCRIPT_TEMPLATES: Array<{ label: string; scriptName: string; source: string; description: string }> = [
+        {
+                label: 'SMA + EMA Mix',
+                scriptName: 'SMA EMA Combo',
+                description: 'Two moving averages to check crossover behavior.',
+                source: `const fast = ema(close, 9);
+const slow = sma(close, 21);
+
+return {
+    plots: [
+        { label: 'EMA 9', values: fast, color: '#22d3ee', lineWidth: 2 },
+        { label: 'SMA 21', values: slow, color: '#f59e0b', lineWidth: 2 }
+    ]
+};`,
+        },
+        {
+                label: 'RSI + Midline',
+                scriptName: 'RSI With Midline',
+                description: 'Momentum check with RSI and a fixed 50 line.',
+                source: `const rsiValues = rsi(close, 14);
+const midline = close.map(() => 50);
+
+return {
+    plots: [
+        { label: 'RSI 14', values: rsiValues, color: '#818cf8', lineWidth: 2 },
+        { label: 'RSI Midline', values: midline, color: '#94a3b8', lineWidth: 1 }
+    ]
+};`,
+        },
+        {
+                label: 'MACD Histogram',
+                scriptName: 'MACD Histogram Only',
+                description: 'Single histogram output to validate bar-style plots.',
+                source: `const m = macd(12, 26, 9);
+
+return {
+    plots: [
+        { label: 'MACD Hist', values: m.histogram, color: '#34d399', style: 'histogram' }
+    ]
+};`,
+        },
+];
+
 export default function Header() {
     const navigate = useNavigate();
     const { theme, toggleTheme } = useTheme();
@@ -96,6 +139,11 @@ export default function Header() {
     const enabledIndicators = useMarketStore((state) => state.enabledIndicators);
     const setIndicatorEnabled = useMarketStore((state) => state.setIndicatorEnabled);
     const clearIndicators = useMarketStore((state) => state.clearIndicators);
+    const customIndicatorScripts = useMarketStore((state) => state.customIndicatorScripts);
+    const addCustomIndicatorScript = useMarketStore((state) => state.addCustomIndicatorScript);
+    const removeCustomIndicatorScript = useMarketStore((state) => state.removeCustomIndicatorScript);
+    const setCustomIndicatorScriptEnabled = useMarketStore((state) => state.setCustomIndicatorScriptEnabled);
+    const hydrateCustomIndicatorScripts = useMarketStore((state) => state.hydrateCustomIndicatorScripts);
     const activeTool = useMarketStore(state => state.activeTool);
     const setActiveTool = useMarketStore(state => state.setActiveTool);
     const isReplayMode = useMarketStore(state => state.isReplayMode);
@@ -107,6 +155,11 @@ export default function Header() {
     const [isIndicatorsOpen, setIsIndicatorsOpen] = useState(false);
     const [indicatorQuery, setIndicatorQuery] = useState('');
     const [activeIndicatorSection, setActiveIndicatorSection] = useState('Technicals');
+    const [isScriptModalOpen, setIsScriptModalOpen] = useState(false);
+    const [scriptNameInput, setScriptNameInput] = useState('');
+    const [scriptDescriptionInput, setScriptDescriptionInput] = useState('');
+    const [scriptSourceInput, setScriptSourceInput] = useState('');
+    const [scriptError, setScriptError] = useState('');
     const indicatorsRef = useRef<HTMLDivElement>(null);
 
     const [isTimeframeOpen, setIsTimeframeOpen] = useState(false);
@@ -163,6 +216,34 @@ export default function Header() {
         }
         return groups;
     }, [indicatorQuery]);
+
+    const openCreateScriptModal = (template = SCRIPT_TEMPLATES[0]) => {
+        setScriptNameInput(template.scriptName);
+        setScriptDescriptionInput(template.description);
+        setScriptSourceInput(template.source);
+        setScriptError('');
+        setIsScriptModalOpen(true);
+    };
+
+    const handleCreateScript = () => {
+        if (!scriptNameInput.trim() || !scriptSourceInput.trim()) {
+            setScriptError('Script name and source are required.');
+            return;
+        }
+
+        addCustomIndicatorScript({
+            name: scriptNameInput,
+            source: scriptSourceInput,
+            description: scriptDescriptionInput,
+        });
+
+        setIsScriptModalOpen(false);
+        setActiveIndicatorSection('My scripts');
+    };
+
+    useEffect(() => {
+        hydrateCustomIndicatorScripts();
+    }, [hydrateCustomIndicatorScripts]);
 
     useEffect(() => {
         const onOutsideClick = (event: MouseEvent) => {
@@ -428,14 +509,23 @@ export default function Header() {
 
                                             <div className="tv-indicators-content-toolbar">
                                                 <p>{enabledIndicators.length} active</p>
-                                                <button
-                                                    type="button"
-                                                    className="tv-indicators-clear"
-                                                    onClick={() => clearIndicators()}
-                                                    disabled={enabledIndicators.length === 0}
-                                                >
-                                                    Clear All
-                                                </button>
+                                                <div className="tv-indicators-toolbar-actions">
+                                                    <button
+                                                        type="button"
+                                                        className="tv-indicators-clear"
+                                                        onClick={() => openCreateScriptModal()}
+                                                    >
+                                                        Create script
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="tv-indicators-clear"
+                                                        onClick={() => clearIndicators()}
+                                                        disabled={enabledIndicators.length === 0}
+                                                    >
+                                                        Clear All
+                                                    </button>
+                                                </div>
                                             </div>
 
                                             <div className="tv-indicators-list styling-scrollbar">
@@ -497,16 +587,142 @@ export default function Header() {
                                                 ))}
                                             </div>
                                         </>
+                                    ) : activeIndicatorSection === 'My scripts' ? (
+                                        <div className="tv-indicators-list styling-scrollbar">
+                                            <div className="tv-indicators-content-toolbar tv-indicators-content-toolbar-compact">
+                                                <p>{customIndicatorScripts.length} scripts</p>
+                                                <button
+                                                    type="button"
+                                                    className="tv-indicators-clear"
+                                                    onClick={() => openCreateScriptModal()}
+                                                >
+                                                    Create script
+                                                </button>
+                                            </div>
+
+                                            {customIndicatorScripts.length === 0 ? (
+                                                <div className="tv-indicators-empty-state !pt-10">
+                                                    <h4>No personal scripts, yet</h4>
+                                                    <p>Build your own indicator in JavaScript and render it directly on the chart.</p>
+                                                    <button type="button" className="tv-indicators-empty-button" onClick={() => openCreateScriptModal()}>
+                                                        Create script
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                customIndicatorScripts.map((script) => (
+                                                    <label key={script.id} className={`tv-indicator-item ${script.enabled ? 'active' : ''}`}>
+                                                        <div className="tv-indicator-item-left">
+                                                            <span className="tv-indicator-color-dot" style={{ background: '#2962ff' }} />
+                                                            <div>
+                                                                <span className="tv-indicator-item-label">{script.name}</span>
+                                                                <span className="tv-indicator-item-desc">{script.description || 'Custom script'}</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="tv-indicator-item-right">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={script.enabled}
+                                                                onChange={(event) => setCustomIndicatorScriptEnabled(script.id, event.target.checked)}
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                className="tv-indicator-delete"
+                                                                onClick={(event) => {
+                                                                    event.preventDefault();
+                                                                    removeCustomIndicatorScript(script.id);
+                                                                }}
+                                                                title="Delete script"
+                                                            >
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        </div>
+                                                    </label>
+                                                ))
+                                            )}
+                                        </div>
                                     ) : (
                                         <div className="tv-indicators-empty-state">
                                             <div className="tv-indicators-empty-logo" />
                                             <h4>No personal scripts, yet</h4>
                                             <p>Start creating your own indicators and strategies with Pine Script®, or remix an existing one to make it yours.</p>
-                                            <button type="button" className="tv-indicators-empty-button">Create script</button>
+                                            <button type="button" className="tv-indicators-empty-button" onClick={() => openCreateScriptModal()}>
+                                                Create script
+                                            </button>
                                         </div>
                                     )}
                                 </section>
                             </div>
+
+                            {isScriptModalOpen && (
+                                <div className="tv-script-modal-overlay" onClick={() => setIsScriptModalOpen(false)}>
+                                    <div className="tv-script-modal" onClick={(event) => event.stopPropagation()}>
+                                        <div className="tv-script-modal-head">
+                                            <h4>Create indicator script</h4>
+                                            <button type="button" className="tv-indicators-close" onClick={() => setIsScriptModalOpen(false)}>
+                                                <X size={18} />
+                                            </button>
+                                        </div>
+
+                                        <div className="tv-script-templates">
+                                            {SCRIPT_TEMPLATES.map((template) => (
+                                                <button
+                                                    key={template.label}
+                                                    type="button"
+                                                    className="tv-script-template-btn"
+                                                    onClick={() => {
+                                                        setScriptNameInput(template.scriptName);
+                                                        setScriptDescriptionInput(template.description);
+                                                        setScriptSourceInput(template.source);
+                                                    }}
+                                                >
+                                                    {template.label}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        <div className="tv-script-field">
+                                            <label htmlFor="scriptName">Name</label>
+                                            <input
+                                                id="scriptName"
+                                                value={scriptNameInput}
+                                                onChange={(event) => setScriptNameInput(event.target.value)}
+                                                placeholder="My custom indicator"
+                                            />
+                                        </div>
+
+                                        <div className="tv-script-field">
+                                            <label htmlFor="scriptDescription">Description</label>
+                                            <input
+                                                id="scriptDescription"
+                                                value={scriptDescriptionInput}
+                                                onChange={(event) => setScriptDescriptionInput(event.target.value)}
+                                                placeholder="What this indicator does"
+                                            />
+                                        </div>
+
+                                        <div className="tv-script-field">
+                                            <label htmlFor="scriptSource">Source</label>
+                                            <textarea
+                                                id="scriptSource"
+                                                value={scriptSourceInput}
+                                                onChange={(event) => setScriptSourceInput(event.target.value)}
+                                                rows={12}
+                                            />
+                                        </div>
+
+                                        <p className="tv-script-help">
+                                            Available helpers: open, high, low, close, volume, candles, sma(values, period), ema(values, period), rsi(values, period), vwap(), bb(period, std), macd().
+                                        </p>
+
+                                        {scriptError && <p className="tv-script-error">{scriptError}</p>}
+
+                                        <div className="tv-script-actions">
+                                            <button type="button" className="tv-script-cancel" onClick={() => setIsScriptModalOpen(false)}>Cancel</button>
+                                            <button type="button" className="tv-script-save" onClick={handleCreateScript}>Save script</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
