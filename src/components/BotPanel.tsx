@@ -733,8 +733,8 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
                             <span
                               className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
                                 selected
-                                  ? 'border-accent bg-accent/15 text-accent'
-                                  : 'border-text-secondary/50 text-transparent'
+                                  ? 'border-[#2962ff] bg-[#2962ff] text-white'
+                                  : 'border-border-subtle text-transparent'
                               }`}
                             >
                               <Check size={12} />
