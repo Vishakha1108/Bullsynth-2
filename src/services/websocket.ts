@@ -35,7 +35,7 @@ const pendingCandles: Record<string, Array<{time: number; open: number; high: nu
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 const FLUSH_DELAY = 300; // ms — wait for the initial burst to finish
 
-function queueInitialCandle(symbol: string, candle: {time: number; open: number; high: number; low: number; close: number; volume: number}) {
+function _queueInitialCandle(symbol: string, candle: {time: number; open: number; high: number; low: number; close: number; volume: number}) {
     if (!pendingCandles[symbol]) pendingCandles[symbol] = [];
     pendingCandles[symbol].push(candle);
 
@@ -44,8 +44,8 @@ function queueInitialCandle(symbol: string, candle: {time: number; open: number;
     flushTimer = setTimeout(flushPendingCandles, FLUSH_DELAY);
 }
 
-// Keep the helper reachable for strict noUnusedLocals builds.
-void queueInitialCandle;
+// Retained for planned reconnect/history batching logic.
+void _queueInitialCandle;
 
 function flushPendingCandles() {
     flushTimer = null;

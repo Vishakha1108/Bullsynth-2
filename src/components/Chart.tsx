@@ -12,6 +12,7 @@ import {
     calculateMACD,
     calculateRSI,
     calculateSMA,
+    executeCustomIndicatorScript,
     calculateVWAP,
     calculateWMA,
     calculateHMA,
@@ -394,7 +395,9 @@ function CompareOverlay() {
 
 function IndicatorsOverlay() {
     const enabledIndicators = useMarketStore((s) => s.enabledIndicators);
-    if (!enabledIndicators.length) return null;
+    const customIndicatorScripts = useMarketStore((s) => s.customIndicatorScripts);
+    const enabledCustomScripts = customIndicatorScripts.filter((script) => script.enabled);
+    if (!enabledIndicators.length && !enabledCustomScripts.length) return null;
 
     const labels = INDICATOR_LIBRARY.reduce<Record<string, string>>((acc, item) => {
         acc[item.id] = item.label;
@@ -406,6 +409,11 @@ function IndicatorsOverlay() {
             {enabledIndicators.map((id) => (
                 <span key={id} className="chart-indicator-tag" style={{ borderColor: INDICATOR_COLORS[id] }}>
                     {labels[id] || id.toUpperCase()}
+                </span>
+            ))}
+            {enabledCustomScripts.map((script) => (
+                <span key={script.id} className="chart-indicator-tag" style={{ borderColor: '#2962ff' }}>
+                    {script.name}
                 </span>
             ))}
         </div>
@@ -448,6 +456,7 @@ function Chart() {
     const candles = useMarketStore(s => s.candles);
     const historySequence = useMarketStore(s => s.historySequence);
     const enabledIndicators = useMarketStore((s) => s.enabledIndicators);
+    const customIndicatorScripts = useMarketStore((s) => s.customIndicatorScripts);
     const chartType = useMarketStore(s => s.chartType);
     const currentSymbol = useMarketStore(s => s.currentSymbol);
     const setCrosshairData = useMarketStore(s => s.setCrosshairData);
@@ -492,6 +501,7 @@ function Chart() {
     const currentCrosshairRef = useRef<{ time: number, price: number } | null>(null);
 
     const indicatorSeriesRef = useRef<IndicatorSeriesBucket>({ line: [], histogram: [] });
+    const customIndicatorErrorRef = useRef<Record<string, string>>({});
     const lastSymbolRef = useRef<string>('');
 
     const removeAllIndicatorSeries = useCallback(() => {
@@ -1086,7 +1096,7 @@ function Chart() {
         if (!chartRef.current) return;
 
         removeAllIndicatorSeries();
-        if (!candles.length || enabledIndicators.length === 0) return;
+        if (!candles.length || (enabledIndicators.length === 0 && !customIndicatorScripts.some((script) => script.enabled))) return;
 
         const chart = chartRef.current;
         const closeValues = candles.map((candle) => candle.close);
@@ -1228,326 +1238,52 @@ function Chart() {
             addHistogramIndicator(histogram);
         }
 
-        // --- WMA ---
-        if (enabledIndicators.includes('wma')) {
-            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.wma, lineWidth: 1, priceLineVisible: false, lastValueVisible: true });
-            series.setData(lineDataFromValues(calculateWMA(closeValues, 20)));
-            addLineIndicator(series);
-        }
+        customIndicatorScripts
+            .filter((script) => script.enabled)
+            .forEach((script) => {
+                try {
+                    const result = executeCustomIndicatorScript(script.source, candles);
 
-        // --- HMA ---
-        if (enabledIndicators.includes('hma')) {
-            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.hma, lineWidth: 1, priceLineVisible: false, lastValueVisible: true });
-            series.setData(lineDataFromValues(calculateHMA(closeValues, 20)));
-            addLineIndicator(series);
-        }
+                    result.plots.forEach((plot) => {
+                        if (plot.style === 'histogram') {
+                            const series = chart.addSeries(HistogramSeries, {
+                                priceLineVisible: false,
+                                lastValueVisible: true,
+                            });
 
-        // --- ALMA ---
-        if (enabledIndicators.includes('alma')) {
-            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.alma, lineWidth: 1, priceLineVisible: false, lastValueVisible: true });
-            series.setData(lineDataFromValues(calculateALMA(closeValues, 20)));
-            addLineIndicator(series);
-        }
+                            series.setData(
+                                lineDataFromValues(plot.values).map((point) => ({
+                                    ...point,
+                                    color: plot.color || '#2962ff',
+                                }))
+                            );
+                            addHistogramIndicator(series);
+                            return;
+                        }
 
-        // --- TEMA ---
-        if (enabledIndicators.includes('tema')) {
-            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.tema, lineWidth: 1, priceLineVisible: false, lastValueVisible: true });
-            series.setData(lineDataFromValues(calculateTEMA(closeValues, 20)));
-            addLineIndicator(series);
-        }
+                        const series = chart.addSeries(LineSeries, {
+                            color: plot.color || '#2962ff',
+                            lineWidth: plot.lineWidth || 2,
+                            priceLineVisible: false,
+                            lastValueVisible: true,
+                        });
 
-        // --- DEMA ---
-        if (enabledIndicators.includes('dema')) {
-            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.dema, lineWidth: 1, priceLineVisible: false, lastValueVisible: true });
-            series.setData(lineDataFromValues(calculateDEMA(closeValues, 20)));
-            addLineIndicator(series);
-        }
+                        series.setData(lineDataFromValues(plot.values));
+                        addLineIndicator(series);
+                    });
 
-        // --- Supertrend ---
-        if (enabledIndicators.includes('supertrend')) {
-            const st = calculateSupertrend(candles, 10, 3);
-            const data = st.supertrend
-                .map((value, idx) => value == null ? null : {
-                    time: candles[idx].time as UTCTimestamp,
-                    value,
-                    color: st.direction[idx] === 1 ? '#4ade80' : '#ef4444',
-                })
-                .filter((p): p is { time: UTCTimestamp; value: number; color: string } => p !== null);
-            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.supertrend, lineWidth: 2, priceLineVisible: false, lastValueVisible: true });
-            series.setData(data);
-            addLineIndicator(series);
-        }
-
-        // --- Parabolic SAR ---
-        if (enabledIndicators.includes('psar')) {
-            const sarValues = calculateParabolicSAR(candles);
-            const series = chart.addSeries(LineSeries, {
-                color: INDICATOR_COLORS.psar,
-                lineWidth: 1,
-                pointMarkersVisible: true,
-                pointMarkersRadius: 2,
-                priceLineVisible: false,
-                lastValueVisible: false,
+                    delete customIndicatorErrorRef.current[script.id];
+                } catch (err) {
+                    const message = err instanceof Error ? err.message : 'Unknown script error';
+                    if (customIndicatorErrorRef.current[script.id] !== message) {
+                        customIndicatorErrorRef.current[script.id] = message;
+                        window.dispatchEvent(new CustomEvent('show-toast', {
+                            detail: `Script \"${script.name}\" failed: ${message}`,
+                        }));
+                    }
+                }
             });
-            series.setData(lineDataFromValues(sarValues));
-            addLineIndicator(series);
-        }
-
-        // --- Ichimoku Cloud ---
-        if (enabledIndicators.includes('ichimoku')) {
-            const ich = calculateIchimoku(candles);
-            const tenkanS = chart.addSeries(LineSeries, { color: '#2962FF', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
-            const kijunS = chart.addSeries(LineSeries, { color: '#E91E63', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
-            const senkouAS = chart.addSeries(LineSeries, { color: '#4CAF50', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
-            const senkouBS = chart.addSeries(LineSeries, { color: '#FF5722', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
-            const chikouS = chart.addSeries(LineSeries, { color: '#9C27B0', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false });
-
-            tenkanS.setData(lineDataFromValues(ich.tenkan));
-            kijunS.setData(lineDataFromValues(ich.kijun));
-            senkouAS.setData(lineDataFromValues(ich.senkouA));
-            senkouBS.setData(lineDataFromValues(ich.senkouB));
-            chikouS.setData(lineDataFromValues(ich.chikou));
-
-            addLineIndicator(tenkanS);
-            addLineIndicator(kijunS);
-            addLineIndicator(senkouAS);
-            addLineIndicator(senkouBS);
-            addLineIndicator(chikouS);
-        }
-
-        // --- ADX ---
-        if (enabledIndicators.includes('adx')) {
-            const adxResult = calculateADX(candles, 14);
-            const scaleId = 'adx';
-            const adxS = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.adx, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: false });
-            const plusS = chart.addSeries(LineSeries, { color: '#4ade80', lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: false });
-            const minusS = chart.addSeries(LineSeries, { color: '#ef4444', lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: false });
-            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
-            adxS.setData(lineDataFromValues(adxResult.adx));
-            plusS.setData(lineDataFromValues(adxResult.plusDI));
-            minusS.setData(lineDataFromValues(adxResult.minusDI));
-            addLineIndicator(adxS);
-            addLineIndicator(plusS);
-            addLineIndicator(minusS);
-        }
-
-        // --- Aroon ---
-        if (enabledIndicators.includes('aroon')) {
-            const aroonResult = calculateAroon(candles, 25);
-            const scaleId = 'aroon';
-            const upS = chart.addSeries(LineSeries, { color: '#4ade80', lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: false });
-            const downS = chart.addSeries(LineSeries, { color: '#ef4444', lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: false });
-            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
-            upS.setData(lineDataFromValues(aroonResult.aroonUp));
-            downS.setData(lineDataFromValues(aroonResult.aroonDown));
-            addLineIndicator(upS);
-            addLineIndicator(downS);
-        }
-
-        // --- ATR ---
-        if (enabledIndicators.includes('atr')) {
-            const scaleId = 'atr';
-            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.atr, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
-            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
-            series.setData(lineDataFromValues(calculateATR(candles, 14)));
-            addLineIndicator(series);
-        }
-
-        // --- Keltner Channels ---
-        if (enabledIndicators.includes('kc')) {
-            const kc = calculateKeltnerChannels(candles);
-            const upperS = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.kc, lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false });
-            const middleS = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.kc, lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
-            const lowerS = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.kc, lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false });
-            upperS.setData(lineDataFromValues(kc.upper));
-            middleS.setData(lineDataFromValues(kc.middle));
-            lowerS.setData(lineDataFromValues(kc.lower));
-            addLineIndicator(upperS);
-            addLineIndicator(middleS);
-            addLineIndicator(lowerS);
-        }
-
-        // --- Donchian Channels ---
-        if (enabledIndicators.includes('dc')) {
-            const dc = calculateDonchianChannels(candles);
-            const upperS = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.dc, lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false });
-            const middleS = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.dc, lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
-            const lowerS = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.dc, lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false });
-            upperS.setData(lineDataFromValues(dc.upper));
-            middleS.setData(lineDataFromValues(dc.middle));
-            lowerS.setData(lineDataFromValues(dc.lower));
-            addLineIndicator(upperS);
-            addLineIndicator(middleS);
-            addLineIndicator(lowerS);
-        }
-
-        // --- Standard Deviation ---
-        if (enabledIndicators.includes('stddev')) {
-            const scaleId = 'stddev';
-            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.stddev, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
-            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
-            series.setData(lineDataFromValues(calculateStdDev(closeValues, 20)));
-            addLineIndicator(series);
-        }
-
-        // --- Choppiness Index ---
-        if (enabledIndicators.includes('chop')) {
-            const scaleId = 'chop';
-            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.chop, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
-            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
-            series.setData(lineDataFromValues(calculateChoppinessIndex(candles, 14)));
-            addLineIndicator(series);
-        }
-
-        // --- OBV ---
-        if (enabledIndicators.includes('obv')) {
-            const scaleId = 'obv';
-            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.obv, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
-            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
-            series.setData(lineDataFromValues(calculateOBV(candles)));
-            addLineIndicator(series);
-        }
-
-        // --- Accumulation/Distribution ---
-        if (enabledIndicators.includes('ad')) {
-            const scaleId = 'ad';
-            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.ad, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
-            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
-            series.setData(lineDataFromValues(calculateAD(candles)));
-            addLineIndicator(series);
-        }
-
-        // --- CMF ---
-        if (enabledIndicators.includes('cmf')) {
-            const scaleId = 'cmf';
-            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.cmf, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
-            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
-            series.setData(lineDataFromValues(calculateCMF(candles, 20)));
-            addLineIndicator(series);
-        }
-
-        // --- Volume Oscillator ---
-        if (enabledIndicators.includes('vo')) {
-            const scaleId = 'vo';
-            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.vo, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
-            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
-            series.setData(lineDataFromValues(calculateVolumeOscillator(candles)));
-            addLineIndicator(series);
-        }
-
-        // --- PVT ---
-        if (enabledIndicators.includes('pvt')) {
-            const scaleId = 'pvt';
-            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.pvt, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
-            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
-            series.setData(lineDataFromValues(calculatePVT(candles)));
-            addLineIndicator(series);
-        }
-
-        // --- Stochastic ---
-        if (enabledIndicators.includes('stoch')) {
-            const stochResult = calculateStochastic(candles, 14, 3, 3);
-            const scaleId = 'stoch';
-            const kS = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.stoch, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: false });
-            const dS = chart.addSeries(LineSeries, { color: '#fb7185', lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: false });
-            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
-            kS.setData(lineDataFromValues(stochResult.k));
-            dS.setData(lineDataFromValues(stochResult.d));
-            addLineIndicator(kS);
-            addLineIndicator(dS);
-        }
-
-        // --- Stochastic RSI ---
-        if (enabledIndicators.includes('stochrsi')) {
-            const stochRSIResult = calculateStochRSI(closeValues, 14, 14, 3, 3);
-            const scaleId = 'stochrsi';
-            const kS = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.stochrsi, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: false });
-            const dS = chart.addSeries(LineSeries, { color: '#fb7185', lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: false });
-            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
-            kS.setData(lineDataFromValues(stochRSIResult.k));
-            dS.setData(lineDataFromValues(stochRSIResult.d));
-            addLineIndicator(kS);
-            addLineIndicator(dS);
-        }
-
-        // --- CCI ---
-        if (enabledIndicators.includes('cci')) {
-            const scaleId = 'cci';
-            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.cci, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
-            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
-            series.setData(lineDataFromValues(calculateCCI(candles, 20)));
-            addLineIndicator(series);
-        }
-
-        // --- Momentum ---
-        if (enabledIndicators.includes('mom')) {
-            const scaleId = 'mom';
-            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.mom, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
-            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
-            series.setData(lineDataFromValues(calculateMomentum(closeValues, 10)));
-            addLineIndicator(series);
-        }
-
-        // --- Williams %R ---
-        if (enabledIndicators.includes('wpr')) {
-            const scaleId = 'wpr';
-            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.wpr, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
-            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
-            series.setData(lineDataFromValues(calculateWilliamsR(candles, 14)));
-            addLineIndicator(series);
-        }
-
-        // --- Awesome Oscillator ---
-        if (enabledIndicators.includes('ao')) {
-            const scaleId = 'ao';
-            const aoValues = calculateAwesomeOscillator(candles);
-            const histogram = chart.addSeries(HistogramSeries, { priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: false });
-            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
-            histogram.setData(
-                aoValues
-                    .map((value, idx) => value == null ? null : { time: candles[idx].time as UTCTimestamp, value, color: value >= 0 ? 'rgba(38,166,154,0.7)' : 'rgba(239,83,80,0.7)' })
-                    .filter((p): p is { time: UTCTimestamp; value: number; color: string } => p !== null)
-            );
-            addHistogramIndicator(histogram);
-        }
-
-        // --- PPO ---
-        if (enabledIndicators.includes('ppo')) {
-            const scaleId = 'ppo';
-            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.ppo, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
-            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
-            series.setData(lineDataFromValues(calculatePPO(closeValues)));
-            addLineIndicator(series);
-        }
-
-        // --- ROC ---
-        if (enabledIndicators.includes('roc')) {
-            const scaleId = 'roc';
-            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.roc, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
-            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
-            series.setData(lineDataFromValues(calculateROC(closeValues, 9)));
-            addLineIndicator(series);
-        }
-
-        // --- TRIX ---
-        if (enabledIndicators.includes('trix')) {
-            const scaleId = 'trix';
-            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.trix, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
-            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
-            series.setData(lineDataFromValues(calculateTRIX(closeValues, 15)));
-            addLineIndicator(series);
-        }
-
-        // --- Ultimate Oscillator ---
-        if (enabledIndicators.includes('uo')) {
-            const scaleId = 'uo';
-            const series = chart.addSeries(LineSeries, { color: INDICATOR_COLORS.uo, lineWidth: 1, priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
-            chart.priceScale(scaleId).applyOptions({ borderColor: '#2a2e39', scaleMargins: { top: 0.78, bottom: 0.02 } });
-            series.setData(lineDataFromValues(calculateUltimateOscillator(candles)));
-            addLineIndicator(series);
-        }
-
-    }, [addHistogramIndicator, addLineIndicator, candles, enabledIndicators, removeAllIndicatorSeries]);
+    }, [addHistogramIndicator, addLineIndicator, candles, customIndicatorScripts, enabledIndicators, removeAllIndicatorSeries]);
 
     return (
         <div className="chart-root">
