@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   X,
   Bot,
@@ -8,6 +8,7 @@ import {
   Circle,
   CheckCircle2,
   BarChart3,
+  Timer,
 } from 'lucide-react';
 import {
   fetchBots,
@@ -45,6 +46,20 @@ function parseErrorMessage(err: unknown): string {
   return err.message;
 }
 
+function formatDuration(totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  const mm = String(minutes).padStart(2, '0');
+  const ss = String(seconds).padStart(2, '0');
+
+  if (hours > 0) {
+    return `${String(hours).padStart(2, '0')}:${mm}:${ss}`;
+  }
+  return `${mm}:${ss}`;
+}
+
 function findActiveLapSession(sessions: BotSession[]): BotSession | null {
   return sessions.find((s) => s.session_type === 'lap' && s.status === 'active') ?? null;
 }
@@ -63,7 +78,18 @@ type BotRuntime = {
   kpi: BotKPIResponse | null;
   portfolio: BotPortfolio | null;
   sessionId: string | null;
+  sessionStartTime: string | null;
   error: string | null;
+};
+
+type ActionPhase = 'idle' | 'starting' | 'stopping';
+
+const EMPTY_RUNTIME: BotRuntime = {
+  kpi: null,
+  portfolio: null,
+  sessionId: null,
+  sessionStartTime: null,
+  error: null,
 };
 
 export default function BotPanel({ onClose }: { onClose?: () => void }) {
@@ -72,11 +98,55 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
   const [selectedBotIds, setSelectedBotIds] = useState<string[]>([]);
   const [running, setRunning] = useState(false);
   const [loadingBots, setLoadingBots] = useState(true);
-  const [actionLoading, setActionLoading] = useState(false);
+  const [actionPhase, setActionPhase] = useState<ActionPhase>('idle');
+  const [apiConnected, setApiConnected] = useState<boolean | null>(null);
   const [panelError, setPanelError] = useState<string | null>(null);
+  const [clockTick, setClockTick] = useState(0);
   const [runtimeByBot, setRuntimeByBot] = useState<Record<string, BotRuntime>>({});
+  const runtimeRef = useRef<Record<string, BotRuntime>>({});
+
+  const actionLoading = actionPhase !== 'idle';
+
+  useEffect(() => {
+    runtimeRef.current = runtimeByBot;
+  }, [runtimeByBot]);
 
   const selectedSet = useMemo(() => new Set(selectedBotIds), [selectedBotIds]);
+
+  const startDisabledReason = useMemo(() => {
+    if (running) return 'Lap already running';
+    if (actionLoading) return actionPhase === 'starting' ? 'Starting...' : 'Stopping in progress...';
+    if (selectedBotIds.length === 0) return 'Select at least one bot';
+    return null;
+  }, [running, actionLoading, actionPhase, selectedBotIds.length]);
+
+  const stopDisabledReason = useMemo(() => {
+    if (actionLoading) return actionPhase === 'starting' ? 'Start in progress...' : 'Stopping...';
+    if (!running) return 'No active lap';
+    return null;
+  }, [running, actionLoading, actionPhase]);
+
+  const hasLapSnapshot = useMemo(
+    () => selectedBotIds.some((botId) => Boolean(runtimeByBot[botId]?.sessionId)),
+    [runtimeByBot, selectedBotIds]
+  );
+
+  const activeLapStartMs = useMemo(() => {
+    const starts = selectedBotIds
+      .map((botId) => runtimeByBot[botId]?.sessionStartTime)
+      .filter((value): value is string => Boolean(value))
+      .map((value) => Date.parse(value))
+      .filter((value) => Number.isFinite(value));
+
+    if (starts.length === 0) return null;
+    return Math.min(...starts);
+  }, [runtimeByBot, selectedBotIds]);
+
+  const lapTimerLabel = useMemo(() => {
+    if (!activeLapStartMs) return '00:00';
+    const elapsedSeconds = Math.max(0, Math.floor((Date.now() - activeLapStartMs) / 1000));
+    return formatDuration(elapsedSeconds);
+  }, [activeLapStartMs, clockTick]);
 
   const visibleBots = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -89,9 +159,11 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
     try {
       const list = await fetchBots();
       setBots(list);
+      setApiConnected(true);
       setPanelError(null);
       setSelectedBotIds((prev) => prev.filter((id) => list.some((b) => b.id === id)));
     } catch (err) {
+      setApiConnected(false);
       setPanelError(parseErrorMessage(err));
     } finally {
       setLoadingBots(false);
@@ -102,7 +174,76 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
     void loadBots();
   }, []);
 
-  const loadRuntime = async (botId: string, sessionId: string | null) => {
+  useEffect(() => {
+    setRuntimeByBot((prev) => {
+      const next: Record<string, BotRuntime> = {};
+      for (const botId of selectedBotIds) {
+        next[botId] = prev[botId] ?? EMPTY_RUNTIME;
+      }
+      return next;
+    });
+  }, [selectedBotIds]);
+
+  useEffect(() => {
+    if (!running || !activeLapStartMs) return;
+    const timer = setInterval(() => setClockTick((prev) => prev + 1), 1000);
+    return () => clearInterval(timer);
+  }, [running, activeLapStartMs]);
+
+  const syncActiveLapsForSelection = async (botIds: string[]) => {
+    if (botIds.length === 0) {
+      setRunning(false);
+      return;
+    }
+
+    const activeByBot = await Promise.all(
+      botIds.map(async (botId) => {
+        try {
+          const sessions = await fetchBotSessions(botId);
+          const active = findActiveLapSession(sessions);
+          return { botId, active };
+        } catch {
+          return { botId, active: null as BotSession | null };
+        }
+      })
+    );
+
+    const anyActive = activeByBot.some((entry) => Boolean(entry.active));
+
+    setRuntimeByBot((prev) => {
+      const next = { ...prev };
+      for (const { botId, active } of activeByBot) {
+        const current = next[botId] ?? EMPTY_RUNTIME;
+        if (active) {
+          next[botId] = {
+            ...current,
+            sessionId: active.id,
+            sessionStartTime: active.start_time,
+            error: null,
+          };
+        } else {
+          next[botId] = current;
+        }
+      }
+      return next;
+    });
+
+    setRunning(anyActive);
+  };
+
+  useEffect(() => {
+    void syncActiveLapsForSelection(selectedBotIds);
+  }, [selectedBotIds]);
+
+  const loadRuntime = async (botId: string, sessionId: string | null, requireSession = false) => {
+    if (requireSession && !sessionId) {
+      return {
+        kpi: null,
+        portfolio: null,
+        error: 'No lap session available for this bot.',
+      };
+    }
+
     try {
       const [kpi, portfolio] = await Promise.all([
         fetchBotKPI(botId, sessionId ?? undefined),
@@ -119,19 +260,33 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
   };
 
   const refreshSelectedRuntime = async () => {
-    if (selectedBotIds.length === 0) return;
+    if (!running || selectedBotIds.length === 0) return;
 
     const entries = await Promise.all(
       selectedBotIds.map(async (botId) => {
-        const current = runtimeByBot[botId];
-        const sessionId = running ? current?.sessionId ?? null : null;
-        const next = await loadRuntime(botId, sessionId);
+        const current = runtimeRef.current[botId];
+        let sessionId = current?.sessionId ?? null;
+        let sessionStartTime = current?.sessionStartTime ?? null;
+
+        if (!sessionId) {
+          try {
+            const sessions = await fetchBotSessions(botId);
+            const activeLap = findActiveLapSession(sessions);
+            sessionId = activeLap?.id ?? null;
+            sessionStartTime = activeLap?.start_time ?? sessionStartTime;
+          } catch {
+            // If session sync fails, the requireSession flag below will surface the error state.
+          }
+        }
+
+        const next = await loadRuntime(botId, sessionId, true);
         return [
           botId,
           {
             kpi: next.kpi,
             portfolio: next.portfolio,
             sessionId,
+            sessionStartTime,
             error: next.error,
           } as BotRuntime,
         ] as const;
@@ -148,6 +303,7 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
   };
 
   useEffect(() => {
+    if (!running) return;
     void refreshSelectedRuntime();
     const t = setInterval(() => {
       void refreshSelectedRuntime();
@@ -168,72 +324,177 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
       return;
     }
 
-    setActionLoading(true);
+    if (actionLoading) return;
+
+    setActionPhase('starting');
     setPanelError(null);
 
-    const sessionMap: Record<string, string | null> = {};
+    try {
+      const startedByBot = await Promise.all(
+        selectedBotIds.map(async (botId) => {
+          // Reuse an already-active lap to avoid race errors when the user retries Start.
+          try {
+            const sessions = await fetchBotSessions(botId);
+            const activeLap = findActiveLapSession(sessions);
+            if (activeLap) {
+              return { botId, session: activeLap, error: null as string | null };
+            }
+          } catch {
+            // Continue to explicit start below.
+          }
 
-    for (const botId of selectedBotIds) {
-      try {
-        const started = await startLapSession(botId);
-        sessionMap[botId] = started.id;
-      } catch {
-        try {
-          const sessions = await fetchBotSessions(botId);
-          const activeLap = findActiveLapSession(sessions);
-          sessionMap[botId] = activeLap?.id ?? null;
-        } catch {
-          sessionMap[botId] = null;
-        }
+          try {
+            const started = await startLapSession(botId);
+            return { botId, session: started, error: null as string | null };
+          } catch (err) {
+            const startErr = parseErrorMessage(err);
+            try {
+              const sessions = await fetchBotSessions(botId);
+              const activeLap = findActiveLapSession(sessions);
+              if (activeLap) {
+                return { botId, session: activeLap, error: null as string | null };
+              }
+            } catch {
+              // Ignore nested fetch errors and use start error.
+            }
+            return { botId, session: null, error: startErr };
+          }
+        })
+      );
+
+      const nextRuntimeEntries = await Promise.all(
+        startedByBot.map(async ({ botId, session, error }) => {
+          if (!session) {
+            return [
+              botId,
+              {
+                kpi: null,
+                portfolio: null,
+                sessionId: null,
+                sessionStartTime: null,
+                error: error ?? 'Could not start lap session.',
+              } as BotRuntime,
+            ] as const;
+          }
+
+          const loaded = await loadRuntime(botId, session.id, true);
+          return [
+            botId,
+            {
+              kpi: loaded.kpi,
+              portfolio: loaded.portfolio,
+              sessionId: session.id,
+              sessionStartTime: session.start_time,
+              error: loaded.error,
+            } as BotRuntime,
+          ] as const;
+        })
+      );
+
+      const nextRuntime = Object.fromEntries(nextRuntimeEntries) as Record<string, BotRuntime>;
+      const startedCount = startedByBot.filter((entry) => Boolean(entry.session)).length;
+
+      setRuntimeByBot(nextRuntime);
+      setRunning(startedCount > 0);
+
+      if (startedCount === 0) {
+        setPanelError('Could not start lap session for the selected bots.');
+      } else if (startedCount < selectedBotIds.length) {
+        setPanelError(`Started lap for ${startedCount}/${selectedBotIds.length} selected bots.`);
+      } else {
+        setPanelError(null);
       }
+      setApiConnected(true);
+    } catch (err) {
+      setApiConnected(false);
+      setPanelError(parseErrorMessage(err));
+      setRunning(false);
+    } finally {
+      setActionPhase('idle');
     }
-
-    const nextRuntime: Record<string, BotRuntime> = { ...runtimeByBot };
-
-    for (const botId of selectedBotIds) {
-      const sessionId = sessionMap[botId] ?? null;
-      const loaded = await loadRuntime(botId, sessionId);
-      nextRuntime[botId] = {
-        kpi: loaded.kpi,
-        portfolio: loaded.portfolio,
-        sessionId,
-        error: loaded.error,
-      };
-    }
-
-    setRuntimeByBot(nextRuntime);
-    setRunning(true);
-    setActionLoading(false);
   };
 
   const handleStop = async () => {
-    setActionLoading(true);
+    if (actionLoading) return;
 
-    await Promise.all(
-      selectedBotIds.map(async (botId) => {
-        try {
-          await stopLapSession(botId);
-        } catch {
-          // Ignore stop race conditions (already stopped or no active lap).
-        }
-      })
-    );
+    setActionPhase('stopping');
+    setPanelError(null);
 
-    setRunning(false);
+    try {
+      const runtimeSnapshot = runtimeRef.current;
 
-    const nextRuntime: Record<string, BotRuntime> = { ...runtimeByBot };
-    for (const botId of selectedBotIds) {
-      const loaded = await loadRuntime(botId, null);
-      nextRuntime[botId] = {
-        kpi: loaded.kpi,
-        portfolio: loaded.portfolio,
-        sessionId: null,
-        error: loaded.error,
-      };
+      const stopTargetEntries = await Promise.all(
+        selectedBotIds.map(async (botId) => {
+          const current = runtimeSnapshot[botId];
+          if (current?.sessionId) {
+            return {
+              botId,
+              sessionId: current.sessionId,
+              sessionStartTime: current.sessionStartTime,
+            };
+          }
+
+          try {
+            const sessions = await fetchBotSessions(botId);
+            const activeLap = findActiveLapSession(sessions);
+            if (activeLap) {
+              return {
+                botId,
+                sessionId: activeLap.id,
+                sessionStartTime: activeLap.start_time,
+              };
+            }
+          } catch {
+            // Ignore and skip stop for this bot.
+          }
+
+          return null;
+        })
+      );
+
+      const stopTargets = stopTargetEntries.filter((entry) => Boolean(entry?.sessionId));
+
+      await Promise.all(
+        stopTargets.map(async (entry) => {
+          try {
+            await stopLapSession(entry!.botId);
+          } catch {
+            // Ignore stop race conditions (already stopped or no active lap).
+          }
+        })
+      );
+
+      setRunning(false);
+
+      const nextRuntimeEntries = await Promise.all(
+        selectedBotIds.map(async (botId) => {
+          const current = runtimeSnapshot[botId];
+          const stopped = stopTargets.find((entry) => entry?.botId === botId);
+          const sessionId = stopped?.sessionId ?? current?.sessionId ?? null;
+          const sessionStartTime = stopped?.sessionStartTime ?? current?.sessionStartTime ?? null;
+          const loaded = await loadRuntime(botId, sessionId, Boolean(sessionId));
+
+          return [
+            botId,
+            {
+              kpi: loaded.kpi,
+              portfolio: loaded.portfolio,
+              sessionId,
+              sessionStartTime,
+              error: loaded.error,
+            } as BotRuntime,
+          ] as const;
+        })
+      );
+
+      setRuntimeByBot(Object.fromEntries(nextRuntimeEntries) as Record<string, BotRuntime>);
+      setApiConnected(true);
+    } catch (err) {
+      setApiConnected(false);
+      setPanelError(parseErrorMessage(err));
+    } finally {
+      setActionPhase('idle');
     }
-
-    setRuntimeByBot(nextRuntime);
-    setActionLoading(false);
   };
 
   return (
@@ -242,7 +503,7 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
         <div className="flex items-center gap-2">
           <BarChart3 size={14} className="text-accent" />
           <span className="text-xs font-bold uppercase tracking-wider">Bot Compare</span>
-          {running && <span className="text-[10px] font-bold text-bull uppercase">Live Session</span>}
+          {running && <span className="text-[10px] font-bold text-bull uppercase">Lap Live</span>}
         </div>
         {onClose && (
           <button onClick={onClose} className="p-1 hover:bg-border-subtle rounded transition-colors cursor-pointer">
@@ -306,14 +567,37 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
         )}
 
         <div className="text-[10px] text-text-secondary uppercase tracking-widest font-semibold mt-1">
-          Step 2: Start Compare Session
+          Step 2: Start Compare Lap Timer
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="flex items-center justify-between bg-bg-elevated/30 border border-border-subtle/70 rounded-lg px-3 py-2">
+          <div className="flex items-center gap-2 text-[11px] text-text-secondary font-semibold uppercase tracking-wide">
+            <Timer size={13} className="text-accent" />
+            Lap Timer
+          </div>
+          <div className={`text-sm font-mono font-bold ${running ? 'text-bull' : 'text-text-primary'}`}>
+            {lapTimerLabel}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="text-[10px] text-text-secondary uppercase tracking-widest font-semibold">
+            Session Controls
+          </div>
+          <button
+            onClick={() => void syncActiveLapsForSelection(selectedBotIds)}
+            disabled={actionLoading}
+            className="text-[10px] uppercase tracking-wider font-semibold text-accent hover:text-text-primary disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+          >
+            Sync
+          </button>
+        </div>
+
+        <div className="flex flex-col gap-2">
           <button
             onClick={handleStart}
             disabled={running || actionLoading || selectedBotIds.length === 0}
-            className="py-2 rounded-lg border border-accent bg-accent/15 text-accent font-semibold text-xs flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            className="w-full py-2.5 rounded-lg border border-bull bg-bull/20 text-bull font-semibold text-xs flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             <Play size={13} />
             Start
@@ -321,18 +605,33 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
           <button
             onClick={handleStop}
             disabled={!running || actionLoading}
-            className="py-2 rounded-lg border border-bear bg-bear/15 text-bear font-semibold text-xs flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            className="w-full py-2.5 rounded-lg border border-bear bg-bear/20 text-bear font-semibold text-xs flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             <Square size={13} />
             Stop
           </button>
         </div>
 
+        <div className="flex items-center justify-between text-[10px] text-text-secondary font-mono">
+          <span>{startDisabledReason ? `Start: ${startDisabledReason}` : 'Start: ready'}</span>
+          <span>{stopDisabledReason ? `Stop: ${stopDisabledReason}` : 'Stop: ready'}</span>
+        </div>
+
+        {actionLoading && (
+          <div className="bg-bg-elevated/30 border border-border-subtle/60 rounded-lg px-3 py-2">
+            <span className="text-[10px] text-text-secondary font-mono uppercase tracking-wider">
+              {actionPhase === 'starting' ? 'starting lap session...' : 'stopping lap session...'}
+            </span>
+          </div>
+        )}
+
         <div className="h-px bg-border-subtle my-1" />
 
         <div className="flex items-center justify-between">
           <div className="text-[10px] text-text-secondary uppercase tracking-widest font-semibold">Compared Bots KPI</div>
-          <span className="text-[10px] text-text-secondary font-mono">{running ? 'Live polling' : 'Overall scope'}</span>
+          <span className="text-[10px] text-text-secondary font-mono">
+            {running ? 'Lap live polling' : hasLapSnapshot ? 'Last lap snapshot' : 'Lap scope'}
+          </span>
         </div>
 
         {selectedBotIds.length === 0 ? (
@@ -355,9 +654,13 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
                       <div className="text-[10px] text-text-secondary font-mono truncate">{botId}</div>
                     </div>
                     <span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded border ${
-                      running ? 'bg-bull/10 border-bull/20 text-bull' : 'bg-bg-elevated border-border-subtle text-text-secondary'
+                      running
+                        ? 'bg-bull/10 border-bull/20 text-bull'
+                        : runtime?.sessionId
+                          ? 'bg-accent/10 border-accent/30 text-accent'
+                          : 'bg-bg-elevated border-border-subtle text-text-secondary'
                     }`}>
-                      {running ? 'Session' : 'Overall'}
+                      {running ? 'Live Lap' : runtime?.sessionId ? 'Lap Done' : 'Waiting'}
                     </span>
                   </div>
 
@@ -376,9 +679,9 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
                     <Metric label="Cash" value={pf ? `$${fmt(pf.cash_balance)}` : '—'} />
                   </div>
 
-                  {running && (
+                  {runtime?.sessionId && (
                     <div className="text-[10px] text-text-secondary font-mono">
-                      session: {runtime?.sessionId ?? 'not-found'}
+                      session: {runtime.sessionId}
                     </div>
                   )}
                 </div>
@@ -390,7 +693,12 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
 
       <div className="p-3 border-t border-border-subtle bg-bg-elevated/70 flex items-center justify-between">
         <div className="text-[10px] text-text-secondary uppercase tracking-wider font-semibold">API Source</div>
-        <div className="text-[10px] text-accent font-mono">Admin API</div>
+        <div className="flex items-center gap-2">
+          <span className={`w-1.5 h-1.5 rounded-full ${apiConnected === false ? 'bg-bear' : apiConnected ? 'bg-bull' : 'bg-text-secondary'}`} />
+          <div className="text-[10px] text-accent font-mono">
+            Admin API {apiConnected === false ? '(disconnected)' : apiConnected ? '(connected)' : '(unknown)'}
+          </div>
+        </div>
       </div>
     </div>
   );

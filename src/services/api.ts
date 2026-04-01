@@ -1,4 +1,30 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+const REQUEST_TIMEOUT_MS = 12000;
+
+async function requestJson(
+    url: string,
+    init?: RequestInit,
+    timeoutMs: number = REQUEST_TIMEOUT_MS
+): Promise<any> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+        const res = await fetch(url, { ...init, signal: controller.signal });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || `HTTP ${res.status}`);
+        }
+        return await res.json();
+    } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') {
+            throw new Error(`Request timed out (${timeoutMs}ms)`);
+        }
+        throw err;
+    } finally {
+        clearTimeout(timer);
+    }
+}
 
 export interface Ticker {
     symbol: string;
@@ -24,15 +50,11 @@ export async function fetchTickers(): Promise<Ticker[]> {
 }
 
 export async function fetchBots(): Promise<Bot[]> {
-    const res = await fetch(`${API_BASE}/api/bots`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
+    return await requestJson(`${API_BASE}/api/bots`);
 }
 
 export async function fetchBot(botId: string): Promise<Bot> {
-    const res = await fetch(`${API_BASE}/api/bots/${botId}`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
+    return await requestJson(`${API_BASE}/api/bots/${botId}`);
 }
 
 export async function createBot(name: string): Promise<Bot> {
@@ -74,15 +96,11 @@ export interface DepositResponse {
 
 export async function fetchBotTrades(botId: string, sessionId?: string): Promise<BotTrade[]> {
     const query = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : '';
-    const res = await fetch(`${API_BASE}/api/bots/${botId}/trades${query}`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
+    return await requestJson(`${API_BASE}/api/bots/${botId}/trades${query}`);
 }
 
 export async function fetchBotPortfolio(botId: string): Promise<BotPortfolio> {
-    const res = await fetch(`${API_BASE}/api/bots/${botId}/portfolio`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
+    return await requestJson(`${API_BASE}/api/bots/${botId}/portfolio`);
 }
 
 export async function depositFunds(botId: string, amount: number): Promise<DepositResponse> {
@@ -145,36 +163,22 @@ export async function fetchBotKPI(botId: string, sessionId?: string): Promise<Bo
     if (sessionId) {
         url += `?session_id=${sessionId}`;
     }
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
+    return await requestJson(url);
 }
 
 export async function fetchBotSessions(botId: string): Promise<BotSession[]> {
-    const res = await fetch(`${API_BASE}/api/bots/${botId}/sessions`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
+    return await requestJson(`${API_BASE}/api/bots/${botId}/sessions`);
 }
 
 export async function startLapSession(botId: string): Promise<BotSession> {
-    const res = await fetch(`${API_BASE}/api/bots/${botId}/sessions/start`, {
+    return await requestJson(`${API_BASE}/api/bots/${botId}/sessions/start`, {
         method: 'POST',
     });
-    if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || `HTTP ${res.status}`);
-    }
-    return await res.json();
 }
 
 export async function stopLapSession(botId: string): Promise<BotSession> {
-    const res = await fetch(`${API_BASE}/api/bots/${botId}/sessions/stop`, {
+    return await requestJson(`${API_BASE}/api/bots/${botId}/sessions/stop`, {
         method: 'POST',
     });
-    if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || `HTTP ${res.status}`);
-    }
-    return await res.json();
 }
 
