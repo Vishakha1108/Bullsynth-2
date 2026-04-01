@@ -81,16 +81,25 @@ self.onmessage = (e) => {
         self.postMessage({ type: 'HISTORY_UPDATE', candles: history });
     }
     else if (type === 'HISTORY') {
-        const rawCandles = payload; // Array of 1s candles
-        // Note: although backend doesn't send this, we keep support.
-        history = []; // Reset history
+        const rawCandles: Candle[] = Array.isArray(payload)
+            ? payload
+            : (Array.isArray(payload?.candles) ? payload.candles : []);
+        const payloadSym: string = Array.isArray(payload)
+            ? currentSymbol
+            : (payload?.symbol || currentSymbol);
         
-        if (rawCandles && rawCandles.length > 0) {
-            // Assume these belong to current symbol
-            rawCache[currentSymbol] = rawCandles.slice(-5000);
+        if (!rawCandles.length) {
+            return;
         }
 
-        for (const c of rawCandles) {
+        if (payloadSym) {
+            rawCache[payloadSym] = rawCandles.slice(-5000);
+        }
+
+        if (payloadSym === currentSymbol) {
+            history = []; // Reset history
+            
+            for (const c of rawCandles) {
             const sourceTime = c.time;
             const normalizedSec = normalizeTimestampToSec(sourceTime);
             const candleTime = Math.floor(normalizedSec / timeframeSec) * timeframeSec;
@@ -120,8 +129,32 @@ self.onmessage = (e) => {
             }
         }
 
-        if (history.length > 2000) history = history.slice(-2000);
-        self.postMessage({ type: 'HISTORY_UPDATE', candles: history });
+            if (history.length > 2000) history = history.slice(-2000);
+            self.postMessage({ type: 'HISTORY_UPDATE', candles: history });
+        }
+    }
+    else if (type === 'GET_COMPARE_HISTORY') {
+        const sym = payload?.symbol;
+        if (!sym) return;
+        const raw = rawCache[sym] || [];
+        
+        const aggregated: Candle[] = [];
+        for (const c of raw) {
+            const candleTime = Math.floor(normalizeTimestampToSec(c.time) / timeframeSec) * timeframeSec;
+            if (!Number.isFinite(candleTime)) continue;
+            
+            const lastCandle = aggregated.length > 0 ? aggregated[aggregated.length - 1] : null;
+
+            if (!lastCandle || candleTime > lastCandle.time) {
+                aggregated.push({ ...c, time: candleTime });
+            } else if (candleTime === lastCandle.time) {
+                lastCandle.high = Math.max(lastCandle.high, c.high);
+                lastCandle.low = Math.min(lastCandle.low, c.low);
+                lastCandle.close = c.close;
+                lastCandle.volume += c.volume;
+            }
+        }
+        self.postMessage({ type: 'COMPARE_HISTORY_UPDATE', symbol: sym, candles: aggregated });
     }
     else if (type === 'TICK') {
         const trade = payload;
