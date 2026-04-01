@@ -38,6 +38,7 @@ export default function TradePanel() {
         if (side === 'SELL' && numericQty > availableQty) return;
         if (type === 'limit' && (!price || parseFloat(price) <= 0)) return;
 
+        // Send to server
         wsManager.send({
             type: 'place_order',
             symbol: currentSymbol,
@@ -46,6 +47,10 @@ export default function TradePanel() {
             price: type === 'limit' ? parseFloat(price) : undefined,
             qty: parseFloat(qty)
         });
+
+        // Immediately add to portfolio (for demo & immediate feedback)
+        const executionPrice = type === 'limit' ? parseFloat(price) : lastPrice;
+        useMarketStore.getState().addCompletedOrder(currentSymbol, side, numericQty, executionPrice);
 
         const numericPrice = parseFloat(price);
         const isMarketable = type === 'market' || (
