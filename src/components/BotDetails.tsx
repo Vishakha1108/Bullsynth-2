@@ -838,6 +838,11 @@ export default function BotDetails() {
   useEffect(() => {
     let cancelled = false;
 
+    const clearData = () => {
+      setPortfolio(null);
+      setTrades([]);
+    };
+
     const load = async () => {
       try {
         const [pf, tr] = await Promise.all([
@@ -852,8 +857,7 @@ export default function BotDetails() {
       }
     };
 
-    setPortfolio(null);
-    setTrades([]);
+    clearData();
     void load();
     const interval = setInterval(load, 3000);
     return () => {

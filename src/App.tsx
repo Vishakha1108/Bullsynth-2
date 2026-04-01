@@ -5,7 +5,7 @@ import Dashboard from './components/Dashboard';
 import AdminDashboard from './components/AdminDashboard';
 import BotDetails from './components/BotDetails';
 import { ThemeProvider } from './store/ThemeContext';
-import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
+import { KeyboardShortcutsModal } from './components/keyboard-shortcuts';
 
 function App() {
   return (

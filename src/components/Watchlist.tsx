@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { TrendingDown, Plus, MoreHorizontal, LayoutGrid, ExternalLink, Pencil, Info, X } from 'lucide-react';
+import { TrendingDown, Plus, ExternalLink, Info, X } from 'lucide-react';
 import useMarketStore from '../store/useMarketStore';
 import { candleWorker, requestHistory, isSymbolCached } from '../services/websocket';
 
@@ -47,9 +47,14 @@ export default function Watchlist({ onClose }: { onClose?: () => void }) {
                     <TrendingDown size={12} className="text-text-primary" />
                 </div>
                 <div className="flex items-center gap-2 text-text-secondary">
-                    <Plus size={16} className="cursor-pointer hover:text-text-primary" />
-                    <LayoutGrid size={15} className="cursor-pointer hover:text-text-primary" />
-                    <MoreHorizontal size={16} className="cursor-pointer hover:text-text-primary" />
+                    <button
+                        type="button"
+                        className="inline-flex items-center justify-center cursor-pointer hover:text-text-primary"
+                        title="Add symbol"
+                        onClick={() => window.dispatchEvent(new CustomEvent('open-ticker-search'))}
+                    >
+                        <Plus size={16} />
+                    </button>
                     {onClose && <X size={18} className="cursor-pointer hover:text-text-primary ml-1" onClick={onClose} />}
                 </div>
             </div>
@@ -113,11 +118,6 @@ export default function Watchlist({ onClose }: { onClose?: () => void }) {
                             {currentSymbol[0]}
                         </div>
                         <span className="text-sm font-bold text-text-primary uppercase">{currentSymbol}</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-text-secondary">
-                        <LayoutGrid size={16} className="cursor-pointer hover:text-white" />
-                        <Pencil size={15} className="cursor-pointer hover:text-white" />
-                        <MoreHorizontal size={16} className="cursor-pointer hover:text-white" />
                     </div>
                 </div>
 

@@ -29,14 +29,14 @@ function StatCard({ label, value, icon: Icon, change, subtitle }: {
   label: string; value: string; icon: LucideIcon; change?: number; subtitle?: string;
 }) {
   return (
-    <div className="dash-card p-5 flex flex-col gap-3 group">
+    <div className="dash-card p-4 flex flex-col gap-2 group">
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">{label}</span>
-        <div className="w-8 h-8 rounded-md dash-icon-bg flex items-center justify-center text-text-secondary group-hover:text-accent transition-colors">
+        <div className="w-8 h-8 rounded-md dash-icon-bg flex items-center justify-center text-text-secondary">
           <Icon size={16} />
         </div>
       </div>
-      <div className="text-2xl font-bold text-text-primary tracking-tight font-mono tabular-nums">{value}</div>
+      <div className="text-2xl leading-tight font-bold text-text-primary tracking-tight font-mono tabular-nums">{value}</div>
       {change !== undefined && (
         <div className={`flex items-center gap-1 text-xs font-semibold ${change >= 0 ? 'text-bull' : 'text-bear'}`}>
           {change >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
@@ -96,8 +96,8 @@ export default function Dashboard() {
     <div className="h-screen flex flex-col bg-bg-terminal text-text-primary overflow-hidden dash-root">
       <Navbar />
 
-      <main className="flex-1 min-h-0 overflow-y-auto styling-scrollbar">
-        <div className="max-w-[1600px] mx-auto px-6 py-6 flex flex-col gap-6">
+      <main className="flex-1 min-h-0 overflow-hidden">
+        <div className="h-full max-w-400 mx-auto px-6 py-4 flex flex-col gap-5">
 
           {/* ── Row 1: Stat Cards ── */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -123,7 +123,7 @@ export default function Dashboard() {
 
           {/* ── Row 2: Holdings Table ── */}
           <div className="dash-card overflow-hidden">
-            <div className="px-5 py-4 dash-section-header flex items-center justify-between">
+            <div className="px-5 py-3 dash-section-header flex items-center justify-between">
               <h2 className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Holdings</h2>
               <span className="text-[10px] font-mono text-text-secondary">{portfolio.holdings.length} positions</span>
             </div>
@@ -154,7 +154,7 @@ export default function Dashboard() {
                       const realPnl = h.realizedPnl;
                       return (
                         <tr key={h.asset} className="dash-table-row">
-                          <td className="px-5 py-3">
+                          <td className="px-5 py-2.5">
                             <div className="flex items-center gap-3">
                               <div
                                 className="w-7 h-7 rounded-md flex items-center justify-center text-[10px] font-bold text-white"
@@ -165,17 +165,17 @@ export default function Dashboard() {
                               <span className="font-semibold text-text-primary">{h.asset}</span>
                             </div>
                           </td>
-                          <td className="text-right px-5 py-3 font-mono tabular-nums">{fmt(h.qty, 4)}</td>
-                          <td className="text-right px-5 py-3 font-mono tabular-nums">{fmtUsd(h.avgPrice)}</td>
-                          <td className="text-right px-5 py-3 font-mono tabular-nums">{fmtUsd(h.currentPrice)}</td>
-                          <td className="text-right px-5 py-3 font-mono tabular-nums font-semibold">{fmtUsd(h.marketValue)}</td>
-                          <td className={`text-right px-5 py-3 font-mono tabular-nums font-semibold ${realPnl >= 0 ? 'text-bull' : 'text-bear'}`}>
+                          <td className="text-right px-5 py-2.5 font-mono tabular-nums">{fmt(h.qty, 4)}</td>
+                          <td className="text-right px-5 py-2.5 font-mono tabular-nums">{fmtUsd(h.avgPrice)}</td>
+                          <td className="text-right px-5 py-2.5 font-mono tabular-nums">{fmtUsd(h.currentPrice)}</td>
+                          <td className="text-right px-5 py-2.5 font-mono tabular-nums font-semibold">{fmtUsd(h.marketValue)}</td>
+                          <td className={`text-right px-5 py-2.5 font-mono tabular-nums font-semibold ${realPnl >= 0 ? 'text-bull' : 'text-bear'}`}>
                             {realPnl >= 0 ? '+' : ''}{fmtUsd(realPnl)}
                           </td>
-                          <td className={`text-right px-5 py-3 font-mono tabular-nums font-semibold ${unrealPnl >= 0 ? 'text-bull' : 'text-bear'}`}>
+                          <td className={`text-right px-5 py-2.5 font-mono tabular-nums font-semibold ${unrealPnl >= 0 ? 'text-bull' : 'text-bear'}`}>
                             {unrealPnl >= 0 ? '+' : ''}{fmtUsd(unrealPnl)}
                           </td>
-                          <td className="text-right px-5 py-3">
+                          <td className="text-right px-5 py-2.5">
                             <button
                               onClick={() => navigate(`/terminal?symbol=${h.asset}`)}
                               className="text-text-secondary hover:text-accent transition-colors cursor-pointer"
@@ -194,18 +194,18 @@ export default function Dashboard() {
           </div>
 
           {/* ── Row 3: Market Overview + Open Orders ── */}
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-5 min-h-0 flex-1">
 
             {/* Market Overview (3 cols) */}
-            <div className="lg:col-span-3 dash-card overflow-hidden flex flex-col">
-              <div className="px-5 py-4 dash-section-header flex items-center justify-between">
+            <div className="lg:col-span-3 dash-card overflow-hidden flex flex-col min-h-0">
+              <div className="px-5 py-3 dash-section-header flex items-center justify-between">
                 <h2 className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Market Overview</h2>
                 <div className="flex items-center gap-2">
                   <div className={`w-1.5 h-1.5 rounded-full ${wsConnected ? 'bg-bull' : 'bg-bear'}`} />
                   <span className="text-[10px] font-mono text-text-secondary">{wsConnected ? 'Live' : 'Offline'}</span>
                 </div>
               </div>
-              <div className="flex-1 overflow-y-auto styling-scrollbar max-h-[360px]">
+              <div className="flex-1 overflow-y-auto styling-scrollbar max-h-75">
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 dash-thead z-10">
                     <tr className="text-[10px] font-semibold uppercase tracking-wider text-text-secondary dash-table-header">
@@ -218,7 +218,7 @@ export default function Dashboard() {
                   <tbody>
                     {marketData.map((item) => (
                       <tr key={item.symbol} className="dash-table-row">
-                        <td className="px-5 py-3">
+                        <td className="px-5 py-2.5">
                           <div className="flex items-center gap-3">
                             <div
                               className="w-7 h-7 rounded-md flex items-center justify-center text-[10px] font-bold text-white"
@@ -229,10 +229,10 @@ export default function Dashboard() {
                             <span className="font-semibold text-text-primary">{item.symbol}</span>
                           </div>
                         </td>
-                        <td className="text-right px-5 py-3 font-mono tabular-nums font-semibold text-text-primary">
+                        <td className="text-right px-5 py-2.5 font-mono tabular-nums font-semibold text-text-primary">
                           {item.price > 0 ? fmtUsd(item.price) : '—'}
                         </td>
-                        <td className="text-right px-5 py-3">
+                        <td className="text-right px-5 py-2.5">
                           {item.price > 0 ? (
                             <span className={`dash-change-badge ${item.change >= 0 ? 'bull' : 'bear'}`}>
                               {item.change >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
@@ -242,7 +242,7 @@ export default function Dashboard() {
                             <span className="text-text-secondary text-xs">—</span>
                           )}
                         </td>
-                        <td className="text-right px-5 py-3">
+                        <td className="text-right px-5 py-2.5">
                           <button
                             onClick={() => navigate(`/terminal?symbol=${item.symbol}`)}
                             className="text-[10px] font-semibold uppercase tracking-wider text-text-secondary hover:text-accent transition-colors cursor-pointer"
@@ -258,12 +258,12 @@ export default function Dashboard() {
             </div>
 
             {/* Open Orders (2 cols) */}
-            <div className="lg:col-span-2 dash-card overflow-hidden flex flex-col">
-              <div className="px-5 py-4 dash-section-header flex items-center justify-between">
+            <div className="lg:col-span-2 dash-card overflow-hidden flex flex-col min-h-0">
+              <div className="px-5 py-3 dash-section-header flex items-center justify-between">
                 <h2 className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Open Orders</h2>
                 <span className="text-[10px] font-mono text-text-secondary">{openOrders.length} active</span>
               </div>
-              <div className="flex-1 overflow-y-auto styling-scrollbar max-h-[360px]">
+              <div className="flex-1 overflow-y-auto styling-scrollbar max-h-75">
                 {openOrders.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 text-text-secondary">
                     <BarChart3 size={24} className="mb-3 opacity-40" />

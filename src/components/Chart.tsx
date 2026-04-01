@@ -99,10 +99,49 @@ export function TickerSearch() {
         setQuery('');
     }, []);
 
-    // Derive tickers list from store - use tickers if available, fall back to symbols
+    // Derive tickers list from store and normalize categories so tabs are useful.
     const tickers = useMemo(() => {
-        if (storeTickers.length > 0) return storeTickers;
-        return storeSymbols.map(s => ({ symbol: s, name: s, category: 'Stocks' }));
+        const baseTickers = storeTickers.length > 0
+            ? storeTickers
+            : storeSymbols.map(s => ({ symbol: s, name: s, category: 'Stocks' }));
+
+        const CRYPTO_SYMBOLS = new Set(['BTC', 'ETH', 'SOL', 'BNB', 'XRP', 'ADA', 'DOGE', 'DOT', 'AVAX', 'MATIC']);
+        const SYNTHETIC_SYMBOLS = new Set(['US30', 'NAS100', 'SPX500', 'VIX', 'XAUUSD', 'XAGUSD', 'WTI', 'BRENT', 'SYNTH1', 'SYNTH2']);
+
+        const inferCategory = (symbol: string, rawCategory?: string) => {
+            const sym = symbol.toUpperCase();
+            const cat = (rawCategory || '').toLowerCase();
+
+            if (CRYPTO_SYMBOLS.has(sym) || cat.includes('crypto')) return 'Crypto';
+            if (SYNTHETIC_SYMBOLS.has(sym) || cat.includes('synthetic')) return 'Synthetic';
+            return 'Stocks';
+        };
+
+        const normalized = baseTickers.map((t) => ({
+            ...t,
+            category: inferCategory(t.symbol, t.category),
+        }));
+
+        // If backend data has no synthetic group, expose a couple of broad-market symbols there.
+        if (!normalized.some((t) => t.category === 'Synthetic')) {
+            const preferredSynthetic = ['SPY', 'QQQ', 'DIA', 'IWM', 'AAPL', 'TSLA'];
+            const fallbackSymbols = normalized
+                .filter((t) => t.category === 'Stocks')
+                .map((t) => t.symbol.toUpperCase());
+
+            const symbolsToPromote = preferredSynthetic.filter((s) => fallbackSymbols.includes(s)).slice(0, 2);
+            const finalPromotions = symbolsToPromote.length > 0 ? symbolsToPromote : fallbackSymbols.slice(0, 2);
+
+            if (finalPromotions.length > 0) {
+                return normalized.map((t) => (
+                    finalPromotions.includes(t.symbol.toUpperCase())
+                        ? { ...t, category: 'Synthetic' }
+                        : t
+                ));
+            }
+        }
+
+        return normalized;
     }, [storeTickers, storeSymbols]);
 
     useEffect(() => {
@@ -147,10 +186,10 @@ export function TickerSearch() {
                 onClick={() => setIsOpen(true)}
             >
                 <div className="flex items-center gap-2">
-                    <Search size={17} className="text-white" />
-                    <span className="ticker-symbol text-white">{currentSymbol}</span>
-                    <div className="w-5 h-5 rounded-full border border-white/30 flex items-center justify-center hover:bg-white/10 transition-colors ml-1">
-                        <Plus size={14} className="text-white" />
+                    <Search size={17} className="text-text-secondary" />
+                    <span className="ticker-symbol">{currentSymbol}</span>
+                    <div className="w-5 h-5 rounded-full border border-border-subtle flex items-center justify-center hover:bg-bg-elevated transition-colors ml-1">
+                        <Plus size={14} className="text-text-secondary" />
                     </div>
                 </div>
             </button>
@@ -160,7 +199,7 @@ export function TickerSearch() {
                     <div className="tv-modal-content" onClick={e => e.stopPropagation()}>
                         <div className="tv-modal-header">
                             <div className="tv-modal-title-row">
-                                <span className="tv-modal-title">Symbol Search</span>
+                                <span className="tv-modal-title">Add Symbol to Watchlist</span>
                                 <button className="tv-modal-close" onClick={() => closeSearch()}>
                                     <X size={18} />
                                 </button>
@@ -170,7 +209,7 @@ export function TickerSearch() {
                                 <input
                                     ref={inputRef}
                                     type="text"
-                                    placeholder="Search symbol or name..."
+                                    placeholder="Search stocks, crypto, or synthetic..."
                                     value={query}
                                     onChange={(e) => setQuery(e.target.value)}
                                 />
@@ -217,7 +256,6 @@ export function TickerSearch() {
                                                 </div>
                                                 <div className="tv-modal-item-right">
                                                     <span className="tv-modal-item-category">{t.category}</span>
-                                                    <span className="tv-modal-item-exchange">SIMULATOR</span>
                                                 </div>
                                             </button>
                                             <button
@@ -261,7 +299,8 @@ function OHLCVOverlay() {
     const o = rawData.open ?? rawData.close ?? 0;
     const h = rawData.high ?? rawData.close ?? 0;
     const l = rawData.low ?? rawData.close ?? 0;
-    const c = rawData.close ?? (rawData as any).value ?? 0;
+    // rawData can be Candle or { value: number }
+    const c = rawData.close ?? (rawData as { value?: number }).value ?? 0;
     const v = rawData.volume ?? 0;
 
     const isUp = c >= o;
@@ -348,32 +387,27 @@ function AlertModal({ onClose }: { onClose: () => void }) {
 
     return (
         <div
-            className="fixed inset-0 z-[1000] flex items-center justify-center"
-            style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)' }}
+            className="tv-alert-overlay"
             onClick={onClose}
         >
             <div
-                className="w-[380px] flex flex-col rounded-lg overflow-hidden shadow-2xl"
-                style={{ background: '#131722', border: '1px solid #2a2e39' }}
+                className="tv-alert-modal"
                 onClick={e => e.stopPropagation()}
             >
                 {/* Header Section */}
-                <div style={{ background: '#131722', borderBottom: '1px solid #2a2e39' }}
-                    className="px-5 py-4 flex items-center justify-between"
-                >
+                <div className="tv-alert-header">
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-md flex items-center justify-center bg-[#2a2e39] text-[#787b86] border border-[#363a45]/30">
+                        <div className="tv-alert-header-icon">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
                             </svg>
                         </div>
                         <div>
-                            <p className="text-[#d1d4dc] font-bold text-[14px] leading-tight">Create Alert</p>
-                            <p className="text-[#787b86] text-[10px] mt-0.5 uppercase tracking-wider font-semibold">{currentSymbol} · <span className="font-mono">${lastPrice.toFixed(2)}</span></p>
+                            <p className="tv-alert-title">Create Alert</p>
+                            <p className="tv-alert-subtitle">{currentSymbol} · <span className="font-mono">${lastPrice.toFixed(2)}</span></p>
                         </div>
                     </div>
-                    <button onClick={onClose}
-                        className="w-6 h-6 rounded flex items-center justify-center text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#2a2e39] transition-all">
+                    <button onClick={onClose} className="tv-alert-close-btn">
                         <X size={14} />
                     </button>
                 </div>
@@ -381,21 +415,13 @@ function AlertModal({ onClose }: { onClose: () => void }) {
                 <div className="p-5 flex flex-col gap-4">
                     {/* Condition Options */}
                     <div className="flex flex-col gap-2">
-                        <p className="text-[10px] uppercase tracking-wider font-bold text-[#787b86]">Condition</p>
+                        <p className="tv-alert-section-label">Condition</p>
                         <div className="flex gap-2">
                             {conditions.map(c => (
                                 <button
                                     key={c.value}
                                     onClick={() => setType(c.value)}
-                                    className="flex-1 py-1.5 rounded text-[11px] font-bold uppercase tracking-wider transition-all duration-150 flex flex-col items-center"
-                                    style={type === c.value ? {
-                                        background: '#2962ff',
-                                        color: '#ffffff'
-                                    } : {
-                                        background: '#131722',
-                                        border: '1px solid #2a2e39',
-                                        color: '#787b86'
-                                    }}
+                                    className={`tv-alert-condition-btn ${type === c.value ? 'active' : ''}`}
                                 >
                                     <span className="text-[14px] leading-tight mb-0.5">{c.icon}</span>
                                     <span>{c.label}</span>
@@ -407,15 +433,15 @@ function AlertModal({ onClose }: { onClose: () => void }) {
                     {/* Price Setup */}
                     <div className="flex flex-col gap-2">
                         <div className="flex items-center justify-between">
-                            <p className="text-[10px] uppercase tracking-wider font-bold text-[#787b86]">Target Price</p>
+                            <p className="tv-alert-section-label">Target Price</p>
                             {!isNaN(parseFloat(price)) && (
-                                <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${diff >= 0 ? 'text-[#26a69a] bg-[#26a69a]/10' : 'text-[#ef5350] bg-[#ef5350]/10'}`}>
+                                <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${diff >= 0 ? 'text-bull bg-bull/10' : 'text-bear bg-bear/10'}`}>
                                     {diff >= 0 ? '+' : ''}{diff.toFixed(2)} ({diffPct.toFixed(2)} %)
                                 </span>
                             )}
                         </div>
                         <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#787b86] font-bold text-[12px]">$</span>
+                            <span className="tv-alert-currency">$</span>
                             <input
                                 ref={inputRef}
                                 type="number"
@@ -424,18 +450,18 @@ function AlertModal({ onClose }: { onClose: () => void }) {
                                 value={price}
                                 onChange={e => setPrice(e.target.value)}
                                 onKeyDown={e => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') onClose(); }}
-                                className="w-full pl-7 pr-20 py-2.5 rounded bg-[#131722] border border-[#2a2e39] text-[#d1d4dc] text-[16px] font-bold outline-none focus:border-[#2962ff] transition-all font-mono"
+                                className="tv-alert-input"
                             />
                             <div className="absolute right-1 top-1/2 -translate-y-1/2 flex gap-0.5">
                                 <button onClick={() => setPrice((parseFloat(price) - 0.01).toFixed(2))}
-                                    className="w-7 h-7 rounded text-[#787b86] hover:text-white hover:bg-[#2a2e39] flex items-center justify-center text-md font-bold transiton-all">−</button>
+                                    className="tv-alert-step-btn">−</button>
                                 <button onClick={() => setPrice((parseFloat(price) + 0.01).toFixed(2))}
-                                    className="w-7 h-7 rounded text-[#787b86] hover:text-white hover:bg-[#2a2e39] flex items-center justify-center text-md font-bold transiton-all">+</button>
+                                    className="tv-alert-step-btn">+</button>
                             </div>
                         </div>
                         <button
                             onClick={() => setPrice(lastPrice.toFixed(2))}
-                            className="text-[10px] uppercase tracking-wider font-bold text-[#2962ff] hover:text-[#5c8fff] self-start transition-all"
+                            className="tv-alert-reset-btn"
                         >
                             ← Reset
                         </button>
@@ -444,17 +470,17 @@ function AlertModal({ onClose }: { onClose: () => void }) {
                     {/* Existing Alerts */}
                     {activeAlerts.length > 0 && (
                         <div className="flex flex-col gap-2">
-                            <p className="text-[10px] uppercase tracking-wider font-bold text-[#787b86]">Active Alerts ({activeAlerts.length})</p>
+                            <p className="tv-alert-section-label">Active Alerts ({activeAlerts.length})</p>
                             <div className="flex flex-col gap-1 max-h-[120px] overflow-y-auto styling-scrollbar">
                                 {activeAlerts.map(a => (
-                                    <div key={a.id} className="flex items-center justify-between px-3 py-2 rounded bg-[#131722] border border-[#2a2e39]">
+                                    <div key={a.id} className="tv-alert-row">
                                         <div className="flex items-center gap-2">
-                                            <span className={`w-1.5 h-1.5 rounded-full ${a.type === 'above' ? 'bg-[#26a69a]' : a.type === 'below' ? 'bg-[#ef5350]' : 'bg-[#2962ff]'}`} />
-                                            <span className="text-[#787b86] text-[11px]">{a.symbol}</span>
-                                            <span className="text-[#4c525e] text-[11px]">{a.type === 'crossing' ? '⇅' : a.type === 'above' ? '↑' : '↓'}</span>
-                                            <span className="text-[#d1d4dc] text-[12px] font-bold font-mono">${a.targetPrice.toFixed(2)}</span>
+                                            <span className={`w-1.5 h-1.5 rounded-full ${a.type === 'above' ? 'bg-bull' : a.type === 'below' ? 'bg-bear' : 'bg-[#2962ff]'}`} />
+                                            <span className="tv-alert-row-symbol">{a.symbol}</span>
+                                            <span className="tv-alert-row-type">{a.type === 'crossing' ? '⇅' : a.type === 'above' ? '↑' : '↓'}</span>
+                                            <span className="tv-alert-row-price">${a.targetPrice.toFixed(2)}</span>
                                         </div>
-                                        <button onClick={() => removeAlert(a.id)} className="text-[#787b86] hover:text-[#ef5350] transition-colors">
+                                        <button onClick={() => removeAlert(a.id)} className="tv-alert-row-remove">
                                             <X size={12} />
                                         </button>
                                     </div>
@@ -466,7 +492,7 @@ function AlertModal({ onClose }: { onClose: () => void }) {
                     {/* CTA Button */}
                     <button
                         onClick={handleCreate}
-                        className="w-full py-2.5 rounded bg-[#2962ff] hover:bg-[#5c8fff] text-white font-bold text-[12px] uppercase tracking-[0.06em] transition-all flex items-center justify-center gap-2 active:scale-[0.98] mt-1 shadow-xl shadow-[#2962ff]/10"
+                        className="tv-alert-cta"
                     >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
@@ -526,16 +552,16 @@ function ChartToolbar() {
         <div className="chart-toolbar">
             {/* Pointer Selection Group */}
             <div className="relative flex items-center w-full justify-center">
-                <div className="flex items-center w-[42px] h-[38px] bg-[#131722] border border-transparent hover:border-[#363a45] rounded cursor-pointer relative overflow-hidden group">
+                <div className="flex items-center w-[42px] h-[38px] bg-bg-terminal border border-transparent hover:border-border-subtle rounded cursor-pointer relative overflow-hidden group">
                     <button
-                        className={`flex-1 h-full flex items-center justify-center text-white hover:text-[#d1d4dc] ${isPointerGroupActive ? '!text-[#2962ff]' : ''}`}
+                        className={`flex-1 h-full flex items-center justify-center text-text-primary hover:text-text-primary ${isPointerGroupActive ? 'text-[#2962ff]!' : ''}`}
                         title={activePointer.label}
                         onClick={() => setActiveTool(activePointer.id)}
                     >
                         <activePointer.icon size={22} />
                     </button>
                     <button
-                        className={`w-[14px] h-full flex items-center justify-center text-[#787b86] hover:text-[#d1d4dc] hover:bg-[#2a2e39] border-l border-[#2a2e39] ${pointerMenuOpen ? 'bg-[#2a2e39]' : ''}`}
+                        className={`w-[14px] h-full flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-border-subtle border-l border-border-subtle ${pointerMenuOpen ? 'bg-border-subtle' : ''}`}
                         onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -549,18 +575,18 @@ function ChartToolbar() {
                 {pointerMenuOpen && (
                     <>
                         <div className="fixed inset-0 z-[190]" onClick={() => setPointerMenuOpen(false)} />
-                        <div className="absolute left-[38px] top-0 ml-1 bg-[#1e222d] border border-[#2a2e39] rounded shadow-2xl z-[200] py-1 min-w-[120px] animate-in fade-in slide-in-from-left-1 duration-200">
-                            <div className="text-[10px] uppercase font-bold text-[#434651] px-3 py-1 mb-1 border-b border-[#2a2e39]">Cursor</div>
+                        <div className="tv-dropdown-surface tv-toolbar-dropdown absolute left-[38px] top-0 ml-1 z-[200] animate-in fade-in slide-in-from-left-1 duration-200">
+                            <div className="tv-toolbar-dropdown-label">Cursor</div>
                             {pointerTools.map(pt => (
                                 <button
                                     key={pt.id}
-                                    className={`w-full text-left px-3 py-1.5 text-[12px] flex items-center gap-3 hover:bg-[#2a2e39] transition-colors ${activeTool === pt.id ? 'text-[#2962ff] bg-[#2962ff]/10' : 'text-[#d1d4dc]'}`}
+                                    className={`tv-dropdown-option flex items-center gap-3 ${activeTool === pt.id ? 'active' : ''}`}
                                     onClick={() => {
                                         setActiveTool(pt.id);
                                         setPointerMenuOpen(false);
                                     }}
                                 >
-                                    <pt.icon size={16} className={activeTool === pt.id ? 'text-[#2962ff]' : 'text-[#787b86]'} />
+                                    <pt.icon size={16} className={activeTool === pt.id ? 'text-[#2962ff]' : 'text-text-secondary'} />
                                     {pt.label}
                                 </button>
                             ))}
@@ -636,24 +662,40 @@ function Chart() {
         points: { time: number; price: number }[];
         type: string;
     } | null>(null);
+    // Store chart container size for modal positioning
+    const [containerSize, setContainerSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+        // Update container size on mount and resize
+        useEffect(() => {
+            function updateSize() {
+                if (chartContainerRef.current) {
+                    setContainerSize({
+                        width: chartContainerRef.current.clientWidth,
+                        height: chartContainerRef.current.clientHeight,
+                    });
+                }
+            }
+            updateSize();
+            window.addEventListener('resize', updateSize);
+            return () => window.removeEventListener('resize', updateSize);
+        }, []);
     const [screenshotFlash, setScreenshotFlash] = useState(false);
     const [toastMessage, setToastMessage] = useState<string | null>(null);
     const [alertModalOpen, setAlertModalOpen] = useState(false);
 
     useEffect(() => {
-        const handleToast = (e: any) => {
-            setToastMessage(e.detail);
+        const handleToast = (e: CustomEvent) => {
+            setToastMessage((e as CustomEvent).detail);
             setTimeout(() => setToastMessage(null), 3000);
         };
         const handleAlertEvent = () => {
             setAlertModalOpen(true);
         };
 
-        window.addEventListener('show-toast' as any, handleToast);
+        window.addEventListener('show-toast', handleToast as EventListener);
         window.addEventListener('open-alert-dialog', handleAlertEvent);
 
         return () => {
-            window.removeEventListener('show-toast' as any, handleToast);
+            window.removeEventListener('show-toast', handleToast as EventListener);
             window.removeEventListener('open-alert-dialog', handleAlertEvent);
         };
     }, []);
@@ -663,7 +705,8 @@ function Chart() {
     const currentCrosshairRef = useRef<{ time: number, price: number } | null>(null);
 
     const drawingSeriesRef = useRef<ISeriesApi<"Line">[]>([]);
-    const drawingPriceLinesRef = useRef<{ series: any; line: any }[]>([]);
+    // Use unknown for series/line, as type is not strictly enforced by lightweight-charts
+    const drawingPriceLinesRef = useRef<{ series: unknown; line: unknown }[]>([]);
 
     const indicatorSeriesRef = useRef<IndicatorSeriesBucket>({ line: [], histogram: [] });
     const lastSymbolRef = useRef<string>('');
@@ -686,11 +729,11 @@ function Chart() {
     const removeAllDrawings = useCallback(() => {
         if (!chartRef.current) return;
         drawingSeriesRef.current.forEach(s => {
-            try { chartRef.current?.removeSeries(s); } catch (e) { }
+            try { chartRef.current?.removeSeries(s); } catch { /* ignore */ }
         });
         drawingSeriesRef.current = [];
         drawingPriceLinesRef.current.forEach(({ series, line }) => {
-            try { series.removePriceLine(line); } catch (e) { }
+            try { (series as { removePriceLine: (l: unknown) => void }).removePriceLine(line); } catch { /* ignore */ }
         });
         drawingPriceLinesRef.current = [];
     }, []);
@@ -724,7 +767,7 @@ function Chart() {
             rightPriceScale: { borderColor: p.border },
             timeScale: { borderColor: p.border },
         });
-    }, [theme]);
+    }, [theme, activeTool]);
 
     const formatCandleData = useCallback((c: Candle) => {
         if (chartType.toLowerCase().includes('line') || chartType === 'Area' || chartType === 'Baseline') {
@@ -1057,11 +1100,12 @@ function Chart() {
             window.removeEventListener('take-chart-screenshot', handleScreenshotEvent);
             window.removeEventListener('reset-chart-view', handleResetChart);
         };
-    }, [setActiveTool, clearDrawings]);
+    }, [setActiveTool, clearDrawings, setDrawings]);
 
     // Drawing Logic - Mouse Handlers
     useEffect(() => {
-        if (!chartRef.current || activeTool === 'crosshair' || activeTool === 'pointer') return;
+        // Pointer tools should not enter drawing workflow.
+        if (!chartRef.current || activeTool === 'crosshair' || activeTool === 'dot' || activeTool === 'arrow' || activeTool === 'pointer') return;
 
         const chart = chartRef.current;
         const container = chartContainerRef.current;
@@ -1087,8 +1131,8 @@ function Chart() {
                         const span = visibleRange.to - visibleRange.from;
                         const newSpan = span * 0.4; // 60% zoom in
                         chart.timeScale().setVisibleLogicalRange({
-                            from: (centerIdx - newSpan / 2) as any,
-                            to: (centerIdx + newSpan / 2) as any
+                            from: centerIdx - newSpan / 2,
+                            to: centerIdx + newSpan / 2
                         });
                     }
                 }
@@ -1219,7 +1263,7 @@ function Chart() {
 
             const p1 = drawingStatus.points[0];
             const p2 = { time: param.time as number, price };
-            let sorted = [p1, p2].sort((a, b) => a.time - b.time);
+            const sorted = [p1, p2].sort((a, b) => a.time - b.time);
 
             if (sorted[0].time === sorted[1].time) {
                 previewSeriesRef.current.setData([
@@ -1254,7 +1298,8 @@ function Chart() {
         const chart = chartRef.current;
 
         // Render existing drawings
-        const markers: any[] = [];
+        // Use unknown for marker type
+        const markers: unknown[] = [];
 
         drawings.forEach((d) => {
             if (d.type === 'ray') {
@@ -1305,8 +1350,8 @@ function Chart() {
                 line.setData(sortedPoints.map(p => ({ time: p.time as UTCTimestamp, value: p.price })));
                 drawingSeriesRef.current.push(line);
             } else if (d.type === 'measure') {
-                let p1 = d.points[0];
-                let p2 = d.points[1];
+                const p1 = d.points[0];
+                const p2 = d.points[1];
                 if (p1 && p2) {
                     const priceDiff = p2.price - p1.price;
                     const percentDiff = (priceDiff / p1.price) * 100;
@@ -1574,8 +1619,8 @@ function Chart() {
                         <div
                             className="absolute z-[500] bg-[#1e222d] border border-[#2a2e39] rounded shadow-2xl p-2 flex flex-col gap-2 min-w-[200px]"
                             style={{
-                                left: Math.min(textEntry.x + 10, (chartContainerRef.current?.clientWidth || 0) - 220),
-                                top: Math.min(textEntry.y + 10, (chartContainerRef.current?.clientHeight || 0) - 80)
+                                left: Math.min(textEntry.x + 10, containerSize.width - 220),
+                                top: Math.min(textEntry.y + 10, containerSize.height - 80)
                             }}
                         >
                             <div className="text-[10px] uppercase font-bold text-[#787b86] px-1">Text Settings</div>

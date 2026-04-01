@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { X, Download, RefreshCw, Wand2, LoaderCircle } from 'lucide-react';
 import {
   Area,
@@ -57,7 +57,7 @@ export default function PnLAnalysisModal({ isOpen, onClose, botId }: PnLAnalysis
   }, [pnlData]);
 
   // Fetch PnL data from backend
-  const fetchPnLData = async (selectedPeriod: string) => {
+  const fetchPnLData = useCallback(async (selectedPeriod: string) => {
     try {
       setLoading(true);
       setError('');
@@ -69,13 +69,13 @@ export default function PnLAnalysisModal({ isOpen, onClose, botId }: PnLAnalysis
     } finally {
       setLoading(false);
     }
-  };
+  }, [botId]);
 
   useEffect(() => {
     if (isOpen && botId) {
       fetchPnLData(period);
     }
-  }, [isOpen, botId, period]);
+  }, [isOpen, botId, period, fetchPnLData]);
 
   const handleGenerateEndpoint = async () => {
     if (!apiPrompt.trim()) {

@@ -50,7 +50,7 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="h-screen w-full dash-bg text-text-primary flex flex-col overflow-hidden font-sans selection:bg-accent/30 selection:text-accent">
+    <div className="h-screen w-full dash-bg text-text-primary flex flex-col overflow-hidden font-sans selection:bg-accent/20 selection:text-text-primary">
       <Navbar />
       
       <main className="flex-1 overflow-y-auto p-8 flex justify-center">
@@ -101,15 +101,15 @@ export default function AdminDashboard() {
               <h2 className="font-semibold text-sm">Active Bot Instances</h2>
             </div>
             
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm whitespace-nowrap">
+            <div className="overflow-x-hidden">
+              <table className="w-full table-fixed text-left text-sm">
                 <thead className="bg-bg-secondary/20 text-text-secondary text-[11px] uppercase tracking-wider">
                   <tr>
-                    <th className="px-6 py-4 font-semibold w-24">Bot ID</th>
-                    <th className="px-6 py-4 font-semibold">Bot Name</th>
-                    <th className="px-6 py-4 font-semibold w-24">Status</th>
-                    <th className="px-6 py-4 font-semibold">API Key</th>
-                    <th className="px-6 py-4 font-semibold">Created At</th>
+                    <th className="px-6 py-4 font-semibold w-[28%]">Bot ID</th>
+                    <th className="px-6 py-4 font-semibold w-[12%]">Bot Name</th>
+                    <th className="px-6 py-4 font-semibold w-[12%]">Status</th>
+                    <th className="px-6 py-4 font-semibold w-[33%]">API Key</th>
+                    <th className="px-6 py-4 font-semibold w-[15%]">Created At</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border-subtle">
@@ -123,7 +123,7 @@ export default function AdminDashboard() {
                     bots.map((bot) => (
                       <tr key={bot.id} className="hover:bg-bg-secondary/20 transition-colors">
                         <td className="px-6 py-4">
-                          <code className="bg-bg-primary px-2 py-1 rounded text-xs text-text-secondary border border-border-subtle font-mono">
+                          <code className="block max-w-full truncate bg-bg-primary px-2 py-1 rounded text-xs text-text-secondary border border-border-subtle font-mono">
                             {bot.id}
                           </code>
                         </td>
@@ -144,7 +144,7 @@ export default function AdminDashboard() {
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2 group">
-                            <code className="bg-bg-primary px-2 py-1 rounded text-xs text-text-primary border border-border-subtle font-mono select-all">
+                            <code className="block min-w-0 flex-1 truncate bg-bg-primary px-2 py-1 rounded text-xs text-text-primary border border-border-subtle font-mono select-all">
                               {bot.api_key}
                             </code>
                             <button 

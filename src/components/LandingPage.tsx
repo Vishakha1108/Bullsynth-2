@@ -1,7 +1,7 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import {
     TrendingUp, BarChart3, ArrowUpDown, Activity, Zap, Globe,
-    Brain, Users, Shield, LineChart, Sparkles, ArrowRight, LogOut
+    Brain, Users, Shield, LineChart, Sparkles, ArrowRight
 } from 'lucide-react';
 import useMarketStore from '../store/useMarketStore';
 
@@ -9,14 +9,6 @@ export default function LandingPage() {
     const tickers = useMarketStore((state) => state.tickers);
     const prices = useMarketStore((state) => state.prices);
     const priceChanges = useMarketStore((state) => state.priceChanges);
-    const userId = useMarketStore((state) => state.userId);
-    const setUserId = useMarketStore((state) => state.setUserId);
-    const navigate = useNavigate();
-
-    const handleLogout = () => {
-        setUserId(null);
-        navigate('/');
-    };
 
     return (
         <div className="nb-landing">
@@ -31,14 +23,6 @@ export default function LandingPage() {
                         <div className="nb-nav-links">
                             <Link to="/terminal" className="nb-nav-link">Terminal</Link>
                             <Link to="/user/dashboard" className="nb-nav-link">Dashboard</Link>
-                        </div>
-                        <div className="nb-nav-actions">
-                            {userId ? (
-                                <button onClick={handleLogout} className="nb-nav-signin flex items-center gap-2">
-                                    <LogOut size={16} />
-                                    Logout
-                                </button>
-                            ) : null}
                         </div>
                     </div>
                 </div>

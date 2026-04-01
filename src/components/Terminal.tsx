@@ -67,9 +67,9 @@ export default function Terminal() {
                 </div>
 
                 {/* Thin Far-Right Icon Toolbar (Always visible) */}
-                <div className="w-[56px] bg-bg-terminal border-l border-border-subtle flex flex-col items-center py-4 gap-4 flex-none z-10 transition-colors">
+                <div className="w-14 bg-bg-terminal border-l border-border-subtle flex flex-col items-center py-4 gap-4 flex-none z-10 transition-colors">
                     <button
-                        className={`w-12 h-16 rounded flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${sidebarTab === 'portfolio' && isRightPanelOpen ? 'bg-border-subtle text-white shadow-inner' : 'text-white hover:text-white hover:bg-bg-elevated'}`}
+                        className={`w-12 h-16 rounded flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${sidebarTab === 'portfolio' && isRightPanelOpen ? 'bg-border-subtle text-text-primary shadow-inner' : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated'}`}
                         onClick={() => {
                             if (sidebarTab === 'portfolio' && isRightPanelOpen) {
                                 setIsRightPanelOpen(false);
@@ -80,12 +80,12 @@ export default function Terminal() {
                         }}
                         title="Portfolio"
                     >
-                        <Wallet size={21} className="text-white" />
-                        <span className="text-[10px] font-semibold leading-[1] text-white">Portfolio</span>
+                        <Wallet size={21} />
+                        <span className="text-[10px] font-semibold leading-none">Portfolio</span>
                     </button>
 
                     <button
-                        className={`w-12 h-16 rounded flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${sidebarTab === 'watchlist' && isRightPanelOpen ? 'bg-border-subtle text-white shadow-inner' : 'text-white hover:text-white hover:bg-bg-elevated'}`}
+                        className={`w-12 h-16 rounded flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${sidebarTab === 'watchlist' && isRightPanelOpen ? 'bg-border-subtle text-text-primary shadow-inner' : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated'}`}
                         onClick={() => {
                             if (sidebarTab === 'watchlist' && isRightPanelOpen) {
                                 setIsRightPanelOpen(false);
@@ -96,12 +96,12 @@ export default function Terminal() {
                         }}
                         title="Watchlist"
                     >
-                        <List size={21} className="text-white" />
-                        <span className="text-[10px] font-semibold leading-[1] text-white">Watchlist</span>
+                        <List size={21} />
+                        <span className="text-[10px] font-semibold leading-none">Watchlist</span>
                     </button>
 
                     <button
-                        className={`w-12 h-16 rounded flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${sidebarTab === 'orderbook' && isRightPanelOpen ? 'bg-border-subtle text-white shadow-inner' : 'text-white hover:text-white hover:bg-bg-elevated'}`}
+                        className={`w-12 h-16 rounded flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${sidebarTab === 'orderbook' && isRightPanelOpen ? 'bg-border-subtle text-text-primary shadow-inner' : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated'}`}
                         onClick={() => {
                             if (sidebarTab === 'orderbook' && isRightPanelOpen) {
                                 setIsRightPanelOpen(false);
@@ -112,12 +112,12 @@ export default function Terminal() {
                         }}
                         title="Order Book"
                     >
-                        <BookOpen size={21} className="text-white" />
-                        <span className="text-[10px] font-semibold leading-[1.1] text-center text-white">Order<br />Book</span>
+                        <BookOpen size={21} />
+                        <span className="text-[10px] font-semibold leading-[1.1] text-center">Order<br />Book</span>
                     </button>
 
                     <button
-                        className={`w-12 h-16 rounded flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${sidebarTab === 'bot' && isRightPanelOpen ? 'bg-border-subtle text-white shadow-inner' : 'text-white hover:text-white hover:bg-bg-elevated'}`}
+                        className={`w-12 h-16 rounded flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${sidebarTab === 'bot' && isRightPanelOpen ? 'bg-border-subtle text-text-primary shadow-inner' : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated'}`}
                         onClick={() => {
                             if (sidebarTab === 'bot' && isRightPanelOpen) {
                                 setIsRightPanelOpen(false);
@@ -128,8 +128,8 @@ export default function Terminal() {
                         }}
                         title="Trading Bots"
                     >
-                        <Bot size={21} className="text-white" />
-                        <span className="text-[10px] font-semibold leading-[1] text-white">Bots</span>
+                        <Bot size={21} />
+                        <span className="text-[10px] font-semibold leading-none">Bots</span>
                     </button>
                 </div>
             </div>

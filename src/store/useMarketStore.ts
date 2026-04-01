@@ -368,7 +368,9 @@ const useMarketStore = create<MarketState>((set) => ({
             ? { ...latestCandle, time: normalizeCandleTime(latestCandle.time) }
             : safeCandles[safeCandles.length - 1] || state.latestCandle;
 
-        useMarketStore.getState().checkAlerts(state.currentSymbol, safeLatest.close);
+        if (safeLatest) {
+            useMarketStore.getState().checkAlerts(state.currentSymbol, safeLatest.close);
+        }
 
         return {
             candles: safeCandles,
@@ -556,7 +558,7 @@ const useMarketStore = create<MarketState>((set) => ({
 
     setActiveTool: (tool) => set({ activeTool: tool }),
     setDrawings: (drawingsOrFn) => set((state) => ({
-        drawings: typeof drawingsOrFn === 'function' ? (drawingsOrFn as any)(state.drawings) : drawingsOrFn
+        drawings: typeof drawingsOrFn === 'function' ? (drawingsOrFn as (prev: Drawing[]) => Drawing[])(state.drawings) : drawingsOrFn
     })),
     clearDrawings: () => set({ drawings: [] }),
 
