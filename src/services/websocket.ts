@@ -232,7 +232,12 @@ class WSManager {
                         state.setPrice(msg.symbol, closePrice, change);
                     }
 
-                    if (msg.symbol !== state.currentSymbol) return;
+                    if (msg.symbol !== state.currentSymbol) {
+                        if (state.compareSymbols.includes(msg.symbol)) {
+                            state.setCompareCandles(msg.symbol, candles);
+                        }
+                        return;
+                    }
                     fetchedSymbols.add(msg.symbol);
                     candleWorker.postMessage({ type: 'HISTORY', payload: candles });
                     return;
@@ -252,19 +257,8 @@ class WSManager {
                         volume: Number(msg.v || 0),
                     };
 
-                    // If this symbol's history hasn't been flushed yet, batch it
-                    if (!fetchedSymbols.has(sym)) {
-                        queueInitialCandle(sym, next);
-                        return;
-                    }
-
-                    // Live mode — forward to worker
-                    if (sym === state.currentSymbol && state.candles.length > 0) {
-                        const openPrice = state.candles[0].open;
-                        const change = openPrice > 0 ? ((price - openPrice) / openPrice) * 100 : 0;
-                        state.setPrice(sym, price, change);
-                    } else {
-                        state.setPrice(sym, price);
+                    if (msg.symbol !== state.currentSymbol && state.compareSymbols.includes(msg.symbol)) {
+                        state.updateCompareCandle(msg.symbol, next);
                     }
 
                     candleWorker.postMessage({ type: 'CANDLE_1S', payload: next });

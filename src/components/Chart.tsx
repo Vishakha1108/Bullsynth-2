@@ -1,15 +1,12 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
-import { createChart, createSeriesMarkers, CandlestickSeries, HistogramSeries, LineSeries, AreaSeries, BaselineSeries, ColorType, CrosshairMode } from 'lightweight-charts';
+import { createChart, CandlestickSeries, HistogramSeries, LineSeries, AreaSeries, BaselineSeries, ColorType, CrosshairMode, PriceScaleMode } from 'lightweight-charts';
 import type { ISeriesApi, IChartApi, UTCTimestamp, MouseEventParams } from 'lightweight-charts';
 import useMarketStore, { INDICATOR_COLORS, INDICATOR_LIBRARY, TIMEFRAMES } from '../store/useMarketStore';
 import type { Candle } from '../store/useMarketStore';
 import { requestHistory, isSymbolCached } from '../services/websocket';
 import { useTheme } from '../store/ThemeContext';
 import {
-    Search, Plus, Type, Ruler,
-    X, Pencil, Circle, MousePointer2, ChevronRight,
-    MoveHorizontal, ZoomIn, Star, Trash2, Camera,
-    Waves, Pentagon, Triangle, ArrowUpRight, Smile, Magnet, Navigation, Lock, EyeOff
+    Search, Plus, X, Star
 } from 'lucide-react';
 import {
     calculateBollingerBands,
@@ -20,6 +17,9 @@ import {
     calculateVWAP,
 } from '../lib/indicators';
 import ReplayControls from './ReplayControls';
+import { ChartToolbar } from './ChartToolbar';
+import { AlertModal } from './AlertModal';
+import { DrawingOverlay } from './DrawingOverlay';
 
 type IndicatorSeriesBucket = {
     line: ISeriesApi<'Line'>[];
@@ -48,6 +48,7 @@ const LIGHT_CHART = {
 // ─── Ticker Search Component ────────────────────────────────────────────────
 export function TickerSearch() {
     const [isOpen, setIsOpen] = useState(false);
+    const [mode, setMode] = useState<'search' | 'compare'>('search');
     const [query, setQuery] = useState('');
     const [tab, setTab] = useState('All');
 
@@ -83,7 +84,10 @@ export function TickerSearch() {
             }
         };
 
-        const handleOpenEvent = () => setIsOpen(true);
+        const handleOpenEvent = (e: any) => {
+            setMode(e.detail?.mode || 'search');
+            setIsOpen(true);
+        };
 
         window.addEventListener('keydown', handleKeyDown);
         window.addEventListener('open-ticker-search', handleOpenEvent);
@@ -93,6 +97,10 @@ export function TickerSearch() {
             window.removeEventListener('open-ticker-search', handleOpenEvent);
         };
     }, [isOpen]); // Depend on isOpen so we know whether to capture typing
+
+    const addCompareSymbol = useMarketStore(s => s.addCompareSymbol);
+    const removeCompareSymbol = useMarketStore(s => s.removeCompareSymbol);
+    const compareSymbols = useMarketStore(s => s.compareSymbols);
 
     const closeSearch = useCallback(() => {
         setIsOpen(false);
@@ -160,16 +168,27 @@ export function TickerSearch() {
     }, [query, tab, tickers]);
 
     const handleSelect = useCallback((symbol: string) => {
-        setCurrentSymbol(symbol);
-        closeSearch();
-
-        // Immediately clear stale chart data before zustand subscription triggers worker INIT
-        useMarketStore.getState().clearCandles();
-
-        if (!isSymbolCached(symbol)) {
-            requestHistory(symbol);
+        if (mode === 'compare') {
+            if (compareSymbols.includes(symbol)) {
+                removeCompareSymbol(symbol);
+            } else {
+                addCompareSymbol(symbol);
+                if (!isSymbolCached(symbol)) {
+                    requestHistory(symbol);
+                } else {
+                    requestHistory(symbol); // Still request to populate candles
+                }
+            }
+        } else {
+            closeSearch();
+            if (symbol === currentSymbol) return;
+            setCurrentSymbol(symbol);
+            useMarketStore.getState().clearCandles();
+            if (!isSymbolCached(symbol)) {
+                requestHistory(symbol);
+            }
         }
-    }, [setCurrentSymbol, closeSearch]);
+    }, [mode, currentSymbol, compareSymbols, addCompareSymbol, setCurrentSymbol, closeSearch]);
 
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
@@ -183,10 +202,10 @@ export function TickerSearch() {
         <div className="ticker-search-container">
             <button
                 className="ticker-search-trigger"
-                onClick={() => setIsOpen(true)}
+                title="Compare Symbol"
+                onClick={() => { setMode('compare'); setIsOpen(true); }}
             >
                 <div className="flex items-center gap-2">
-                    <Search size={17} className="text-text-secondary" />
                     <span className="ticker-symbol">{currentSymbol}</span>
                     <div className="w-5 h-5 rounded-full border border-border-subtle flex items-center justify-center hover:bg-bg-elevated transition-colors ml-1">
                         <Plus size={14} className="text-text-secondary" />
@@ -199,7 +218,7 @@ export function TickerSearch() {
                     <div className="tv-modal-content" onClick={e => e.stopPropagation()}>
                         <div className="tv-modal-header">
                             <div className="tv-modal-title-row">
-                                <span className="tv-modal-title">Add Symbol to Watchlist</span>
+                                <span className="tv-modal-title">{mode === 'compare' ? 'Compare Symbol' : 'Symbol Search'}</span>
                                 <button className="tv-modal-close" onClick={() => closeSearch()}>
                                     <X size={18} />
                                 </button>
@@ -248,9 +267,11 @@ export function TickerSearch() {
                                                 <div className="tv-modal-item-left">
                                                     <div className="tv-modal-item-symbol">
                                                         {t.symbol}
-                                                        {t.symbol === currentSymbol && (
+                                                        {mode === 'compare' && compareSymbols.includes(t.symbol) ? (
+                                                            <span className="tv-modal-item-check text-red-500 text-xs ml-2">Remove</span>
+                                                        ) : t.symbol === currentSymbol ? (
                                                             <span className="tv-modal-item-check">✓</span>
-                                                        )}
+                                                        ) : null}
                                                     </div>
                                                     <div className="tv-modal-item-name">{t.name}</div>
                                                 </div>
@@ -324,6 +345,36 @@ function OHLCVOverlay() {
     );
 }
 
+function CompareOverlay() {
+    const compareSymbols = useMarketStore((s) => s.compareSymbols);
+    const compareCandles = useMarketStore((s) => s.compareCandles);
+    const removeCompareSymbol = useMarketStore((s) => s.removeCompareSymbol);
+
+    if (!compareSymbols.length) return null;
+    const compareColors = ['#f59e0b', '#8b5cf6', '#ec4899', '#10b981', '#3b82f6'];
+
+    return (
+        <div className="absolute top-[32px] left-[8px] z-10 flex flex-col gap-1 pointer-events-none text-[12px] font-semibold">
+            {compareSymbols.map((sym, idx) => {
+                const candles = compareCandles[sym];
+                const lastPrice = candles?.length ? candles[candles.length - 1].close.toFixed(2) : 'Loading...';
+                return (
+                    <div key={sym} className="flex items-center gap-2 group pointer-events-auto" style={{ color: compareColors[idx % compareColors.length] }}>
+                        <span>{sym}</span>
+                        <span className="opacity-80 font-mono">{lastPrice}</span>
+                        <button 
+                            className="opacity-0 group-hover:opacity-100 transition-opacity text-text-muted hover:text-text-primary ml-1"
+                            onClick={(e) => { e.stopPropagation(); removeCompareSymbol(sym); }}
+                        >
+                            <X size={14} />
+                        </button>
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
 function IndicatorsOverlay() {
     const enabledIndicators = useMarketStore((s) => s.enabledIndicators);
     if (!enabledIndicators.length) return null;
@@ -345,276 +396,7 @@ function IndicatorsOverlay() {
 }
 
 // ─── Custom Icons ────────────────────────────────────────────────────────
-const TrendLineIcon = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-        <circle cx="5" cy="19" r="2" />
-        <circle cx="19" cy="5" r="2" />
-        <path d="M 6.4 17.6 L 17.6 6.4" />
-    </svg>
-);
 
-// ─── Alert Modal Component ──────────────────────────────────────────────────
-function AlertModal({ onClose }: { onClose: () => void }) {
-    const currentSymbol = useMarketStore(s => s.currentSymbol);
-    const lastPrice = useMarketStore(s => s.lastPrice);
-    const addAlert = useMarketStore(s => s.addAlert);
-    const alerts = useMarketStore(s => s.alerts);
-    const removeAlert = useMarketStore(s => s.removeAlert);
-    const [price, setPrice] = useState(lastPrice.toFixed(2));
-    const [type, setType] = useState<'crossing' | 'above' | 'below'>('crossing');
-    const inputRef = useRef<HTMLInputElement>(null);
-
-    const activeAlerts = alerts.filter(a => a.active);
-
-    const handleCreate = () => {
-        const targetPrice = parseFloat(price);
-        if (isNaN(targetPrice) || targetPrice <= 0) return;
-        addAlert({ symbol: currentSymbol, targetPrice, type });
-        window.dispatchEvent(new CustomEvent('show-toast', {
-            detail: `🔔 Alert set: ${currentSymbol} ${type === 'crossing' ? 'crosses' : type === 'above' ? '≥' : '≤'} $${targetPrice.toFixed(2)}`
-        }));
-        onClose();
-    };
-
-    const conditions: { value: 'crossing' | 'above' | 'below'; label: string; icon: string }[] = [
-        { value: 'crossing', label: 'Crossing', icon: '⇅' },
-        { value: 'above', label: 'Above', icon: '↑' },
-        { value: 'below', label: 'Below', icon: '↓' },
-    ];
-
-    const diff = parseFloat(price) - lastPrice;
-    const diffPct = lastPrice !== 0 ? (diff / lastPrice) * 100 : 0;
-
-    return (
-        <div
-            className="tv-alert-overlay"
-            onClick={onClose}
-        >
-            <div
-                className="tv-alert-modal"
-                onClick={e => e.stopPropagation()}
-            >
-                {/* Header Section */}
-                <div className="tv-alert-header">
-                    <div className="flex items-center gap-3">
-                        <div className="tv-alert-header-icon">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
-                            </svg>
-                        </div>
-                        <div>
-                            <p className="tv-alert-title">Create Alert</p>
-                            <p className="tv-alert-subtitle">{currentSymbol} · <span className="font-mono">${lastPrice.toFixed(2)}</span></p>
-                        </div>
-                    </div>
-                    <button onClick={onClose} className="tv-alert-close-btn">
-                        <X size={14} />
-                    </button>
-                </div>
-
-                <div className="p-5 flex flex-col gap-4">
-                    {/* Condition Options */}
-                    <div className="flex flex-col gap-2">
-                        <p className="tv-alert-section-label">Condition</p>
-                        <div className="flex gap-2">
-                            {conditions.map(c => (
-                                <button
-                                    key={c.value}
-                                    onClick={() => setType(c.value)}
-                                    className={`tv-alert-condition-btn ${type === c.value ? 'active' : ''}`}
-                                >
-                                    <span className="text-[14px] leading-tight mb-0.5">{c.icon}</span>
-                                    <span>{c.label}</span>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Price Setup */}
-                    <div className="flex flex-col gap-2">
-                        <div className="flex items-center justify-between">
-                            <p className="tv-alert-section-label">Target Price</p>
-                            {!isNaN(parseFloat(price)) && (
-                                <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${diff >= 0 ? 'text-bull bg-bull/10' : 'text-bear bg-bear/10'}`}>
-                                    {diff >= 0 ? '+' : ''}{diff.toFixed(2)} ({diffPct.toFixed(2)} %)
-                                </span>
-                            )}
-                        </div>
-                        <div className="relative">
-                            <span className="tv-alert-currency">$</span>
-                            <input
-                                ref={inputRef}
-                                type="number"
-                                step="0.01"
-                                autoFocus
-                                value={price}
-                                onChange={e => setPrice(e.target.value)}
-                                onKeyDown={e => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') onClose(); }}
-                                className="tv-alert-input"
-                            />
-                            <div className="absolute right-1 top-1/2 -translate-y-1/2 flex gap-0.5">
-                                <button onClick={() => setPrice((parseFloat(price) - 0.01).toFixed(2))}
-                                    className="tv-alert-step-btn">−</button>
-                                <button onClick={() => setPrice((parseFloat(price) + 0.01).toFixed(2))}
-                                    className="tv-alert-step-btn">+</button>
-                            </div>
-                        </div>
-                        <button
-                            onClick={() => setPrice(lastPrice.toFixed(2))}
-                            className="tv-alert-reset-btn"
-                        >
-                            ← Reset
-                        </button>
-                    </div>
-
-                    {/* Existing Alerts */}
-                    {activeAlerts.length > 0 && (
-                        <div className="flex flex-col gap-2">
-                            <p className="tv-alert-section-label">Active Alerts ({activeAlerts.length})</p>
-                            <div className="flex flex-col gap-1 max-h-[120px] overflow-y-auto styling-scrollbar">
-                                {activeAlerts.map(a => (
-                                    <div key={a.id} className="tv-alert-row">
-                                        <div className="flex items-center gap-2">
-                                            <span className={`w-1.5 h-1.5 rounded-full ${a.type === 'above' ? 'bg-bull' : a.type === 'below' ? 'bg-bear' : 'bg-[#2962ff]'}`} />
-                                            <span className="tv-alert-row-symbol">{a.symbol}</span>
-                                            <span className="tv-alert-row-type">{a.type === 'crossing' ? '⇅' : a.type === 'above' ? '↑' : '↓'}</span>
-                                            <span className="tv-alert-row-price">${a.targetPrice.toFixed(2)}</span>
-                                        </div>
-                                        <button onClick={() => removeAlert(a.id)} className="tv-alert-row-remove">
-                                            <X size={12} />
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* CTA Button */}
-                    <button
-                        onClick={handleCreate}
-                        className="tv-alert-cta"
-                    >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
-                        </svg>
-                        Set Alert
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-// ─── Chart Toolbar (Left side, TradingView drawing tools) ───────────────────
-function ChartToolbar() {
-    const activeTool = useMarketStore(s => s.activeTool);
-    const setActiveTool = useMarketStore(s => s.setActiveTool);
-    const clearDrawings = useMarketStore(s => s.clearDrawings);
-
-    const pointerTools = [
-        { id: 'crosshair', icon: Plus, label: 'Cross' },
-        { id: 'dot', icon: Circle, label: 'Dot' },
-        { id: 'arrow', icon: MousePointer2, label: 'Arrow' },
-    ];
-
-    const activePointer = pointerTools.find(t => t.id === activeTool) || pointerTools[0];
-    const isPointerGroupActive = pointerTools.some(t => t.id === activeTool);
-    const [pointerMenuOpen, setPointerMenuOpen] = useState(false);
-
-    const tools = [
-        { id: 'trendline', icon: TrendLineIcon, label: 'Trend Line (Alt+T)' },
-        null, // separator
-        { id: 'ray', icon: MoveHorizontal, label: 'Horizontal Ray (Alt+H)' },
-        null, // separator
-        { id: 'text', icon: Type, label: 'Text' },
-        null, // separator
-        { id: 'measure', icon: Ruler, label: 'Measure (M)' },
-        { id: 'zoom', icon: ZoomIn, label: 'Zoom In (Ctrl+↑)' },
-        null, // separator
-        { id: 'clear', icon: Trash2, label: 'Clear All (Alt+C)', action: () => { clearDrawings(); window.dispatchEvent(new CustomEvent('reset-chart-view')); } },
-        { id: 'screenshot', icon: Camera, label: 'Screenshot (Ctrl+Shift+S)', action: () => window.dispatchEvent(new CustomEvent('take-chart-screenshot')) },
-
-        null, // separator (Start of dummy icons)
-        { id: 'pitchfork', icon: Waves, label: 'Gann & Fibonacci' },
-        { id: 'shapes', icon: Pentagon, label: 'Geometric Shapes' },
-        { id: 'patterns', icon: Triangle, label: 'Patterns' },
-        { id: 'prediction', icon: ArrowUpRight, label: 'Prediction & Measure' },
-        { id: 'icons', icon: Smile, label: 'Icons & Stickers' },
-        null, // separator
-        { id: 'magnet', icon: Magnet, label: 'Magnet' },
-        { id: 'stay', icon: Navigation, label: 'Stay in Drawing Mode' },
-        { id: 'lock-all', icon: Lock, label: 'Lock All Drawings' },
-        { id: 'hide-all', icon: EyeOff, label: 'Hide All Drawings' },
-        { id: 'pencil', icon: Pencil, label: 'Draw' },
-    ];
-
-    return (
-        <div className="chart-toolbar">
-            {/* Pointer Selection Group */}
-            <div className="relative flex items-center w-full justify-center">
-                <div className="flex items-center w-[42px] h-[38px] bg-bg-terminal border border-transparent hover:border-border-subtle rounded cursor-pointer relative overflow-hidden group">
-                    <button
-                        className={`flex-1 h-full flex items-center justify-center text-text-primary hover:text-text-primary ${isPointerGroupActive ? 'text-[#2962ff]!' : ''}`}
-                        title={activePointer.label}
-                        onClick={() => setActiveTool(activePointer.id)}
-                    >
-                        <activePointer.icon size={22} />
-                    </button>
-                    <button
-                        className={`w-[14px] h-full flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-border-subtle border-l border-border-subtle ${pointerMenuOpen ? 'bg-border-subtle' : ''}`}
-                        onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setPointerMenuOpen(!pointerMenuOpen);
-                        }}
-                    >
-                        <ChevronRight size={12} className={`transition-transform duration-200 ${pointerMenuOpen ? 'rotate-90' : ''}`} />
-                    </button>
-                </div>
-
-                {pointerMenuOpen && (
-                    <>
-                        <div className="fixed inset-0 z-[190]" onClick={() => setPointerMenuOpen(false)} />
-                        <div className="tv-dropdown-surface tv-toolbar-dropdown absolute left-[38px] top-0 ml-1 z-[200] animate-in fade-in slide-in-from-left-1 duration-200">
-                            <div className="tv-toolbar-dropdown-label">Cursor</div>
-                            {pointerTools.map(pt => (
-                                <button
-                                    key={pt.id}
-                                    className={`tv-dropdown-option flex items-center gap-3 ${activeTool === pt.id ? 'active' : ''}`}
-                                    onClick={() => {
-                                        setActiveTool(pt.id);
-                                        setPointerMenuOpen(false);
-                                    }}
-                                >
-                                    <pt.icon size={16} className={activeTool === pt.id ? 'text-[#2962ff]' : 'text-text-secondary'} />
-                                    {pt.label}
-                                </button>
-                            ))}
-                        </div>
-                    </>
-                )}
-            </div>
-
-            {/* Main Tools (Working + Dummy + Reordered Bottom) */}
-            {tools.map((tool, idx) => {
-                if (!tool) return <div key={`sep-${idx}`} className="chart-toolbar-sep" />;
-                return (
-                    <button
-                        key={tool.id}
-                        className={`chart-toolbar-btn ${activeTool === tool.id ? 'active' : ''}`}
-                        onClick={() => {
-                            if (tool.action) tool.action();
-                            else setActiveTool(tool.id);
-                        }}
-                        title={tool.label}
-                    >
-                        <tool.icon size={22} />
-                    </button>
-                );
-            })}
-        </div>
-    );
-}
 
 class ChartErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: Error | null }> {
     constructor(props: { children: React.ReactNode }) { super(props); this.state = { hasError: false, error: null }; }
@@ -658,26 +440,9 @@ function Chart() {
     const setDrawings = useMarketStore(s => s.setDrawings);
     const clearDrawings = useMarketStore(s => s.clearDrawings);
 
-    const [drawingStatus, setDrawingStatus] = useState<{
-        points: { time: number; price: number }[];
-        type: string;
-    } | null>(null);
-    // Store chart container size for modal positioning
-    const [containerSize, setContainerSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
-        // Update container size on mount and resize
-        useEffect(() => {
-            function updateSize() {
-                if (chartContainerRef.current) {
-                    setContainerSize({
-                        width: chartContainerRef.current.clientWidth,
-                        height: chartContainerRef.current.clientHeight,
-                    });
-                }
-            }
-            updateSize();
-            window.addEventListener('resize', updateSize);
-            return () => window.removeEventListener('resize', updateSize);
-        }, []);
+    // Refs to avoid stale closures and unnecessary effect resubscriptions
+    const drawingsRef = useRef(drawings);
+    drawingsRef.current = drawings;
     const [screenshotFlash, setScreenshotFlash] = useState(false);
     const [toastMessage, setToastMessage] = useState<string | null>(null);
     const [alertModalOpen, setAlertModalOpen] = useState(false);
@@ -700,13 +465,7 @@ function Chart() {
         };
     }, []);
 
-    const [textEntry, setTextEntry] = useState<{ x: number, y: number, time: number, price: number } | null>(null);
-    const textInputRef = useRef<HTMLInputElement>(null);
     const currentCrosshairRef = useRef<{ time: number, price: number } | null>(null);
-
-    const drawingSeriesRef = useRef<ISeriesApi<"Line">[]>([]);
-    // Use unknown for series/line, as type is not strictly enforced by lightweight-charts
-    const drawingPriceLinesRef = useRef<{ series: unknown; line: unknown }[]>([]);
 
     const indicatorSeriesRef = useRef<IndicatorSeriesBucket>({ line: [], histogram: [] });
     const lastSymbolRef = useRef<string>('');
@@ -724,18 +483,6 @@ function Chart() {
 
     const addHistogramIndicator = useCallback((series: ISeriesApi<'Histogram'>) => {
         indicatorSeriesRef.current.histogram.push(series);
-    }, []);
-
-    const removeAllDrawings = useCallback(() => {
-        if (!chartRef.current) return;
-        drawingSeriesRef.current.forEach(s => {
-            try { chartRef.current?.removeSeries(s); } catch { /* ignore */ }
-        });
-        drawingSeriesRef.current = [];
-        drawingPriceLinesRef.current.forEach(({ series, line }) => {
-            try { (series as { removePriceLine: (l: unknown) => void }).removePriceLine(line); } catch { /* ignore */ }
-        });
-        drawingPriceLinesRef.current = [];
     }, []);
 
     // Apply chart colours based on theme
@@ -983,6 +730,64 @@ function Chart() {
         lastSymbolRef.current = currentSymbol;
     }, [historySequence, formatCandleData, currentSymbol]);
 
+    // Render compare symbols
+    const compareSymbols = useMarketStore(s => s.compareSymbols);
+    const compareCandles = useMarketStore(s => s.compareCandles);
+    const compareSeriesMapRef = useRef<Record<string, ISeriesApi<"Line">>>({});
+
+    useEffect(() => {
+        if (!chartRef.current) return;
+        const chart = chartRef.current;
+        
+        chart.priceScale('right').applyOptions({ mode: PriceScaleMode.Normal });
+
+        // Remove detached series
+        Object.keys(compareSeriesMapRef.current).forEach(sym => {
+            if (!compareSymbols.includes(sym)) {
+                try {
+                    chart.removeSeries(compareSeriesMapRef.current[sym]);
+                } catch { /* ignore */ }
+                delete compareSeriesMapRef.current[sym];
+            }
+        });
+
+        const compareColors = ['#f59e0b', '#8b5cf6', '#ec4899', '#10b981', '#3b82f6'];
+
+        // Add or update series
+        compareSymbols.forEach((sym, idx) => {
+            let series = compareSeriesMapRef.current[sym];
+            if (!series) {
+                series = chart.addSeries(LineSeries, {
+                    color: compareColors[idx % compareColors.length],
+                    lineWidth: 2,
+                    priceScaleId: 'right', // Render onto the main scale to align perfectly with percentage mode
+                    title: sym,
+                });
+                compareSeriesMapRef.current[sym] = series;
+            }
+
+            const compareCandlesData = compareCandles[sym];
+            if (compareCandlesData && compareCandlesData.length > 0) {
+                const mainStart = candles.length > 0 ? candles[0].close : 1;
+                const compareStart = compareCandlesData[0].close;
+                const multiplier = compareStart !== 0 ? mainStart / compareStart : 1;
+
+                const lineData = compareCandlesData.map(c => ({ time: c.time as UTCTimestamp, value: c.close * multiplier }));
+                // Eliminate duplicates by time
+                const deduped: { time: UTCTimestamp, value: number }[] = [];
+                for (const point of lineData) {
+                    if (deduped.length === 0 || deduped[deduped.length - 1].time !== point.time) {
+                        deduped.push(point);
+                    } else {
+                        deduped[deduped.length - 1] = point; // Replace if duplicate
+                    }
+                }
+                series.setData(deduped);
+            }
+        });
+
+    }, [compareSymbols, compareCandles, theme, candles]);
+
     // Shortcuts and Custom Events implementation
     useEffect(() => {
         const performScreenshot = async () => {
@@ -1083,7 +888,6 @@ function Chart() {
             // Escape: Reset to crosshair
             else if (key === 'escape') {
                 setActiveTool('crosshair');
-                setDrawingStatus(null);
             }
             // Shift + Ctrl + S: Screenshot
             else if (e.shiftKey && isCtrl && key === 's') {
@@ -1113,15 +917,9 @@ function Chart() {
 
         const handleMouseDown = (param: MouseEventParams) => {
             if (!param.time || !param.point) return;
-            const price = seriesRef.current?.candle.coordinateToPrice(param.point.y);
-            if (price === null || price === undefined) return;
-
             const time = param.time as number;
 
-            if (activeTool === 'ray') {
-                setDrawings([...drawings, { type: 'ray', points: [{ time, price }] }]);
-                return;
-            }
+
 
             if (activeTool === 'zoom') {
                 const visibleRange = chart.timeScale().getVisibleLogicalRange();
@@ -1150,284 +948,12 @@ function Chart() {
                 return;
             }
 
-            if (activeTool === 'text') {
-                setTextEntry({ x: param.point.x, y: param.point.y, time, price });
-                return;
-            }
-
-            // Pencil is handled by freehand drag listeners
-            if (activeTool === 'pencil') return;
-
-            if (!drawingStatus) {
-                setDrawingStatus({ type: activeTool, points: [{ time, price }] });
-            } else {
-                // Finish drawing for 2-point tools
-                setDrawings([...drawings, { ...drawingStatus, points: [...drawingStatus.points, { time, price }] }]);
-                setDrawingStatus(null);
-            }
         };
 
         chart.subscribeClick(handleMouseDown);
         return () => chart.unsubscribeClick(handleMouseDown);
-    }, [activeTool, drawingStatus, drawings, setDrawings, setActiveTool]);
-
-    // Pencil freehand drag support
-    const isDraggingPencilRef = useRef(false);
-    const pencilPointsRef = useRef<{ time: number, price: number }[]>([]);
-
-    useEffect(() => {
-        const container = chartContainerRef.current;
-        if (!container) return;
-
-        const handleMouseDown = () => {
-            if (useMarketStore.getState().activeTool === 'pencil') {
-                isDraggingPencilRef.current = true;
-                pencilPointsRef.current = [];
-            }
-        };
-
-        const handleMouseUp = () => {
-            if (isDraggingPencilRef.current && useMarketStore.getState().activeTool === 'pencil') {
-                isDraggingPencilRef.current = false;
-                if (pencilPointsRef.current.length > 0) {
-                    setDrawings(d => [...d, { type: 'pencil', points: pencilPointsRef.current }]);
-                    pencilPointsRef.current = [];
-                }
-            }
-        };
-
-        container.addEventListener('mousedown', handleMouseDown);
-        window.addEventListener('mouseup', handleMouseUp);
-
-        return () => {
-            container.removeEventListener('mousedown', handleMouseDown);
-            window.removeEventListener('mouseup', handleMouseUp);
-        };
-    }, [setDrawings]);
-
-    // Live preview during drawing
-    const previewSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
-    useEffect(() => {
-        if (!chartRef.current) return;
-        const chart = chartRef.current;
-
-        // Immediately clean up preview if drawing cancels or finishes
-        if (!drawingStatus) {
-            if (previewSeriesRef.current) {
-                chart.removeSeries(previewSeriesRef.current);
-                previewSeriesRef.current = null;
-            }
-        }
-
-        const handleMouseMove = (param: MouseEventParams) => {
-            if (!param.point || !param.time) return;
-            const price = seriesRef.current?.candle.coordinateToPrice(param.point.y);
-            if (price === undefined || price === null) return;
-
-            const currentActiveTool = useMarketStore.getState().activeTool;
-
-            // Handle Pencil preview
-            if (isDraggingPencilRef.current && currentActiveTool === 'pencil') {
-                const arr = pencilPointsRef.current.filter(p => p.time !== param.time);
-                arr.push({ time: param.time as number, price });
-                pencilPointsRef.current = arr;
-
-                if (!previewSeriesRef.current) {
-                    previewSeriesRef.current = chart.addSeries(LineSeries, {
-                        color: '#2962ff',
-                        lineWidth: 2,
-                        lineStyle: 0,
-                        priceLineVisible: false,
-                        lastValueVisible: false,
-                    });
-                }
-                const sorted = [...arr].sort((a, b) => a.time - b.time);
-                previewSeriesRef.current.setData(sorted.map(p => ({ time: p.time as UTCTimestamp, value: p.price })));
-                return;
-            }
-
-            // Handle 2-point preview tools
-            if (!drawingStatus || !['trendline', 'ray', 'fibonacci', 'measure'].includes(drawingStatus.type)) {
-                return;
-            }
-
-            if (!previewSeriesRef.current) {
-                previewSeriesRef.current = chart.addSeries(LineSeries, {
-                    color: '#2962ff',
-                    lineWidth: 2,
-                    lineStyle: 1, // Dashed
-                    priceLineVisible: false,
-                    lastValueVisible: false,
-                });
-            }
-
-            const p1 = drawingStatus.points[0];
-            const p2 = { time: param.time as number, price };
-            const sorted = [p1, p2].sort((a, b) => a.time - b.time);
-
-            if (sorted[0].time === sorted[1].time) {
-                previewSeriesRef.current.setData([
-                    { time: sorted[0].time as UTCTimestamp, value: sorted[1].price }
-                ]);
-            } else {
-                previewSeriesRef.current.setData([
-                    { time: sorted[0].time as UTCTimestamp, value: sorted[0].price },
-                    { time: sorted[1].time as UTCTimestamp, value: sorted[1].price }
-                ]);
-            }
-        };
-
-        chart.subscribeCrosshairMove(handleMouseMove);
-        return () => chart.unsubscribeCrosshairMove(handleMouseMove);
-    }, [drawingStatus]);
-
-    // Initial tool state: disable chart scroll/scale if pencil is active
-    useEffect(() => {
-        if (!chartRef.current) return;
-        const isPencil = activeTool === 'pencil';
-        chartRef.current.applyOptions({
-            handleScroll: !isPencil,
-            handleScale: !isPencil,
-        });
     }, [activeTool]);
 
-    // Render drawings
-    useEffect(() => {
-        if (!chartRef.current) return;
-        removeAllDrawings();
-        const chart = chartRef.current;
-
-        // Render existing drawings
-        // Use unknown for marker type
-        const markers: unknown[] = [];
-
-        drawings.forEach((d) => {
-            if (d.type === 'ray') {
-                if (seriesRef.current?.candle && d.points[0]) {
-                    const priceLine = seriesRef.current.candle.createPriceLine({
-                        price: d.points[0].price,
-                        color: '#2962ff',
-                        lineWidth: 2,
-                        lineStyle: 0,
-                        axisLabelVisible: false,
-                    });
-                    drawingPriceLinesRef.current.push({ series: seriesRef.current.candle, line: priceLine });
-                }
-            } else if (d.type === 'trendline') {
-                const line = chart.addSeries(LineSeries, {
-                    color: '#2962ff',
-                    lineWidth: 2,
-                    priceLineVisible: false,
-                    lastValueVisible: false,
-                });
-
-                let p1 = d.points[0];
-                let p2 = d.points[1];
-
-                if (p1 && p2) {
-                    if (p1.time === p2.time) {
-                        line.setData([{ time: p1.time as UTCTimestamp, value: p1.price }]);
-                    } else {
-                        if (p1.time > p2.time) {
-                            const temp = p1; p1 = p2; p2 = temp;
-                        }
-                        line.setData([
-                            { time: p1.time as UTCTimestamp, value: p1.price },
-                            { time: p2.time as UTCTimestamp, value: p2.price }
-                        ]);
-                    }
-                    drawingSeriesRef.current.push(line);
-                }
-            } else if (d.type === 'pencil') {
-                const line = chart.addSeries(LineSeries, {
-                    color: '#2962ff',
-                    lineWidth: 2,
-                    lineStyle: 0,
-                    priceLineVisible: false,
-                    lastValueVisible: false,
-                });
-                const sortedPoints = [...d.points].sort((a, b) => a.time - b.time);
-                line.setData(sortedPoints.map(p => ({ time: p.time as UTCTimestamp, value: p.price })));
-                drawingSeriesRef.current.push(line);
-            } else if (d.type === 'measure') {
-                const p1 = d.points[0];
-                const p2 = d.points[1];
-                if (p1 && p2) {
-                    const priceDiff = p2.price - p1.price;
-                    const percentDiff = (priceDiff / p1.price) * 100;
-                    const line = chart.addSeries(LineSeries, {
-                        color: 'rgba(41, 153, 255, 0.7)',
-                        lineWidth: 2,
-                        lineStyle: 1,
-                        priceLineVisible: false,
-                        lastValueVisible: false,
-                    });
-                    const sorted = [p1, p2].sort((a, b) => a.time - b.time);
-                    if (sorted[0].time === sorted[1].time) {
-                        line.setData([{ time: sorted[0].time as UTCTimestamp, value: sorted[1].price }]);
-                    } else {
-                        line.setData([
-                            { time: sorted[0].time as UTCTimestamp, value: sorted[0].price },
-                            { time: sorted[1].time as UTCTimestamp, value: sorted[1].price }
-                        ]);
-                    }
-                    drawingSeriesRef.current.push(line);
-                    markers.push({
-                        time: p2.time as UTCTimestamp,
-                        position: priceDiff >= 0 ? 'aboveBar' : 'belowBar',
-                        color: priceDiff >= 0 ? '#26a69a' : '#ef5350',
-                        shape: priceDiff >= 0 ? 'arrowUp' : 'arrowDown',
-                        text: `${priceDiff > 0 ? '+' : ''}${percentDiff.toFixed(2)}%`,
-                    });
-                }
-            } else if (d.type === 'fibonacci') {
-                let p1 = d.points[0];
-                let p2 = d.points[1];
-                if (p1 && p2) {
-                    if (p1.time > p2.time) {
-                        const temp = p1; p1 = p2; p2 = temp;
-                    }
-                    const diff = p2.price - p1.price;
-                    const levels = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
-                    const colors = ['#787b86', '#ef5350', '#ff9800', '#4caf50', '#089981', '#2962ff', '#787b86'];
-                    levels.forEach((level, i) => {
-                        const line = chart.addSeries(LineSeries, {
-                            color: colors[i],
-                            lineWidth: 1,
-                            lineStyle: 2,
-                            priceLineVisible: false,
-                            lastValueVisible: false,
-                        });
-                        const priceLevel = p1.price + (diff * level);
-                        if (p1.time === p2.time) {
-                            line.setData([{ time: p1.time as UTCTimestamp, value: priceLevel }]);
-                        } else {
-                            line.setData([
-                                { time: p1.time as UTCTimestamp, value: priceLevel },
-                                { time: p2.time as UTCTimestamp, value: priceLevel }
-                            ]);
-                        }
-                        drawingSeriesRef.current.push(line);
-                    });
-                }
-            } else if (d.type === 'text') {
-                if (d.points[0]) {
-                    markers.push({
-                        time: d.points[0].time as UTCTimestamp,
-                        position: 'aboveBar',
-                        color: theme === 'dark' ? '#fff' : '#000',
-                        shape: 'arrowUp',
-                        text: d.text,
-                    });
-                }
-            }
-        });
-
-        if (seriesRef.current?.candle) {
-            createSeriesMarkers(seriesRef.current.candle, markers.sort((a, b) => a.time - b.time));
-        }
-
-    }, [drawings, candles, removeAllDrawings, theme]);
 
     // Real-time updates
     const latestCandle = useMarketStore(s => s.latestCandle);
@@ -1616,7 +1142,9 @@ function Chart() {
                 <div className="chart-canvas-wrap">
                     {/* OHLCV overlay floats on top of chart */}
                     <OHLCVOverlay />
+                    <CompareOverlay />
                     <IndicatorsOverlay />
+                    <DrawingOverlay chartRef={chartRef} seriesRef={seriesRef} />
                     <div
                         ref={chartContainerRef}
                         className={`chart-canvas ${screenshotFlash ? 'animate-flash' : ''} ${activeTool === 'arrow' ? 'cursor-arrow' :
@@ -1624,51 +1152,6 @@ function Chart() {
                                     activeTool === 'crosshair' ? 'cursor-cross' : ''
                             }`}
                     />
-
-                    {/* Custom Text Entry Modal Overlay */}
-                    {textEntry && (
-                        <div
-                            className="absolute z-[500] bg-[#1e222d] border border-[#2a2e39] rounded shadow-2xl p-2 flex flex-col gap-2 min-w-[200px]"
-                            style={{
-                                left: Math.min(textEntry.x + 10, containerSize.width - 220),
-                                top: Math.min(textEntry.y + 10, containerSize.height - 80)
-                            }}
-                        >
-                            <div className="text-[10px] uppercase font-bold text-[#787b86] px-1">Text Settings</div>
-                            <input
-                                autoFocus
-                                ref={textInputRef}
-                                className="bg-[#131722] border border-[#363a45] text-[#d1d4dc] text-sm px-2 py-1.5 rounded outline-none focus:border-[#2962ff]"
-                                placeholder="Enter label text..."
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        const text = e.currentTarget.value;
-                                        if (text) {
-                                            setDrawings([...drawings, { type: 'text', text, points: [{ time: textEntry.time, price: textEntry.price }] }]);
-                                        }
-                                        setTextEntry(null);
-                                    } else if (e.key === 'Escape') {
-                                        setTextEntry(null);
-                                    }
-                                }}
-                            />
-                            <div className="flex justify-end gap-2 px-1">
-                                <button className="text-[10px] text-[#787b86] hover:text-white" onClick={() => setTextEntry(null)}>Cancel</button>
-                                <button
-                                    className="text-[10px] text-[#2962ff] font-bold"
-                                    onClick={() => {
-                                        const val = textInputRef.current?.value;
-                                        if (val) {
-                                            setDrawings([...drawings, { type: 'text', text: val, points: [{ time: textEntry.time, price: textEntry.price }] }]);
-                                        }
-                                        setTextEntry(null);
-                                    }}
-                                >
-                                    OK
-                                </button>
-                            </div>
-                        </div>
-                    )}
 
                     {alertModalOpen && <AlertModal onClose={() => setAlertModalOpen(false)} />}
 

@@ -86,6 +86,7 @@ export interface Drawing {
     type: string;
     points: DrawingPoint[];
     text?: string;
+    data?: any;
 }
 
 export interface BotConfig {
@@ -192,9 +193,13 @@ interface MarketState {
     chartType: string;
     watchlist: string[];
     activeTool: string;
+    magnetMode: 'off' | 'weak' | 'strong';
     drawings: Drawing[];
     prices: Record<string, number>;
     priceChanges: Record<string, number>;
+
+    compareSymbols: string[];
+    compareCandles: Record<string, Candle[]>;
 
     historySequence: number;
     portfolio: Portfolio;
@@ -241,12 +246,19 @@ interface MarketState {
     removeFromWatchlist: (symbol: string) => void;
     setPrice: (symbol: string, price: number, change?: number) => void;
     setActiveTool: (tool: string) => void;
+    setMagnetMode: (mode: 'off' | 'weak' | 'strong') => void;
     setDrawings: (drawings: Drawing[] | ((prev: Drawing[]) => Drawing[])) => void;
     clearDrawings: () => void;
+    
+    addCompareSymbol: (symbol: string) => void;
+    removeCompareSymbol: (symbol: string) => void;
+    setCompareCandles: (symbol: string, candles: Candle[]) => void;
+    updateCompareCandle: (symbol: string, candle: Candle) => void;
     setBotStatus: (botId: string, status: 'running' | 'stopped' | 'standby') => void;
     updateBotConfig: (botId: string, config: Partial<BotConfig>) => void;
 
     // Alert Actions
+    alerts: Alert[];
     addAlert: (alert: Omit<Alert, 'id' | 'active' | 'createdAt'>) => void;
     removeAlert: (id: string) => void;
     checkAlerts: (symbol: string, currentPrice: number) => void;
@@ -310,9 +322,12 @@ const useMarketStore = create<MarketState>((set) => ({
     chartType: 'Candles',
     watchlist: ['AAPL', 'BTC', 'ETH'],
     activeTool: 'crosshair',
+    magnetMode: 'weak',
     drawings: [],
     prices: {},
     priceChanges: {},
+    compareSymbols: [],
+    compareCandles: {},
     historySequence: 0,
 
     portfolio: initialPortfolio,
@@ -557,10 +572,56 @@ const useMarketStore = create<MarketState>((set) => ({
     }),
 
     setActiveTool: (tool) => set({ activeTool: tool }),
+    setMagnetMode: (mode) => set({ magnetMode: mode }),
     setDrawings: (drawingsOrFn) => set((state) => ({
         drawings: typeof drawingsOrFn === 'function' ? (drawingsOrFn as (prev: Drawing[]) => Drawing[])(state.drawings) : drawingsOrFn
     })),
     clearDrawings: () => set({ drawings: [] }),
+
+    addCompareSymbol: (symbol) => set((state) => ({
+        compareSymbols: state.compareSymbols.includes(symbol) ? state.compareSymbols : [...state.compareSymbols, symbol]
+    })),
+    removeCompareSymbol: (symbol) => set((state) => {
+        const nextCandles = { ...state.compareCandles };
+        delete nextCandles[symbol];
+        return {
+            compareSymbols: state.compareSymbols.filter(s => s !== symbol),
+            compareCandles: nextCandles
+        };
+    }),
+    setCompareCandles: (symbol, candles) => set((state) => ({
+        compareCandles: {
+            ...state.compareCandles,
+            [symbol]: sanitizeCandles(candles).slice(-2000)
+        }
+    })),
+    updateCompareCandle: (symbol, candle) => set((state) => {
+        if (!state.compareSymbols.includes(symbol)) return state;
+        
+        const currentCandles = state.compareCandles[symbol] || [];
+        const normalizedCandle = { ...candle, time: normalizeCandleTime(candle.time) };
+        const updatedCandles = [...currentCandles];
+        const lastCandle = updatedCandles.length > 0 ? updatedCandles[updatedCandles.length - 1] : null;
+
+        if (lastCandle) {
+            if (normalizedCandle.time === lastCandle.time) {
+                updatedCandles[updatedCandles.length - 1] = normalizedCandle;
+            } else if (normalizedCandle.time > lastCandle.time) {
+                updatedCandles.push(normalizedCandle);
+            }
+        } else {
+            updatedCandles.push(normalizedCandle);
+        }
+
+        if (updatedCandles.length > 2000) updatedCandles.shift();
+
+        return {
+            compareCandles: {
+                ...state.compareCandles,
+                [symbol]: updatedCandles
+            }
+        };
+    }),
 
     setBotStatus: (botId, status) => set((state) => ({
         botStatus: { ...state.botStatus, [botId]: status }
@@ -574,20 +635,22 @@ const useMarketStore = create<MarketState>((set) => ({
     })),
 
     // Replay implementaton
-    startReplay: (startIndex, allCandles) => set((state) => ({
-        isReplayMode: true,
-        isReplaying: false,
-        replayIndex: 0,
-        // The user wants it to play from the beginning of history up to the point they clicked (X)
-        replayCandles: allCandles.slice(0, startIndex + 1),
-        // Start visible chart with just the first candle (or empty)
-        candles: allCandles.length > 0 ? [allCandles[0]] : [],
-        latestCandle: allCandles.length > 0 ? allCandles[0] : null,
+    startReplay: (startIndex, allCandles) => set((state) => {
+        const initialCandles = allCandles.slice(0, startIndex + 1);
+        const futureCandles = allCandles.slice(startIndex + 1);
+        return {
+            isReplayMode: true,
+            isReplaying: false,
+            replayIndex: 0,
+            replayCandles: futureCandles,
+            candles: initialCandles,
+            latestCandle: initialCandles[initialCandles.length - 1] || null,
         // Save the full history so we can restore it when replay closes!
         _savedFullHistory: allCandles,
-        historySequence: state.historySequence + 1,
-        activeTool: 'crosshair', // reset tool
-    })),
+            historySequence: state.historySequence + 1,
+            activeTool: 'crosshair', // reset tool
+        };
+    }),
 
     stopReplay: () => set((state) => {
         if (!state.isReplayMode) return state; // Safety guard if we cancel before clicking the chart
@@ -607,14 +670,16 @@ const useMarketStore = create<MarketState>((set) => ({
     }),
 
     setIsReplaying: (playing) => set((state) => {
-        if (playing && state.isReplayMode && state.replayIndex >= state.replayCandles.length - 1) {
-            // Auto-restart from the beginning if they hit play at the end!
+        if (playing && state.isReplayMode && state.replayIndex >= state.replayCandles.length) {
+            const all = state._savedFullHistory || [];
+            const future = state.replayCandles;
+            const init = all.slice(0, all.length - future.length);
             return {
                 isReplaying: true,
                 replayIndex: 0,
-                candles: state.replayCandles.length > 0 ? [state.replayCandles[0]] : [],
-                latestCandle: state.replayCandles.length > 0 ? state.replayCandles[0] : null,
-                historySequence: state.historySequence + 1, // trigger full chart refresh
+                candles: init,
+                latestCandle: init[init.length - 1] || null,
+                historySequence: state.historySequence + 1,
             };
         }
         return { isReplaying: playing };
@@ -622,19 +687,17 @@ const useMarketStore = create<MarketState>((set) => ({
 
     stepReplay: () => set((state) => {
         if (!state.isReplayMode) return state;
-        const nextIndex = state.replayIndex + 1;
-        
-        if (nextIndex >= state.replayCandles.length) {
+        if (state.replayIndex >= state.replayCandles.length) {
             // End of replay data
-            return { isReplaying: false, replayIndex: nextIndex - 1 };
+            return { isReplaying: false };
         }
 
-        const nextCandle = state.replayCandles[nextIndex];
+        const nextCandle = state.replayCandles[state.replayIndex];
         const updatedCandles = [...state.candles, nextCandle];
         if (updatedCandles.length > 2000) updatedCandles.shift();
 
         return {
-            replayIndex: nextIndex,
+            replayIndex: state.replayIndex + 1,
             candles: updatedCandles,
             latestCandle: nextCandle,
             lastPrice: nextCandle.close,
