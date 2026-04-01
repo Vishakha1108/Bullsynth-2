@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Activity, Monitor, UserCircle, ShieldAlert, ChevronDown, Cpu, LayoutList } from "lucide-react";
+import { Activity, Monitor, UserCircle, ShieldAlert, ChevronDown, Cpu, LayoutList, Bot as BotIcon } from "lucide-react";
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ModeToggle } from './mode-toggle';
 import { fetchBots, type Bot } from '../services/api';
@@ -100,8 +100,8 @@ export function Navbar() {
               : 'text-text-secondary hover:text-text-primary dash-nav-btn'
           }`}
         >
-          <ShieldAlert className="w-3.5 h-3.5" />
-          Admin
+          <BotIcon className="w-3.5 h-3.5" />
+          Bots
         </button>
       </div>
       <div className="flex items-center gap-4">

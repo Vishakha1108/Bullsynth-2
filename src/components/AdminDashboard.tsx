@@ -59,7 +59,7 @@ export default function AdminDashboard() {
             <div>
               <h1 className="text-3xl font-bold tracking-tight text-text-primary flex items-center gap-3">
                 <ShieldAlert className="text-accent" size={28} />
-                Admin Dashboard
+                Bots Dashboard
               </h1>
               <p className="text-text-secondary mt-1 text-sm">Manage autonomous bots and generate API tokens.</p>
             </div>

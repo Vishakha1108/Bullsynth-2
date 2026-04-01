@@ -11,6 +11,89 @@ export default function LandingPage() {
     const tickers = useMarketStore((state) => state.tickers);
     const prices = useMarketStore((state) => state.prices);
     const priceChanges = useMarketStore((state) => state.priceChanges);
+    const operatingPillars = [
+        {
+            icon: <Brain size={18} />,
+            title: 'Context-Aware Analysis',
+            desc: 'Blend price action, sentiment, and structure into one fast decision layer.',
+        },
+        {
+            icon: <Zap size={18} />,
+            title: 'Fast Execution Paths',
+            desc: 'Move from analysis to terminal execution or bot deployment in a single flow.',
+        },
+        {
+            icon: <Shield size={18} />,
+            title: 'Risk-First Controls',
+            desc: 'Track performance and behavior continuously before capital is overexposed.',
+        },
+    ];
+
+    const workflowSteps = [
+        {
+            icon: <Globe size={16} />,
+            title: 'Scan Markets',
+            desc: 'Use live feeds and symbols to identify high-conviction opportunities.',
+        },
+        {
+            icon: <Activity size={16} />,
+            title: 'Validate Signal',
+            desc: 'Confirm direction using chart behavior, order flow, and momentum context.',
+        },
+        {
+            icon: <LineChart size={16} />,
+            title: 'Execute or Automate',
+            desc: 'Place trades manually or shift repeatable logic into bots for scale.',
+        },
+    ];
+
+    const capabilities = [
+        {
+            icon: <Zap />,
+            title: 'High Grade Algo Execution',
+            desc: 'Deploy and optimize algorithmic strategies in real time with ultra-low-latency execution engines.',
+        },
+        {
+            icon: <Users />,
+            title: 'Social Trading Grid',
+            desc: 'Mirror top-performing traders in real time, with performance scoring and risk metrics.',
+        },
+        {
+            icon: <Activity />,
+            title: 'Low-Latency Execution',
+            desc: 'Built on high-frequency-grade architecture, ensuring your trades hit before the rest.',
+        },
+        {
+            icon: <BarChart3 />,
+            title: 'Dynamic Market Heatmaps',
+            desc: 'Instantly identify liquidity zones and aggressive flows across all asset classes.',
+        },
+        {
+            icon: <ArrowUpDown />,
+            title: 'Depth of Market & Order Flow',
+            desc: 'Full L2/L3 data with live bid-ask flow, iceberg detection, and trade imbalances.',
+        },
+        {
+            icon: <LineChart />,
+            title: 'Precision Charting Engine',
+            desc: 'Multi-timeframe, latency-free charts with deep indicator libraries and predictive overlays.',
+        },
+        {
+            icon: <Globe />,
+            title: 'Global Market Access',
+            desc: 'Seamless multi-asset execution across emerging and developed markets on one screen.',
+        },
+        {
+            icon: <Brain />,
+            title: 'Sentiment Intelligence',
+            desc: 'Natural language AI scans global news and social data for actionable sentiment signals.',
+        },
+        {
+            icon: <Shield />,
+            title: 'Institutional Terminal Layer',
+            desc: 'Professional-grade data, analytics, and workflows designed for disciplined operators.',
+        },
+    ];
 
     useEffect(() => {
         wsManager.connect();
@@ -29,6 +112,7 @@ export default function LandingPage() {
                         <div className="nb-nav-links">
                             <Link to="/terminal" className="nb-nav-link">Terminal</Link>
                             <Link to="/user/dashboard" className="nb-nav-link">Dashboard</Link>
+                            <Link to="/admin/dashboard" className="nb-nav-link">Bots</Link>
                         </div>
                     </div>
                 </div>
@@ -87,38 +171,85 @@ export default function LandingPage() {
                 </div>
             </section>
 
-            {/* ── Features Grid ───────────────────────────────────────────── */}
-            <section className="nb-section">
+            {/* ── Lower Experience ────────────────────────────────────────── */}
+            <section className="nb-section nb-section-layered">
                 <div className="nb-section-inner">
+                    <span className="nb-section-kicker">System Architecture</span>
                     <h2 className="nb-section-title">
-                        Harness the Power of <span className="nb-hero-gradient">AI</span>
+                        A Logical Flow From Signals to <span className="nb-hero-gradient">Execution</span>
                     </h2>
                     <p className="nb-section-desc">
-                        Make the smartest financial decisions with institutional-grade tools.
+                        The lower stack is built to keep every step clear: discover opportunity, validate direction, execute with speed, and scale with bots.
                     </p>
-                    <div className="nb-features-grid">
-                        <FeatureCard icon={<Zap />} title="High Grade Algo Execution" desc="Deploy and optimize algorithmic strategies in real time with ultra-low-latency execution engines." />
-                        <FeatureCard icon={<Users />} title="Social Trading Grid" desc="Mirror top-performing traders in real time, with performance scoring and risk metrics." />
-                        <FeatureCard icon={<Activity />} title="Low-Latency Execution" desc="Built on high-frequency-grade architecture, ensuring your trades hit before the rest." />
-                        <FeatureCard icon={<BarChart3 />} title="Dynamic Market Heatmaps" desc="Instantly identify liquidity zones and aggressive flows across all asset classes." />
-                        <FeatureCard icon={<ArrowUpDown />} title="Depth of Market & Order Flow" desc="Full L2/L3 data with live bid-ask flow, iceberg detection, and trade imbalances." />
-                        <FeatureCard icon={<LineChart />} title="Precision Charting Engine" desc="Multi-timeframe, latency-free charts with deep indicator libraries and predictive overlays." />
-                        <FeatureCard icon={<Globe />} title="Global Market Access" desc="Seamless multi-asset execution across emerging and developed markets on one screen." />
-                        <FeatureCard icon={<Brain />} title="Sentiment Intelligence" desc="Natural language AI scans global news and social data for actionable sentiment signals." />
-                        <FeatureCard icon={<Shield />} title="Bloomberg-Level Terminal" desc="Institutional-grade data, analytics, and tools designed for millions of users." />
+
+                    <div className="nb-pillars-grid">
+                        {operatingPillars.map((pillar) => (
+                            <article key={pillar.title} className="nb-pillar-card">
+                                <div className="nb-pillar-icon">{pillar.icon}</div>
+                                <h3 className="nb-pillar-title">{pillar.title}</h3>
+                                <p className="nb-pillar-desc">{pillar.desc}</p>
+                            </article>
+                        ))}
+                    </div>
+
+                    <div className="nb-lower-layout">
+                        <aside className="nb-system-map">
+                            <p className="nb-system-kicker">Execution Map</p>
+                            <h3 className="nb-system-title">From market movement to bot action.</h3>
+                            <p className="nb-system-desc">
+                                Watch opportunities emerge, validate with precision, and route decisions into Terminal or Bots without workflow friction.
+                            </p>
+                            <div className="nb-workflow-list">
+                                {workflowSteps.map((step, index) => (
+                                    <article key={step.title} className="nb-workflow-step">
+                                        <span className="nb-workflow-index">{String(index + 1).padStart(2, '0')}</span>
+                                        <div className="nb-workflow-icon">{step.icon}</div>
+                                        <div>
+                                            <h4 className="nb-workflow-title">{step.title}</h4>
+                                            <p className="nb-workflow-desc">{step.desc}</p>
+                                        </div>
+                                    </article>
+                                ))}
+                            </div>
+                        </aside>
+
+                        <div className="nb-features-grid">
+                            {capabilities.map((feature, index) => (
+                                <FeatureCard
+                                    key={feature.title}
+                                    icon={feature.icon}
+                                    title={feature.title}
+                                    desc={feature.desc}
+                                    highlight={index === 0}
+                                />
+                            ))}
+                        </div>
                     </div>
                 </div>
             </section>
 
             {/* ── Footer ──────────────────────────────────────────────────── */}
             <footer className="nb-footer">
+                <div className="nb-footer-cta-band">
+                    <div>
+                        <p className="nb-footer-cta-kicker">Ready to Execute</p>
+                        <h3 className="nb-footer-cta-title">
+                            Trade in Terminal, monitor in Dashboard, and scale repeatable logic through Bots.
+                        </h3>
+                    </div>
+                    <div className="nb-footer-cta-actions">
+                        <Link to="/terminal" className="nb-footer-cta-primary">Open Terminal</Link>
+                        <Link to="/admin/dashboard" className="nb-footer-cta-secondary">Open Bots</Link>
+                    </div>
+                </div>
+
                 <div className="nb-footer-inner">
                     <div className="nb-footer-brand">
                         <div className="nb-logo">
                             <TrendingUp size={20} />
                             <span>NEXTBULL</span>
                         </div>
-                        <p className="nb-footer-tagline">Power your financial decisions</p>
+                        <p className="nb-footer-tagline">Structured market intelligence with execution-ready surfaces.</p>
                         <a href="mailto:contact@nextbull.in" className="nb-footer-email">contact@nextbull.in</a>
                     </div>
                     <div className="nb-footer-links">
@@ -126,6 +257,13 @@ export default function LandingPage() {
                             <h4>Platform</h4>
                             <Link to="/terminal">Terminal</Link>
                             <Link to="/user/dashboard">Dashboard</Link>
+                            <Link to="/admin/dashboard">Bots</Link>
+                        </div>
+                        <div className="nb-footer-col">
+                            <h4>Workflow</h4>
+                            <Link to="/terminal">Analyze & Trade</Link>
+                            <Link to="/user/dashboard">Review Performance</Link>
+                            <Link to="/admin/dashboard">Deploy Bots</Link>
                         </div>
                         <div className="nb-footer-col">
                             <h4>Company</h4>
@@ -141,12 +279,12 @@ export default function LandingPage() {
     );
 }
 
-function FeatureCard({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
+function FeatureCard({ icon, title, desc, highlight = false }: { icon: React.ReactNode; title: string; desc: string; highlight?: boolean }) {
     return (
-        <div className="nb-feature-card">
+        <article className={`nb-feature-card ${highlight ? 'highlight' : ''}`}>
             <div className="nb-feature-icon">{icon}</div>
             <h3 className="nb-feature-title">{title}</h3>
             <p className="nb-feature-desc">{desc}</p>
-        </div>
+        </article>
     );
 }
