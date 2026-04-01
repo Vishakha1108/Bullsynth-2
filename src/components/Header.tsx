@@ -8,7 +8,7 @@ import {
     Menu, RotateCcw,
     Search, Maximize2, Minimize2, Sun, Moon, LayoutDashboard, X,
     UserRound, UserPlus, Wallet, ChartNoAxesColumn, Sigma, Bookmark, Trophy, Flame, ShoppingBag, ChevronDown,
-    Bell, CandlestickChart as CandlestickTypeIcon
+    Bell, CandlestickChart as CandlestickTypeIcon, Home, HelpCircle, Zap, Keyboard, Globe
 } from 'lucide-react';
 
 type StaticIndicator = {
@@ -101,6 +101,9 @@ export default function Header() {
     const isReplayMode = useMarketStore(state => state.isReplayMode);
     const stopReplay = useMarketStore(state => state.stopReplay);
 
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+
     const [isIndicatorsOpen, setIsIndicatorsOpen] = useState(false);
     const [indicatorQuery, setIndicatorQuery] = useState('');
     const [activeIndicatorSection, setActiveIndicatorSection] = useState('Technicals');
@@ -163,6 +166,9 @@ export default function Header() {
 
     useEffect(() => {
         const onOutsideClick = (event: MouseEvent) => {
+            if (!menuRef.current?.contains(event.target as Node)) {
+                setIsMenuOpen(false);
+            }
             if (!indicatorsRef.current?.contains(event.target as Node)) {
                 setIsIndicatorsOpen(false);
             }
@@ -216,9 +222,63 @@ export default function Header() {
             {/* Left section */}
             <div className="tv-header-left">
                 {/* Menu / Logo */}
-                <button type="button" className="tv-header-btn" title="Menu">
-                    <Menu size={21} />
-                </button>
+                <div className="relative" ref={menuRef}>
+                    <button 
+                        type="button" 
+                        className={`tv-header-btn ${isMenuOpen ? 'active' : ''}`}
+                        title="Menu"
+                        onClick={() => setIsMenuOpen(v => !v)}
+                    >
+                        <Menu size={21} />
+                    </button>
+
+                    {isMenuOpen && (
+                        <div className="absolute top-[120%] left-0 w-64 bg-bg-elevated border border-border-subtle rounded-md shadow-lg z-50 py-2 flex flex-col text-[14px]">
+                            <button className="flex items-center gap-3 px-4 py-2.5 hover:bg-border-subtle transition-colors text-left" onClick={() => { setIsMenuOpen(false); navigate('/'); }}>
+                                <Home size={18} className="text-text-secondary" />
+                                <span>Home</span>
+                            </button>
+                            <button className="flex items-center gap-3 px-4 py-2.5 hover:bg-border-subtle transition-colors text-left" onClick={() => setIsMenuOpen(false)}>
+                                <HelpCircle size={18} className="text-text-secondary" />
+                                <span>Help Center</span>
+                            </button>
+                            <button className="flex items-center gap-3 px-4 py-2.5 hover:bg-border-subtle transition-colors text-left" onClick={() => setIsMenuOpen(false)}>
+                                <Zap size={18} className="text-text-secondary" />
+                                <span>What's new</span>
+                            </button>
+                            
+                            <div className="h-px bg-border-subtle my-1 w-full" />
+                            
+                            <button className="flex items-center justify-between px-4 py-2.5 hover:bg-border-subtle transition-colors text-left" onClick={() => toggleTheme()}>
+                                <div className="flex items-center gap-3">
+                                    {theme === 'dark' ? <Moon size={18} className="text-text-secondary" /> : <Sun size={18} className="text-text-secondary" />}
+                                    <span>Dark color theme</span>
+                                </div>
+                                <div className={`w-8 h-4 rounded-full p-0.5 transition-colors relative flex items-center ${theme === 'dark' ? 'bg-[#2962ff]' : 'bg-border-strong'}`}>
+                                    <div className={`w-3 h-3 rounded-full bg-white absolute transition-transform ${theme === 'dark' ? 'translate-x-4' : 'translate-x-0'}`} />
+                                </div>
+                            </button>
+
+                            <button className="flex items-center justify-between px-4 py-2.5 hover:bg-border-subtle transition-colors text-left" onClick={() => setIsMenuOpen(false)}>
+                                <div className="flex items-center gap-3">
+                                    <Globe size={18} className="text-text-secondary" />
+                                    <span>Language</span>
+                                </div>
+                                <ChevronDown size={16} className="text-text-muted -rotate-90" />
+                            </button>
+
+                            <div className="h-px bg-border-subtle my-1 w-full" />
+                            
+                            <button className="flex items-center justify-between px-4 py-2.5 hover:bg-border-subtle transition-colors text-left" onClick={() => { setIsMenuOpen(false); window.dispatchEvent(new CustomEvent('open-keyboard-shortcuts')); }}>
+                                <div className="flex items-center gap-3">
+                                    <Keyboard size={18} className="text-text-secondary" />
+                                    <span>Keyboard shortcuts</span>
+                                </div>
+                                <span className="text-text-muted text-xs">Ctrl+K</span>
+                            </button>
+                        </div>
+                    )}
+                </div>
 
                 <div className="tv-header-separator" />
 

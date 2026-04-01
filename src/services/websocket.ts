@@ -203,7 +203,12 @@ class WSManager {
                         state.setPrice(msg.symbol, closePrice, change);
                     }
 
-                    if (msg.symbol !== state.currentSymbol) return;
+                    if (msg.symbol !== state.currentSymbol) {
+                        if (state.compareSymbols.includes(msg.symbol)) {
+                            state.setCompareCandles(msg.symbol, candles);
+                        }
+                        return;
+                    }
                     fetchedSymbols.add(msg.symbol);
                     candleWorker.postMessage({ type: 'HISTORY', payload: candles });
                     return;
@@ -228,6 +233,10 @@ class WSManager {
                         close: price,
                         volume: Number(msg.v || 0),
                     };
+
+                    if (msg.symbol !== state.currentSymbol && state.compareSymbols.includes(msg.symbol)) {
+                        state.updateCompareCandle(msg.symbol, next);
+                    }
 
                     candleWorker.postMessage({ type: 'CANDLE_1S', payload: next });
                     return;
