@@ -1,17 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { 
-  X, 
-  ChevronDown, 
-  ChevronUp, 
-  Activity, 
-  CandlestickChart, 
-  List, 
-  Radar, 
-  Triangle, 
-  ArrowRightLeft, 
-  Clock,
+import {
+  X,
+  ChevronDown,
+  ChevronUp,
+  Activity,
+  CandlestickChart,
+  List,
   AlertCircle
 } from 'lucide-react';
+import { formatModifierKey } from '../lib/platform';
 
 const SECTIONS = [
   {
@@ -26,9 +23,11 @@ const SECTIONS = [
       { keys: ['/'], description: 'Open Indicators menu' },
       { keys: ['Esc'], description: 'Close dialog / Reset active tool' },
       { keys: ['Alt', 'T'], description: 'Trendline' },
-      { keys: ['Alt', 'H'], description: 'Horizontal Ray' },
-      { keys: ['Alt', 'R'], description: 'Horizontal Ray' },
+      { keys: ['Alt', 'H'], description: 'Horizontal Line' },
+      { keys: ['Alt', 'R'], description: 'Horizontal Line' },
+      { keys: ['Alt', 'V'], description: 'Vertical Line' },
       { keys: ['Alt', 'C'], description: 'Clear all drawings & Reset chart' },
+      { keys: ['Ctrl', 'H'], description: 'Hide / Show all drawings' },
       { keys: ['T'], description: 'Text tool' },
       { keys: ['M'], description: 'Measure tool' },
       { keys: ['Ctrl', '↑'], description: 'Zoom In' },
@@ -62,39 +61,6 @@ const SECTIONS = [
       { keys: ['Space'], description: 'Next symbol in watchlist' },
       { keys: ['Shift', 'Space'], description: 'Previous symbol in watchlist' },
     ]
-  },
-  {
-    id: 'screener',
-    title: 'Screener',
-    icon: Radar,
-    shortcuts: [
-      { keys: ['Shift', 'S'], description: 'Open Screener' }
-    ]
-  },
-  {
-    id: 'pine',
-    title: 'Pine Script® Editor',
-    icon: Triangle,
-    shortcuts: [
-      { keys: ['Ctrl', 'E'], description: 'Open Pine Script Editor' }
-    ]
-  },
-  {
-    id: 'trading',
-    title: 'Trading',
-    icon: ArrowRightLeft,
-    shortcuts: [
-      { keys: ['Shift', 'B'], description: 'Buy Market' },
-      { keys: ['Shift', 'S'], description: 'Sell Market' },
-    ]
-  },
-  {
-    id: 'alerts',
-    title: 'Alerts',
-    icon: Clock,
-    shortcuts: [
-      { keys: ['Alt', 'A'], description: 'Add Alert' }
-    ]
   }
 ];
 
@@ -106,8 +72,9 @@ export function KeyboardShortcutsModal() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Handle Ctrl + /
-      if (e.ctrlKey && e.key === '/') {
+      // Handle Ctrl+/ (Windows/Linux) and Cmd+/ (macOS)
+      const isSlash = e.key === '/' || e.code === 'Slash';
+      if ((e.ctrlKey || e.metaKey) && isSlash) {
         e.preventDefault();
         setIsOpen((prev) => !prev);
       }
@@ -117,8 +84,16 @@ export function KeyboardShortcutsModal() {
       }
     };
 
+    const handleOpenFromMenu = () => {
+      setIsOpen(true);
+    };
+
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('open-keyboard-shortcuts', handleOpenFromMenu);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('open-keyboard-shortcuts', handleOpenFromMenu);
+    };
   }, []);
 
 
@@ -171,6 +146,7 @@ export function KeyboardShortcutsModal() {
       {/* Right corner panel */}
       <div 
         style={{ width: `${panelWidth}px` }}
+        data-keyboard-shortcuts-modal="true"
         className="fixed top-4 right-4 bottom-4 z-[100] bg-[#131722] border border-[#2a2e39] rounded-xl shadow-2xl flex flex-col overflow-hidden"
       >
         {/* Resize Handle on the left edge */}
@@ -227,7 +203,7 @@ export function KeyboardShortcutsModal() {
                               {shortcut.keys.map((key, keyIdx) => (
                                 <div key={keyIdx} className="flex items-center">
                                   <kbd className="px-2.5 py-1 bg-[#131722] border border-[#363a45] rounded-md shadow-sm text-xs text-[#d1d4dc] font-medium font-mono min-w-[28px] text-center">
-                                    {key}
+                                    {formatModifierKey(key)}
                                   </kbd>
                                   {keyIdx < shortcut.keys.length - 1 && (
                                     <span className="text-[#787b86] text-xs mx-1">+</span>

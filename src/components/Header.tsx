@@ -3,57 +3,15 @@ import useMarketStore, { INDICATOR_COLORS, INDICATOR_LIBRARY, TIMEFRAMES } from 
 import { changeTimeframe } from '../services/websocket';
 import { TickerSearch } from './Chart';
 import { useTheme } from '../store/ThemeContext';
+import { formatShortcutLabel } from '../lib/platform';
 import { useNavigate } from 'react-router-dom';
 import {
     Menu, RotateCcw,
-    Search, Maximize2, Minimize2, Sun, Moon, LayoutDashboard, X,
+    Search, Maximize2, Minimize2, Sun, Moon, LayoutDashboard, X, Plus,
     UserRound, UserPlus, Wallet, ChartNoAxesColumn, Sigma, Bookmark, Trophy, Flame, ShoppingBag, ChevronDown,
     Bell, CandlestickChart as CandlestickTypeIcon, Home, HelpCircle, Zap, Keyboard, Globe
 } from 'lucide-react';
 
-type StaticIndicator = {
-    id: string;
-    label: string;
-    category: string;
-    description: string;
-    color: string;
-};
-
-const TV_HARDCODED_INDICATORS: StaticIndicator[] = [
-    { id: 'wma', label: 'Weighted Moving Average', category: 'Trend', description: 'Weighted average with recent price emphasis', color: '#f97316' },
-    { id: 'hma', label: 'Hull Moving Average', category: 'Trend', description: 'Low-lag moving average smoothing', color: '#c084fc' },
-    { id: 'alma', label: 'Arnaud Legoux Moving Average', category: 'Trend', description: 'Gaussian-weighted adaptive moving average', color: '#22d3ee' },
-    { id: 'tema', label: 'Triple Exponential Moving Average', category: 'Trend', description: 'Triple-smoothed EMA for trend detection', color: '#2dd4bf' },
-    { id: 'dema', label: 'Double Exponential Moving Average', category: 'Trend', description: 'Reduced-lag EMA smoothing', color: '#f43f5e' },
-    { id: 'supertrend', label: 'Supertrend', category: 'Trend', description: 'ATR-based trend following overlay', color: '#4ade80' },
-    { id: 'psar', label: 'Parabolic SAR', category: 'Trend', description: 'Stop-and-reverse trend tracking points', color: '#facc15' },
-    { id: 'ichimoku', label: 'Ichimoku Cloud', category: 'Trend', description: 'Cloud-based support and resistance system', color: '#60a5fa' },
-    { id: 'adx', label: 'Average Directional Index (14)', category: 'Trend', description: 'Trend strength without direction bias', color: '#94a3b8' },
-    { id: 'aroon', label: 'Aroon', category: 'Trend', description: 'Measures trend changes and momentum', color: '#fb7185' },
-
-    { id: 'atr', label: 'Average True Range (14)', category: 'Volatility', description: 'Volatility measurement over 14 periods', color: '#9ca3af' },
-    { id: 'kc', label: 'Keltner Channels', category: 'Volatility', description: 'EMA channel using ATR envelope', color: '#67e8f9' },
-    { id: 'dc', label: 'Donchian Channels (20)', category: 'Volatility', description: 'High-low breakout channel', color: '#86efac' },
-    { id: 'stddev', label: 'Standard Deviation', category: 'Volatility', description: 'Dispersion of prices around average', color: '#a78bfa' },
-    { id: 'chop', label: 'Choppiness Index (14)', category: 'Volatility', description: 'Ranging versus trending market filter', color: '#fda4af' },
-
-    { id: 'obv', label: 'On Balance Volume', category: 'Volume', description: 'Cumulative volume flow indicator', color: '#fde047' },
-    { id: 'ad', label: 'Accumulation/Distribution', category: 'Volume', description: 'Price and volume accumulation pressure', color: '#fbbf24' },
-    { id: 'cmf', label: 'Chaikin Money Flow (20)', category: 'Volume', description: 'Volume-weighted buying and selling pressure', color: '#f59e0b' },
-    { id: 'vo', label: 'Volume Oscillator', category: 'Volume', description: 'Difference between fast and slow volume averages', color: '#eab308' },
-    { id: 'pvt', label: 'Price Volume Trend', category: 'Volume', description: 'Trend line combining price move and volume', color: '#fcd34d' },
-
-    { id: 'stoch', label: 'Stochastic (14, 3, 3)', category: 'Oscillator', description: 'Momentum oscillator for overbought and oversold', color: '#818cf8' },
-    { id: 'stochrsi', label: 'Stochastic RSI (14)', category: 'Oscillator', description: 'RSI transformed into stochastic oscillator', color: '#6366f1' },
-    { id: 'cci', label: 'Commodity Channel Index (20)', category: 'Oscillator', description: 'Deviation of price from statistical mean', color: '#7c3aed' },
-    { id: 'mom', label: 'Momentum (10)', category: 'Oscillator', description: 'Measures price change speed', color: '#2dd4bf' },
-    { id: 'wpr', label: 'Williams %R (14)', category: 'Oscillator', description: 'Momentum oscillator from 0 to -100', color: '#34d399' },
-    { id: 'ao', label: 'Awesome Oscillator', category: 'Oscillator', description: 'Market momentum around median price', color: '#10b981' },
-    { id: 'ppo', label: 'Percentage Price Oscillator', category: 'Oscillator', description: 'EMA momentum as percentage difference', color: '#14b8a6' },
-    { id: 'roc', label: 'Rate of Change (9)', category: 'Oscillator', description: 'Percent change over selected periods', color: '#06b6d4' },
-    { id: 'trix', label: 'TRIX (15)', category: 'Oscillator', description: 'Triple-smoothed momentum oscillator', color: '#0ea5e9' },
-    { id: 'uo', label: 'Ultimate Oscillator', category: 'Oscillator', description: 'Multi-period momentum pressure oscillator', color: '#38bdf8' },
-];
 
 type IndicatorSidebarItem = {
     label: string;
@@ -90,9 +48,11 @@ const INDICATOR_SIDEBAR_GROUPS: Array<{ section: string; items: IndicatorSidebar
 export default function Header() {
     const navigate = useNavigate();
     const { theme, toggleTheme } = useTheme();
+    const currentSymbol = useMarketStore((state) => state.currentSymbol);
     const currentPrice = useMarketStore((state) => state.lastPrice);
     const timeframe = useMarketStore((state) => state.timeframe);
     const priceChange24h = useMarketStore((state) => state.priceChange24h);
+    const priceChanges = useMarketStore((state) => state.priceChanges);
     const enabledIndicators = useMarketStore((state) => state.enabledIndicators);
     const setIndicatorEnabled = useMarketStore((state) => state.setIndicatorEnabled);
     const clearIndicators = useMarketStore((state) => state.clearIndicators);
@@ -138,31 +98,24 @@ export default function Header() {
     const chartTypesRef = useRef<HTMLDivElement>(null);
 
     const groupedWorkingIndicators = useMemo(() => {
-        const groups: Record<string, typeof INDICATOR_LIBRARY> = {};
-        for (const ind of INDICATOR_LIBRARY) {
-            if (!groups[ind.category]) groups[ind.category] = [];
-            groups[ind.category].push(ind);
-        }
-        return groups;
-    }, []);
-
-    const groupedStaticIndicators = useMemo(() => {
         const query = indicatorQuery.trim().toLowerCase();
         const filtered = query
-            ? TV_HARDCODED_INDICATORS.filter((indicator) => (
-                indicator.label.toLowerCase().includes(query)
-                || indicator.description.toLowerCase().includes(query)
-                || indicator.category.toLowerCase().includes(query)
+            ? INDICATOR_LIBRARY.filter((ind) => (
+                ind.label.toLowerCase().includes(query)
+                || ind.description.toLowerCase().includes(query)
+                || ind.category.toLowerCase().includes(query)
             ))
-            : TV_HARDCODED_INDICATORS;
+            : INDICATOR_LIBRARY;
 
-        const groups: Record<string, StaticIndicator[]> = {};
+        const groups: Record<string, typeof INDICATOR_LIBRARY> = {};
         for (const ind of filtered) {
             if (!groups[ind.category]) groups[ind.category] = [];
             groups[ind.category].push(ind);
         }
         return groups;
     }, [indicatorQuery]);
+
+    const livePriceChange = priceChanges[currentSymbol] ?? priceChange24h;
 
     useEffect(() => {
         const onOutsideClick = (event: MouseEvent) => {
@@ -274,7 +227,7 @@ export default function Header() {
                                     <Keyboard size={18} className="text-text-secondary" />
                                     <span>Keyboard shortcuts</span>
                                 </div>
-                                <span className="text-text-muted text-xs">Ctrl+K</span>
+                                <span className="text-text-muted text-xs">{formatShortcutLabel('Ctrl+/')}</span>
                             </button>
                         </div>
                     )}
@@ -282,8 +235,24 @@ export default function Header() {
 
                 <div className="tv-header-separator" />
 
-                {/* Symbol selector — full TickerSearch modal */}
-                <div className="flex items-center mx-1">
+                {/* Symbol selector split trigger */}
+                <div className="flex items-center mx-1 gap-1">
+                    <button
+                        className="tv-header-btn text-text-primary hover:text-white flex items-center gap-2 bg-border-subtle rounded-md px-3 py-1"
+                        onClick={() => window.dispatchEvent(new CustomEvent('open-ticker-search', { detail: { mode: 'search' } }))}
+                    >
+                        <Search size={16} />
+                        <span className="font-semibold">{currentSymbol}</span>
+                        <span className="text-xs text-text-muted ml-1 hidden sm:inline">Search</span>
+                    </button>
+                    <button 
+                        className="tv-header-btn text-text-secondary hover:text-white flex items-center justify-center p-1 rounded-md border border-border-subtle"
+                        title="Compare Symbol"
+                        onClick={() => window.dispatchEvent(new CustomEvent('open-ticker-search', { detail: { mode: 'compare' } }))}
+                    >
+                        <Plus size={16} />
+                    </button>
+                    {/* The modal component itself */}
                     <TickerSearch />
                 </div>
 
@@ -469,32 +438,6 @@ export default function Header() {
                                                     </div>
                                                 ))}
 
-                                                {Object.entries(groupedStaticIndicators).map(([category, indicators]) => (
-                                                    <div key={`static-${category}`}>
-                                                        <div className="tv-indicator-category-header">{category}</div>
-                                                        {indicators.map((indicator) => (
-                                                            <label key={indicator.id} className="tv-indicator-item">
-                                                                <div className="tv-indicator-item-left">
-                                                                    <span
-                                                                        className="tv-indicator-color-dot"
-                                                                        style={{ background: indicator.color }}
-                                                                    />
-                                                                    <div>
-                                                                        <span className="tv-indicator-item-label">{indicator.label}</span>
-                                                                        <span className="tv-indicator-item-desc">{indicator.description}</span>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="tv-indicator-item-right">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={false}
-                                                                        onChange={() => undefined}
-                                                                    />
-                                                                </div>
-                                                            </label>
-                                                        ))}
-                                                    </div>
-                                                ))}
                                             </div>
                                         </>
                                     ) : (
@@ -535,22 +478,17 @@ export default function Header() {
                 {/* Price info strip */}
                 <div className="tv-price-strip">
                     <span className="tv-price-value">${currentPrice.toFixed(2)}</span>
-                    <span className={`tv-price-change ${priceChange24h >= 0 ? 'up' : 'down'}`}>
-                        {priceChange24h >= 0 ? '+' : ''}{priceChange24h.toFixed(2)}%
+                    <span className={`tv-price-change ${livePriceChange >= 0 ? 'up' : 'down'}`}>
+                        {livePriceChange >= 0 ? '+' : ''}{livePriceChange.toFixed(2)}%
                     </span>
                 </div>
 
                 <div className="tv-header-separator" />
 
-                <button type="button" className="tv-header-btn icon-text" title="Quick Search (Ctrl+K)" onClick={() => window.dispatchEvent(new CustomEvent('open-ticker-search'))}>
-                    <Search size={21} />
-                    <span>Quick Search</span>
-                </button>
-
                 <button 
                     type="button" 
                     className="tv-header-btn icon-text" 
-                    title="Create Alert (Alt+A)"
+                    title={`Create Alert (${formatShortcutLabel('Alt+A')})`}
                     onClick={() => window.dispatchEvent(new CustomEvent('open-alert-dialog'))}
                 >
                     <Bell size={21} />

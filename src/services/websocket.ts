@@ -17,6 +17,9 @@ candleWorker.onmessage = (e) => {
         // Worker reset — clear all chart data
         useMarketStore.getState().clearCandles();
     }
+    else if (type === 'COMPARE_HISTORY_UPDATE') {
+        useMarketStore.getState().setCompareCandles(e.data.symbol, e.data.candles);
+    }
 };
 
 // Track which symbols already have history fetched — avoids redundant re-fetches
@@ -41,6 +44,9 @@ function queueInitialCandle(symbol: string, candle: {time: number; open: number;
     flushTimer = setTimeout(flushPendingCandles, FLUSH_DELAY);
 }
 
+// Keep the helper reachable for strict noUnusedLocals builds.
+void queueInitialCandle;
+
 function flushPendingCandles() {
     flushTimer = null;
     const currentSymbol = useMarketStore.getState().currentSymbol;
@@ -50,9 +56,7 @@ function flushPendingCandles() {
         if (!candles || candles.length === 0) continue;
         fetchedSymbols.add(sym);
 
-        if (sym === currentSymbol) {
-            candleWorker.postMessage({ type: 'HISTORY', payload: candles });
-        }
+        candleWorker.postMessage({ type: 'HISTORY', payload: { symbol: sym, candles } });
         // Price update for non-current symbols
         const last = candles[candles.length - 1];
         const first = candles[0];
@@ -74,12 +78,19 @@ export function requestHistory(_symbol?: string) {
     // The worker's rawCache handles symbol switches via INIT.
 }
 
+export function requestCompareHistory(symbol: string) {
+    candleWorker.postMessage({ type: 'GET_COMPARE_HISTORY', payload: { symbol } });
+}
+
 useMarketStore.subscribe((state, prevState) => {
     if (state.currentSymbol !== prevState.currentSymbol || state.timeframe !== prevState.timeframe) {
         candleWorker.postMessage({
             type: 'INIT',
             payload: { timeframeSec: state.timeframe, symbol: state.currentSymbol }
         });
+
+        // Rebuild compare candles at the new timeframe or after symbol switches.
+        state.compareSymbols.forEach((sym) => requestCompareHistory(sym));
     }
 
     if (prevState.isReplayMode && !state.isReplayMode) {
@@ -88,6 +99,8 @@ useMarketStore.subscribe((state, prevState) => {
             type: 'INIT',
             payload: { timeframeSec: state.timeframe, symbol: state.currentSymbol }
         });
+
+        state.compareSymbols.forEach((sym) => requestCompareHistory(sym));
     }
 });
 
@@ -108,6 +121,15 @@ class WSManager {
     }
 
     connect() {
+        if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+            return;
+        }
+
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+        }
+
         this.ws = new WebSocket(this.url);
 
         this.ws.onopen = () => {
@@ -121,6 +143,8 @@ class WSManager {
                 type: 'INIT',
                 payload: { timeframeSec: initState.timeframe, symbol: initState.currentSymbol }
             });
+
+            initState.compareSymbols.forEach((sym) => requestCompareHistory(sym));
 
             // Ask for symbol list in case welcome arrives before UI is ready.
             this.send({ type: 'get_symbols' });
@@ -239,13 +263,17 @@ class WSManager {
                         return;
                     }
                     fetchedSymbols.add(msg.symbol);
-                    candleWorker.postMessage({ type: 'HISTORY', payload: candles });
+                    candleWorker.postMessage({ type: 'HISTORY', payload: { symbol: msg.symbol, candles } });
                     return;
                 }
 
                 if (msgType === 'candle') {
                     const price = Number(msg.c || 0);
                     const sym = msg.symbol;
+
+                    if (sym) {
+                        state.setPrice(sym, price);
+                    }
 
                     const next = {
                         symbol: sym,
@@ -337,6 +365,7 @@ class WSManager {
         };
 
         this.ws.onclose = () => {
+            this.ws = null;
             fetchedSymbols.clear();
             if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
             for (const k of Object.keys(pendingCandles)) delete pendingCandles[k];

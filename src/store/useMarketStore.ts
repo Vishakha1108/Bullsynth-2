@@ -67,16 +67,15 @@ export interface CrosshairData {
 }
 
 export type IndicatorId =
-    | 'sma20'
-    | 'sma50'
-    | 'sma100'
-    | 'ema20'
-    | 'ema50'
-    | 'ema100'
-    | 'vwap'
-    | 'bb20'
-    | 'rsi14'
-    | 'macd';
+    | 'sma20' | 'sma50' | 'sma100'
+    | 'ema20' | 'ema50' | 'ema100'
+    | 'vwap' | 'bb20' | 'rsi14' | 'macd'
+    | 'wma' | 'hma' | 'alma' | 'tema' | 'dema'
+    | 'supertrend' | 'psar' | 'ichimoku' | 'adx' | 'aroon'
+    | 'atr' | 'kc' | 'dc' | 'stddev' | 'chop'
+    | 'obv' | 'ad' | 'cmf' | 'vo' | 'pvt'
+    | 'stoch' | 'stochrsi' | 'cci' | 'mom' | 'wpr'
+    | 'ao' | 'ppo' | 'roc' | 'trix' | 'uo';
 
 export interface DrawingPoint {
     time: number;
@@ -119,19 +118,83 @@ export const INDICATOR_COLORS: Record<IndicatorId, string> = {
     bb20: '#9ca3af',
     rsi14: '#818cf8',
     macd: '#34d399',
+    wma: '#f97316',
+    hma: '#c084fc',
+    alma: '#22d3ee',
+    tema: '#2dd4bf',
+    dema: '#f43f5e',
+    supertrend: '#4ade80',
+    psar: '#facc15',
+    ichimoku: '#60a5fa',
+    adx: '#94a3b8',
+    aroon: '#fb7185',
+    atr: '#9ca3af',
+    kc: '#67e8f9',
+    dc: '#86efac',
+    stddev: '#a78bfa',
+    chop: '#fda4af',
+    obv: '#fde047',
+    ad: '#fbbf24',
+    cmf: '#f59e0b',
+    vo: '#eab308',
+    pvt: '#fcd34d',
+    stoch: '#818cf8',
+    stochrsi: '#6366f1',
+    cci: '#7c3aed',
+    mom: '#2dd4bf',
+    wpr: '#34d399',
+    ao: '#10b981',
+    ppo: '#14b8a6',
+    roc: '#06b6d4',
+    trix: '#0ea5e9',
+    uo: '#38bdf8',
 };
 
 export const INDICATOR_LIBRARY: IndicatorDefinition[] = [
+    // Trend
     { id: 'sma20', label: 'Simple Moving Average (20)', category: 'Trend', description: '20-period simple moving average' },
     { id: 'sma50', label: 'Simple Moving Average (50)', category: 'Trend', description: '50-period simple moving average' },
     { id: 'sma100', label: 'Simple Moving Average (100)', category: 'Trend', description: '100-period simple moving average' },
     { id: 'ema20', label: 'Exponential Moving Average (20)', category: 'Trend', description: '20-period exponential moving average' },
     { id: 'ema50', label: 'Exponential Moving Average (50)', category: 'Trend', description: '50-period exponential moving average' },
     { id: 'ema100', label: 'Exponential Moving Average (100)', category: 'Trend', description: '100-period exponential moving average' },
-    { id: 'vwap', label: 'Volume Weighted Average Price', category: 'Volume', description: 'Session VWAP' },
+    { id: 'wma', label: 'Weighted Moving Average', category: 'Trend', description: 'Weighted average with recent price emphasis' },
+    { id: 'hma', label: 'Hull Moving Average', category: 'Trend', description: 'Low-lag moving average smoothing' },
+    { id: 'alma', label: 'Arnaud Legoux Moving Average', category: 'Trend', description: 'Gaussian-weighted adaptive moving average' },
+    { id: 'tema', label: 'Triple Exponential Moving Average', category: 'Trend', description: 'Triple-smoothed EMA for trend detection' },
+    { id: 'dema', label: 'Double Exponential Moving Average', category: 'Trend', description: 'Reduced-lag EMA smoothing' },
+    { id: 'supertrend', label: 'Supertrend', category: 'Trend', description: 'ATR-based trend following overlay' },
+    { id: 'psar', label: 'Parabolic SAR', category: 'Trend', description: 'Stop-and-reverse trend tracking points' },
+    { id: 'ichimoku', label: 'Ichimoku Cloud', category: 'Trend', description: 'Cloud-based support and resistance system' },
+    { id: 'adx', label: 'Average Directional Index (14)', category: 'Trend', description: 'Trend strength without direction bias' },
+    { id: 'aroon', label: 'Aroon', category: 'Trend', description: 'Measures trend changes and momentum' },
+    // Volatility
     { id: 'bb20', label: 'Bollinger Bands (20, 2)', category: 'Volatility', description: 'Upper and lower volatility bands' },
+    { id: 'atr', label: 'Average True Range (14)', category: 'Volatility', description: 'Volatility measurement over 14 periods' },
+    { id: 'kc', label: 'Keltner Channels', category: 'Volatility', description: 'EMA channel using ATR envelope' },
+    { id: 'dc', label: 'Donchian Channels (20)', category: 'Volatility', description: 'High-low breakout channel' },
+    { id: 'stddev', label: 'Standard Deviation', category: 'Volatility', description: 'Dispersion of prices around average' },
+    { id: 'chop', label: 'Choppiness Index (14)', category: 'Volatility', description: 'Ranging versus trending market filter' },
+    // Volume
+    { id: 'vwap', label: 'Volume Weighted Average Price', category: 'Volume', description: 'Session VWAP' },
+    { id: 'obv', label: 'On Balance Volume', category: 'Volume', description: 'Cumulative volume flow indicator' },
+    { id: 'ad', label: 'Accumulation/Distribution', category: 'Volume', description: 'Price and volume accumulation pressure' },
+    { id: 'cmf', label: 'Chaikin Money Flow (20)', category: 'Volume', description: 'Volume-weighted buying and selling pressure' },
+    { id: 'vo', label: 'Volume Oscillator', category: 'Volume', description: 'Difference between fast and slow volume averages' },
+    { id: 'pvt', label: 'Price Volume Trend', category: 'Volume', description: 'Trend line combining price move and volume' },
+    // Oscillators
     { id: 'rsi14', label: 'Relative Strength Index (14)', category: 'Oscillator', description: 'Momentum oscillator from 0 to 100' },
     { id: 'macd', label: 'MACD (12, 26, 9)', category: 'Oscillator', description: 'Trend momentum with histogram and signal line' },
+    { id: 'stoch', label: 'Stochastic (14, 3, 3)', category: 'Oscillator', description: 'Momentum oscillator for overbought and oversold' },
+    { id: 'stochrsi', label: 'Stochastic RSI (14)', category: 'Oscillator', description: 'RSI transformed into stochastic oscillator' },
+    { id: 'cci', label: 'Commodity Channel Index (20)', category: 'Oscillator', description: 'Deviation of price from statistical mean' },
+    { id: 'mom', label: 'Momentum (10)', category: 'Oscillator', description: 'Measures price change speed' },
+    { id: 'wpr', label: 'Williams %R (14)', category: 'Oscillator', description: 'Momentum oscillator from 0 to -100' },
+    { id: 'ao', label: 'Awesome Oscillator', category: 'Oscillator', description: 'Market momentum around median price' },
+    { id: 'ppo', label: 'Percentage Price Oscillator', category: 'Oscillator', description: 'EMA momentum as percentage difference' },
+    { id: 'roc', label: 'Rate of Change (9)', category: 'Oscillator', description: 'Percent change over selected periods' },
+    { id: 'trix', label: 'TRIX (15)', category: 'Oscillator', description: 'Triple-smoothed momentum oscillator' },
+    { id: 'uo', label: 'Ultimate Oscillator', category: 'Oscillator', description: 'Multi-period momentum pressure oscillator' },
 ];
 
 export const AVAILABLE_SYMBOLS = [
@@ -198,6 +261,7 @@ interface MarketState {
     drawings: Drawing[];
     prices: Record<string, number>;
     priceChanges: Record<string, number>;
+    priceBaselines: Record<string, number>;
 
     compareSymbols: string[];
     compareCandles: Record<string, Candle[]>;
@@ -269,7 +333,7 @@ interface MarketState {
     alerts: Alert[];
     addAlert: (alert: Omit<Alert, 'id' | 'active' | 'createdAt'>) => void;
     removeAlert: (id: string) => void;
-    checkAlerts: (symbol: string, currentPrice: number) => void;
+    checkAlerts: (symbol: string, currentPrice: number, previousPrice: number) => void;
 
     // Replay Actions
     startReplay: (startIndex: number, allCandles: Candle[]) => void;
@@ -334,6 +398,7 @@ const useMarketStore = create<MarketState>((set) => ({
     drawings: [],
     prices: {},
     priceChanges: {},
+    priceBaselines: {},
     compareSymbols: [],
     compareCandles: {},
     historySequence: 0,
@@ -395,14 +460,33 @@ const useMarketStore = create<MarketState>((set) => ({
             : safeCandles[safeCandles.length - 1] || state.latestCandle;
 
         if (safeLatest) {
-            useMarketStore.getState().checkAlerts(state.currentSymbol, safeLatest.close);
+            const previousPrice = state.lastPrice || safeLatest.close;
+            useMarketStore.getState().checkAlerts(state.currentSymbol, safeLatest.close, previousPrice);
         }
+
+        if (!safeLatest) {
+            return {
+                candles: safeCandles,
+                latestCandle: safeLatest,
+                historySequence: state.historySequence + 1,
+            };
+        }
+
+        const symbol = state.currentSymbol;
+        const baseline = state.priceBaselines[symbol] ?? safeLatest.close;
+        const nextPriceBaselines = state.priceBaselines[symbol] == null
+            ? { ...state.priceBaselines, [symbol]: baseline }
+            : state.priceBaselines;
+        const liveChange = baseline === 0 ? 0 : ((safeLatest.close - baseline) / baseline) * 100;
 
         return {
             candles: safeCandles,
             latestCandle: safeLatest,
-            prices: safeLatest ? { ...state.prices, [state.currentSymbol]: safeLatest.close } : state.prices,
-            lastPrice: safeLatest ? safeLatest.close : state.lastPrice,
+            prices: { ...state.prices, [symbol]: safeLatest.close },
+            priceBaselines: nextPriceBaselines,
+            priceChanges: { ...state.priceChanges, [symbol]: liveChange },
+            lastPrice: safeLatest.close,
+            priceChange24h: liveChange,
             historySequence: state.historySequence + 1,
         };
     }),
@@ -432,11 +516,21 @@ const useMarketStore = create<MarketState>((set) => ({
         if (updatedCandles.length > 2000) {
             updatedCandles.shift();
         }
+        const symbol = state.currentSymbol;
+        const baseline = state.priceBaselines[symbol] ?? normalizedCandle.close;
+        const nextPriceBaselines = state.priceBaselines[symbol] == null
+            ? { ...state.priceBaselines, [symbol]: baseline }
+            : state.priceBaselines;
+        const liveChange = baseline === 0 ? 0 : ((normalizedCandle.close - baseline) / baseline) * 100;
+
         return {
             latestCandle: normalizedCandle,
             candles: updatedCandles,
             lastPrice: normalizedCandle.close,
-            prices: { ...state.prices, [state.currentSymbol]: normalizedCandle.close }
+            prices: { ...state.prices, [symbol]: normalizedCandle.close },
+            priceBaselines: nextPriceBaselines,
+            priceChanges: { ...state.priceChanges, [symbol]: liveChange },
+            priceChange24h: liveChange,
         };
     }),
 
@@ -456,16 +550,20 @@ const useMarketStore = create<MarketState>((set) => ({
     removeAlert: (id) => set((state) => ({
         alerts: state.alerts.filter(a => a.id !== id)
     })),
-    checkAlerts: (symbol, currentPrice) => set((state) => {
+    checkAlerts: (symbol, currentPrice, previousPrice) => set((state) => {
         const triggeredAlerts = state.alerts.filter(alert => {
             if (!alert.active || alert.symbol !== symbol) return false;
             
-            // Logic for "crossing" is simplified for trial: trigger if price is near target
             if (alert.type === 'crossing') {
-                return (Math.abs(currentPrice - alert.targetPrice) / alert.targetPrice) < 0.0005;
+                return (previousPrice < alert.targetPrice && currentPrice >= alert.targetPrice) || 
+                       (previousPrice > alert.targetPrice && currentPrice <= alert.targetPrice);
             }
-            if (alert.type === 'above') return currentPrice >= alert.targetPrice;
-            if (alert.type === 'below') return currentPrice <= alert.targetPrice;
+            if (alert.type === 'above') {
+                return previousPrice < alert.targetPrice && currentPrice >= alert.targetPrice;
+            }
+            if (alert.type === 'below') {
+                return previousPrice > alert.targetPrice && currentPrice <= alert.targetPrice;
+            }
             return false;
         });
 
@@ -656,11 +754,20 @@ const useMarketStore = create<MarketState>((set) => ({
         watchlist: state.watchlist.filter((s) => s !== symbol)
     })),
 
-    setPrice: (symbol, price, change) => set((state) => {
-        const nextPrices = { ...state.prices, [symbol]: price };
-        const nextChanges = change !== undefined ? { ...state.priceChanges, [symbol]: change } : state.priceChanges;
+    setPrice: (symbol, price, _change) => set((state) => {
+        void _change;
 
-        useMarketStore.getState().checkAlerts(symbol, price);
+        const baseline = state.priceBaselines[symbol] ?? price;
+        const nextPriceBaselines = state.priceBaselines[symbol] == null
+            ? { ...state.priceBaselines, [symbol]: baseline }
+            : state.priceBaselines;
+        const liveChange = baseline === 0 ? 0 : ((price - baseline) / baseline) * 100;
+
+        const nextPrices = { ...state.prices, [symbol]: price };
+        const nextChanges = { ...state.priceChanges, [symbol]: liveChange };
+
+        const previousPrice = state.prices[symbol] || price;
+        useMarketStore.getState().checkAlerts(symbol, price, previousPrice);
 
         // Auto-recalculate portfolio holdings when prices change
         let updatedMetrics = state.dynamicPortfolioMetrics;
@@ -674,6 +781,7 @@ const useMarketStore = create<MarketState>((set) => ({
         if (symbol === state.currentSymbol) {
             return {
                 prices: nextPrices,
+                priceBaselines: nextPriceBaselines,
                 priceChanges: nextChanges,
                 lastPrice: price,
                 priceChange24h: change !== undefined ? change : state.priceChange24h,
