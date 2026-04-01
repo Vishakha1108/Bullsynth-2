@@ -25,13 +25,53 @@ export function isSymbolCached(symbol: string): boolean {
     return fetchedSymbols.has(symbol);
 }
 
+// ── Initial candle batching ──────────────────────────────────────────────────
+// The backend sends candle history as individual 'candle' messages on connect.
+// We batch them per-symbol and flush to the worker as HISTORY after a short pause.
+const pendingCandles: Record<string, Array<{time: number; open: number; high: number; low: number; close: number; volume: number}>> = {};
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+const FLUSH_DELAY = 300; // ms — wait for the initial burst to finish
+
+function queueInitialCandle(symbol: string, candle: {time: number; open: number; high: number; low: number; close: number; volume: number}) {
+    if (!pendingCandles[symbol]) pendingCandles[symbol] = [];
+    pendingCandles[symbol].push(candle);
+
+    // Reset the debounce timer on every candle
+    if (flushTimer) clearTimeout(flushTimer);
+    flushTimer = setTimeout(flushPendingCandles, FLUSH_DELAY);
+}
+
+function flushPendingCandles() {
+    flushTimer = null;
+    const currentSymbol = useMarketStore.getState().currentSymbol;
+
+    for (const sym of Object.keys(pendingCandles)) {
+        const candles = pendingCandles[sym];
+        if (!candles || candles.length === 0) continue;
+        fetchedSymbols.add(sym);
+
+        if (sym === currentSymbol) {
+            candleWorker.postMessage({ type: 'HISTORY', payload: candles });
+        }
+        // Price update for non-current symbols
+        const last = candles[candles.length - 1];
+        const first = candles[0];
+        const change = first.open > 0 ? ((last.close - first.open) / first.open) * 100 : 0;
+        useMarketStore.getState().setPrice(sym, last.close, sym === currentSymbol ? change : undefined);
+    }
+
+    // Clear all pending
+    for (const k of Object.keys(pendingCandles)) delete pendingCandles[k];
+}
+
 /**
- * Change the candle timeframe. Call this when the user clicks a timeframe button.
- * It re-initializes the worker which clears history and starts fresh aggregation.
+ * Request history — the backend sends history as individual candle messages
+ * on connect, so for reconnects/symbol changes we re-init the worker which
+ * will use its rawCache. This is kept as a no-op for compatibility.
  */
-export function requestHistory(symbol?: string) {
-    const sym = symbol || useMarketStore.getState().currentSymbol;
-    wsManager.send({ type: 'get_history', symbol: sym });
+export function requestHistory(_symbol?: string) {
+    // Backend does not support get_history — history arrives as individual candle messages on connect.
+    // The worker's rawCache handles symbol switches via INIT.
 }
 
 useMarketStore.subscribe((state, prevState) => {
@@ -40,14 +80,14 @@ useMarketStore.subscribe((state, prevState) => {
             type: 'INIT',
             payload: { timeframeSec: state.timeframe, symbol: state.currentSymbol }
         });
-        if (!isSymbolCached(state.currentSymbol)) {
-            requestHistory();
-        }
     }
 
     if (prevState.isReplayMode && !state.isReplayMode) {
-        // Fresh re-fetch required to bridge the time gap created during Replay
-        requestHistory(state.currentSymbol);
+        // Re-init worker to rebuild from rawCache after replay ends
+        candleWorker.postMessage({
+            type: 'INIT',
+            payload: { timeframeSec: state.timeframe, symbol: state.currentSymbol }
+        });
     }
 });
 
@@ -84,17 +124,6 @@ class WSManager {
 
             // Ask for symbol list in case welcome arrives before UI is ready.
             this.send({ type: 'get_symbols' });
-
-            // Ask for history of current symbol
-            requestHistory();
-
-            // Subscribe to all watchlist symbols for real-time updates
-            const watchlist = useMarketStore.getState().watchlist;
-            watchlist.forEach(s => {
-                if (s !== useMarketStore.getState().currentSymbol) {
-                    this.send({ type: 'get_history', symbol: s });
-                }
-            });
         };
 
         this.ws.onmessage = (event) => {
@@ -211,16 +240,10 @@ class WSManager {
 
                 if (msgType === 'candle') {
                     const price = Number(msg.c || 0);
-                    if (msg.symbol === state.currentSymbol && state.candles.length > 0) {
-                        const openPrice = state.candles[0].open;
-                        const change = openPrice > 0 ? ((price - openPrice) / openPrice) * 100 : 0;
-                        state.setPrice(msg.symbol, price, change);
-                    } else {
-                        state.setPrice(msg.symbol, price);
-                    }
+                    const sym = msg.symbol;
 
                     const next = {
-                        symbol: msg.symbol,
+                        symbol: sym,
                         time: normalizeToSec(msg.t ?? msg.ts ?? msg.time),
                         open: Number(msg.o || 0),
                         high: Number(msg.h || 0),
@@ -228,6 +251,21 @@ class WSManager {
                         close: price,
                         volume: Number(msg.v || 0),
                     };
+
+                    // If this symbol's history hasn't been flushed yet, batch it
+                    if (!fetchedSymbols.has(sym)) {
+                        queueInitialCandle(sym, next);
+                        return;
+                    }
+
+                    // Live mode — forward to worker
+                    if (sym === state.currentSymbol && state.candles.length > 0) {
+                        const openPrice = state.candles[0].open;
+                        const change = openPrice > 0 ? ((price - openPrice) / openPrice) * 100 : 0;
+                        state.setPrice(sym, price, change);
+                    } else {
+                        state.setPrice(sym, price);
+                    }
 
                     candleWorker.postMessage({ type: 'CANDLE_1S', payload: next });
                     return;
@@ -306,6 +344,8 @@ class WSManager {
 
         this.ws.onclose = () => {
             fetchedSymbols.clear();
+            if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+            for (const k of Object.keys(pendingCandles)) delete pendingCandles[k];
             useMarketStore.getState().setWsConnected(false);
             console.log(`WS closed, reconnecting in ${this.reconnectDelay}ms`);
             if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
