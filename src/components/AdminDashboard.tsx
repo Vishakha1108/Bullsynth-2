@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Navbar } from './Navbar';
 import { fetchBots, createBot, type Bot } from '../services/api';
-import { Check, Copy, Plus, Server, ShieldAlert, Cpu } from 'lucide-react'; 
+import { Check, Copy, Plus, Server, Cpu } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function AdminDashboard() {

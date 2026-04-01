@@ -25,8 +25,8 @@ function fmtUsd(value: number): string {
 }
 
 // ─── Stat Card ───────────────────────────────────────────────
-function StatCard({ label, value, icon: Icon, change, subtitle }: {
-  label: string; value: string; icon: LucideIcon; change?: number; subtitle?: string;
+function StatCard({ label, value, icon: Icon, change, subtitle, valueColor }: {
+  label: string; value: string; icon: LucideIcon; change?: number; subtitle?: string; valueColor?: string;
 }) {
   return (
     <div className="dash-card p-4 flex flex-col gap-2 group">
@@ -36,7 +36,7 @@ function StatCard({ label, value, icon: Icon, change, subtitle }: {
           <Icon size={16} />
         </div>
       </div>
-      <div className="text-2xl leading-tight font-bold text-text-primary tracking-tight font-mono tabular-nums">{value}</div>
+      <div className="text-2xl leading-tight font-bold tracking-tight font-mono tabular-nums" style={{ color: valueColor ?? 'var(--color-text-primary)' }}>{value}</div>
       {change !== undefined && (
         <div className={`flex items-center gap-1 text-xs font-semibold ${change >= 0 ? 'text-bull' : 'text-bear'}`}>
           {change >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
@@ -112,6 +112,7 @@ export default function Dashboard() {
               value={fmtUsd(portfolio.cash)}
               icon={DollarSign}
               subtitle="Available"
+              valueColor="#2962ff"
             />
             <StatCard
               label="Total P&L"
