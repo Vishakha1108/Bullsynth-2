@@ -239,8 +239,8 @@ Response:
                       />
                       <Tooltip
                         formatter={(value) => {
-                          const numericValue = typeof value === 'number' ? value : Number(value ?? 0);
-                          return [`$${numericValue.toFixed(2)}`, 'PnL'];
+                          const numeric = typeof value === 'number' ? value : Number(value);
+                          return [Number.isFinite(numeric) ? `$${numeric.toFixed(2)}` : String(value ?? ''), 'PnL'];
                         }}
                         labelFormatter={(label) => `Time: ${label}`}
                         contentStyle={{

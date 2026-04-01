@@ -106,15 +106,6 @@ export interface IndicatorDefinition {
     description: string;
 }
 
-export interface CustomIndicatorScript {
-    id: string;
-    name: string;
-    source: string;
-    description?: string;
-    enabled: boolean;
-    createdAt: number;
-}
-
 export const INDICATOR_COLORS: Record<IndicatorId, string> = {
     sma20: '#f59e0b',
     sma50: '#fb7185',
@@ -262,7 +253,6 @@ interface MarketState {
     high24h: number;
     low24h: number;
     enabledIndicators: IndicatorId[];
-    customIndicatorScripts: CustomIndicatorScript[];
     chartType: string;
     watchlist: string[];
     activeTool: string;
@@ -315,10 +305,6 @@ interface MarketState {
     toggleIndicator: (indicatorId: IndicatorId) => void;
     setIndicatorEnabled: (indicatorId: IndicatorId, enabled: boolean) => void;
     clearIndicators: () => void;
-    addCustomIndicatorScript: (script: { name: string; source: string; description?: string }) => void;
-    removeCustomIndicatorScript: (scriptId: string) => void;
-    setCustomIndicatorScriptEnabled: (scriptId: string, enabled: boolean) => void;
-    hydrateCustomIndicatorScripts: () => void;
     setChartType: (type: string) => void;
     addToWatchlist: (symbol: string) => void;
     removeFromWatchlist: (symbol: string) => void;
@@ -354,44 +340,6 @@ interface MarketState {
 }
 
 const PORTFOLIO_STORAGE_KEY = 'synthetic_bull_portfolio';
-const CUSTOM_INDICATORS_STORAGE_KEY = 'synthetic_bull_custom_indicators';
-
-function parseCustomIndicatorScripts(raw: string | null): CustomIndicatorScript[] {
-    if (!raw) return [];
-
-    try {
-        const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed)) return [];
-
-        return parsed
-            .map((item) => {
-                if (!item) return null;
-
-                const id = typeof item.id === 'string' ? item.id : `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-                const name = typeof item.name === 'string'
-                    ? item.name
-                    : (typeof item.scriptName === 'string' ? item.scriptName : 'Custom Script');
-                const source = typeof item.source === 'string'
-                    ? item.source
-                    : (typeof item.script === 'string' ? item.script : '');
-
-                if (!source.trim()) return null;
-
-                return {
-                    id,
-                    name,
-                    source,
-                    description: typeof item.description === 'string' ? item.description : '',
-                    enabled: typeof item.enabled === 'boolean' ? item.enabled : true,
-                    createdAt: typeof item.createdAt === 'number' ? item.createdAt : Date.now(),
-                } as CustomIndicatorScript;
-            })
-            .filter((item): item is CustomIndicatorScript => item !== null);
-    } catch (e) {
-        console.error('Failed to parse custom indicators from localStorage', e);
-        return [];
-    }
-}
 
 const initialPortfolio: Portfolio = (() => {
     if (typeof window === 'undefined') return {
@@ -419,12 +367,6 @@ const initialPortfolio: Portfolio = (() => {
     };
 })();
 
-const initialCustomIndicatorScripts: CustomIndicatorScript[] = (() => {
-    if (typeof window === 'undefined') return [];
-
-    return parseCustomIndicatorScripts(localStorage.getItem(CUSTOM_INDICATORS_STORAGE_KEY));
-})();
-
 const useMarketStore = create<MarketState>((set) => ({
     candles: [],
     latestCandle: null,
@@ -441,7 +383,6 @@ const useMarketStore = create<MarketState>((set) => ({
     high24h: 0,
     low24h: 0,
     enabledIndicators: [],
-    customIndicatorScripts: initialCustomIndicatorScripts,
     chartType: 'Candles',
     watchlist: ['AAPL', 'BTC', 'ETH'],
     activeTool: 'crosshair',
@@ -703,55 +644,6 @@ const useMarketStore = create<MarketState>((set) => ({
     })),
 
     clearIndicators: () => set({ enabledIndicators: [] }),
-    addCustomIndicatorScript: ({ name, source, description }) => set((state) => {
-        const trimmedName = name.trim();
-        const trimmedSource = source.trim();
-        if (!trimmedName || !trimmedSource) return state;
-
-        const nextScripts: CustomIndicatorScript[] = [
-            ...state.customIndicatorScripts,
-            {
-                id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-                name: trimmedName,
-                source: trimmedSource,
-                description: description?.trim() || '',
-                enabled: true,
-                createdAt: Date.now(),
-            },
-        ];
-
-        if (typeof window !== 'undefined') {
-            localStorage.setItem(CUSTOM_INDICATORS_STORAGE_KEY, JSON.stringify(nextScripts));
-        }
-
-        return { customIndicatorScripts: nextScripts };
-    }),
-    removeCustomIndicatorScript: (scriptId) => set((state) => {
-        const nextScripts = state.customIndicatorScripts.filter((script) => script.id !== scriptId);
-
-        if (typeof window !== 'undefined') {
-            localStorage.setItem(CUSTOM_INDICATORS_STORAGE_KEY, JSON.stringify(nextScripts));
-        }
-
-        return { customIndicatorScripts: nextScripts };
-    }),
-    setCustomIndicatorScriptEnabled: (scriptId, enabled) => set((state) => {
-        const nextScripts = state.customIndicatorScripts.map((script) => (
-            script.id === scriptId ? { ...script, enabled } : script
-        ));
-
-        if (typeof window !== 'undefined') {
-            localStorage.setItem(CUSTOM_INDICATORS_STORAGE_KEY, JSON.stringify(nextScripts));
-        }
-
-        return { customIndicatorScripts: nextScripts };
-    }),
-    hydrateCustomIndicatorScripts: () => set(() => {
-        if (typeof window === 'undefined') return { customIndicatorScripts: [] };
-
-        const nextScripts = parseCustomIndicatorScripts(localStorage.getItem(CUSTOM_INDICATORS_STORAGE_KEY));
-        return { customIndicatorScripts: nextScripts };
-    }),
     setChartType: (type) => set({ chartType: type }),
     addToWatchlist: (symbol) => set((state) => ({
         watchlist: state.watchlist.includes(symbol) ? state.watchlist : [...state.watchlist, symbol]

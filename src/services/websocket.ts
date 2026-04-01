@@ -35,7 +35,7 @@ const pendingCandles: Record<string, Array<{time: number; open: number; high: nu
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 const FLUSH_DELAY = 300; // ms — wait for the initial burst to finish
 
-function _queueInitialCandle(symbol: string, candle: {time: number; open: number; high: number; low: number; close: number; volume: number}) {
+function queueInitialCandle(symbol: string, candle: {time: number; open: number; high: number; low: number; close: number; volume: number}) {
     if (!pendingCandles[symbol]) pendingCandles[symbol] = [];
     pendingCandles[symbol].push(candle);
 
@@ -44,8 +44,8 @@ function _queueInitialCandle(symbol: string, candle: {time: number; open: number
     flushTimer = setTimeout(flushPendingCandles, FLUSH_DELAY);
 }
 
-// Retained for planned reconnect/history batching logic.
-void _queueInitialCandle;
+// Keep the helper reachable for strict noUnusedLocals builds.
+void queueInitialCandle;
 
 function flushPendingCandles() {
     flushTimer = null;
@@ -73,8 +73,7 @@ function flushPendingCandles() {
  * on connect, so for reconnects/symbol changes we re-init the worker which
  * will use its rawCache. This is kept as a no-op for compatibility.
  */
-export function requestHistory(symbol?: string) {
-    void symbol;
+export function requestHistory(_symbol?: string) {
     // Backend does not support get_history — history arrives as individual candle messages on connect.
     // The worker's rawCache handles symbol switches via INIT.
 }

@@ -75,15 +75,13 @@ export default function TradePanel() {
                     className={`tv-trade-side-btn buy ${side === 'BUY' ? 'active' : ''}`}
                     onClick={() => setSide('BUY')}
                 >
-                    <span className="tv-trade-side-label">Buy</span>
-                    <span className="tv-trade-side-price">{bestAsk > 0 ? bestAsk.toFixed(2) : '--'}</span>
+                    Buy
                 </button>
                 <button
                     className={`tv-trade-side-btn sell ${side === 'SELL' ? 'active' : ''}`}
                     onClick={() => setSide('SELL')}
                 >
-                    <span className="tv-trade-side-label">Sell</span>
-                    <span className="tv-trade-side-price">{bestBid > 0 ? bestBid.toFixed(2) : '--'}</span>
+                    Sell
                 </button>
             </div>
 
