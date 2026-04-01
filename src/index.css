@@ -2009,39 +2009,57 @@ input[type='number'] {
   display: flex;
   gap: 0;
   margin-bottom: 10px;
-  border-radius: 4px;
+  border-radius: 12px;
   overflow: hidden;
-  border: 1px solid #2a2e39;
+  border: 1px solid #3a3f4d;
+  background: #2f3340;
 }
 
 .tv-trade-side-btn {
   flex: 1;
-  padding: 8px 0;
+  padding: 6px 0 7px;
   border: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.12s ease;
-  background: transparent;
-  color: #787b86;
+  transition: all 0.15s ease;
+  background: #3a3f4d;
+  color: #a8adb8;
 }
 
-.tv-trade-side-btn.buy:hover {
-  color: #26a69a;
+.tv-trade-side-btn + .tv-trade-side-btn {
+  border-left: 1px solid #4a4f5d;
 }
 
-.tv-trade-side-btn.sell:hover {
-  color: #ef5350;
+.tv-trade-side-btn:hover {
+  filter: brightness(1.05);
 }
 
 .tv-trade-side-btn.buy.active {
-  background: #26a69a;
-  color: #131722;
+  background: #2459e0;
+  color: #f5f8ff;
 }
 
 .tv-trade-side-btn.sell.active {
   background: #ef5350;
-  color: #131722;
+  color: #fff5f5;
+}
+
+.tv-trade-side-label {
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 600;
+}
+
+.tv-trade-side-price {
+  font-size: 13px;
+  line-height: 1;
+  font-weight: 700;
 }
 
 .tv-trade-type-toggle {
@@ -2171,12 +2189,12 @@ input[type='number'] {
 }
 
 .tv-trade-submit.buy {
-  background: #26a69a;
-  color: #131722;
+  background: #2459e0;
+  color: #f5f8ff;
 }
 
 .tv-trade-submit.buy:hover {
-  background: #2bbd8e;
+  background: #2f65f0;
 }
 
 .tv-trade-submit.sell {
