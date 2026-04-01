@@ -9,7 +9,7 @@ import RightPanel from './RightPanel';
 import BottomBar from './BottomBar.tsx';
 import useMarketStore from '../store/useMarketStore';
 import { List, BookOpen, Bot, Wallet } from 'lucide-react';
-import Portfolio from './PortfolioNew';
+import Portfolio from './Portfolio';
 import BotPanel from './BotPanel';
 import NotificationContainer from './Notification';
 

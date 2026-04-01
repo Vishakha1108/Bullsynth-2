@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { calculateHoldings, type Holding, type PortfolioMetrics, type OrderRecord } from '../lib/portfolioEngine';
 
 export interface Trade {
     id: number;
@@ -268,9 +267,6 @@ interface MarketState {
 
     historySequence: number;
     portfolio: Portfolio;
-    completedOrders: OrderRecord[];
-    dynamicHoldings: Holding[];
-    dynamicPortfolioMetrics: PortfolioMetrics | null;
     openOrders: Order[];
     wsConnected: boolean;
 
@@ -305,10 +301,6 @@ interface MarketState {
     addOrder: (order: Order) => void;
     removeOrder: (orderId: number) => void;
     setOpenOrders: (orders: Order[]) => void;
-    executeOrder: (symbol: string, side: 'BUY' | 'SELL', quantity: number, price: number) => void;
-    addCompletedOrder: (symbol: string, side: 'BUY' | 'SELL', quantity: number, price: number) => void;
-    setCompletedOrders: (orders: OrderRecord[]) => void;
-    getPortfolioMetrics: () => PortfolioMetrics | null;
     setPortfolio: (p: Portfolio) => void;
     toggleIndicator: (indicatorId: IndicatorId) => void;
     setIndicatorEnabled: (indicatorId: IndicatorId, enabled: boolean) => void;
@@ -404,9 +396,6 @@ const useMarketStore = create<MarketState>((set) => ({
     historySequence: 0,
 
     portfolio: initialPortfolio,
-    completedOrders: [],
-    dynamicHoldings: [],
-    dynamicPortfolioMetrics: null,
     openOrders: [],
     wsConnected: false,
 
@@ -602,75 +591,6 @@ const useMarketStore = create<MarketState>((set) => ({
     addOrder: (order) => set((state) => ({ openOrders: [...state.openOrders, order] })),
     removeOrder: (orderId) => set((state) => ({ openOrders: state.openOrders.filter((o) => o.order_id !== orderId) })),
     setOpenOrders: (orders) => set({ openOrders: orders }),
-    
-    // Portfolio Engine Methods
-    addCompletedOrder: (symbol, side, quantity, price) => set((state) => {
-        const newOrder: OrderRecord = {
-            id: `order-${Date.now()}-${Math.random()}`,
-            symbol,
-            side,
-            quantity,
-            price,
-            timestamp: Date.now(),
-        };
-        const updatedOrders = [...state.completedOrders, newOrder];
-        const metrics = calculateHoldings(updatedOrders, state.prices);
-        return {
-            completedOrders: updatedOrders,
-            dynamicPortfolioMetrics: { ...metrics, cash: state.portfolio.cash },
-            dynamicHoldings: metrics.holdings,
-        };
-    }),
-
-    setCompletedOrders: (orders) => set((state) => {
-        const metrics = calculateHoldings(orders, state.prices);
-        return {
-            completedOrders: orders,
-            dynamicPortfolioMetrics: { ...metrics, cash: state.portfolio.cash },
-            dynamicHoldings: metrics.holdings,
-        };
-    }),
-
-    executeOrder: (symbol, side, quantity, price) => set((state) => {
-        // Add to completed orders
-        const newOrder: OrderRecord = {
-            id: `order-${Date.now()}-${Math.random()}`,
-            symbol,
-            side,
-            quantity,
-            price,
-            timestamp: Date.now(),
-        };
-        const updatedOrders = [...state.completedOrders, newOrder];
-        
-        // Recalculate portfolio
-        const metrics = calculateHoldings(updatedOrders, state.prices);
-        
-        // Update cash based on BUY/SELL
-        let newCash = state.portfolio.cash;
-        if (side === 'BUY') {
-            newCash -= quantity * price;
-        } else {
-            newCash += quantity * price;
-        }
-        
-        return {
-            completedOrders: updatedOrders,
-            dynamicPortfolioMetrics: { ...metrics, cash: newCash },
-            dynamicHoldings: metrics.holdings,
-            portfolio: {
-                ...state.portfolio,
-                cash: newCash,
-                totalValue: newCash + metrics.currentValue,
-            },
-        };
-    }),
-
-    getPortfolioMetrics: (): (PortfolioMetrics | null) => {
-        const state = useMarketStore.getState();
-        return state.dynamicPortfolioMetrics;
-    },
-
     setPortfolio: (p) => {
         set((state) => {
             // Check if incoming portfolio is the default "reset" state (100k cash, no holdings, no P&L)
@@ -692,14 +612,6 @@ const useMarketStore = create<MarketState>((set) => ({
                 }
             }
 
-            // Update prices from portfolio holdings (so portfolio engine has current prices)
-            const nextPrices = { ...state.prices };
-            for (const holding of mergedHoldings) {
-                if (holding.currentPrice > 0) {
-                    nextPrices[holding.asset] = holding.currentPrice;
-                }
-            }
-
             // Recalculate totals based on merged holdings
             const totalMarketValue = mergedHoldings.reduce((sum, h) => sum + h.marketValue, 0);
             const totalUnrealizedPnl = mergedHoldings.reduce((sum, h) => sum + h.unrealizedPnl, 0);
@@ -712,22 +624,8 @@ const useMarketStore = create<MarketState>((set) => ({
                 totalValue: updatedTotalValue
             };
 
-            // Recalculate dynamic portfolio with updated prices
-            let updatedMetrics = state.dynamicPortfolioMetrics;
-            let updatedHoldings = state.dynamicHoldings;
-            if (state.completedOrders.length > 0) {
-                const metrics = calculateHoldings(state.completedOrders, nextPrices);
-                updatedMetrics = { ...metrics, cash: updatedPortfolio.cash };
-                updatedHoldings = metrics.holdings;
-            }
-
             localStorage.setItem(PORTFOLIO_STORAGE_KEY, JSON.stringify(updatedPortfolio));
-            return { 
-                portfolio: updatedPortfolio,
-                prices: nextPrices,
-                dynamicPortfolioMetrics: updatedMetrics,
-                dynamicHoldings: updatedHoldings,
-            };
+            return { portfolio: updatedPortfolio };
         });
     },
 
@@ -769,31 +667,19 @@ const useMarketStore = create<MarketState>((set) => ({
         const previousPrice = state.prices[symbol] || price;
         useMarketStore.getState().checkAlerts(symbol, price, previousPrice);
 
-        // Auto-recalculate portfolio holdings when prices change
-        let updatedMetrics = state.dynamicPortfolioMetrics;
-        let updatedHoldings = state.dynamicHoldings;
-        if (state.completedOrders.length > 0) {
-            const metrics = calculateHoldings(state.completedOrders, nextPrices);
-            updatedMetrics = { ...metrics, cash: state.portfolio.cash };
-            updatedHoldings = metrics.holdings;
-        }
-
         if (symbol === state.currentSymbol) {
             return {
                 prices: nextPrices,
                 priceBaselines: nextPriceBaselines,
                 priceChanges: nextChanges,
                 lastPrice: price,
-                priceChange24h: change !== undefined ? change : state.priceChange24h,
-                dynamicPortfolioMetrics: updatedMetrics,
-                dynamicHoldings: updatedHoldings,
+                priceChange24h: liveChange,
             };
         }
-        return { 
-            prices: nextPrices, 
+        return {
+            prices: nextPrices,
+            priceBaselines: nextPriceBaselines,
             priceChanges: nextChanges,
-            dynamicPortfolioMetrics: updatedMetrics,
-            dynamicHoldings: updatedHoldings,
         };
     }),
 
