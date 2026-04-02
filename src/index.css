@@ -5478,6 +5478,43 @@ input[type='number'] {
   background: rgba(241, 245, 249, 0.85);
 }
 
+.light .dash-admin-input,
+.light .dash-admin-search-wrap {
+  background: linear-gradient(145deg, rgba(248, 250, 252, 0.96), rgba(241, 245, 249, 0.9));
+  border-color: rgba(148, 163, 184, 0.4);
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+
+.light .dash-admin-code {
+  background: linear-gradient(145deg, rgba(248, 250, 252, 0.96), rgba(241, 245, 249, 0.9));
+  border-color: rgba(148, 163, 184, 0.4);
+  color: #475569;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+
+.light .dash-admin-input {
+  color: #131722;
+}
+
+.light .dash-admin-input::placeholder,
+.light .dash-admin-search-input::placeholder {
+  color: #8b95a7;
+}
+
+.light .dash-admin-input:focus,
+.light .dash-admin-search-wrap:focus-within {
+  border-color: rgba(99, 102, 241, 0.65);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.12), inset 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+
+.light .dash-admin-search-wrap {
+  color: #5d606b;
+}
+
+.light .dash-admin-search-wrap svg {
+  color: #6b7280;
+}
+
 .light .dash-icon-bg {
   background: rgba(99, 102, 241, 0.12);
   color: #6366f1;

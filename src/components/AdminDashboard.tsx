@@ -175,7 +175,7 @@ export default function AdminDashboard() {
                 value={newBotName}
                 onChange={(e) => setNewBotName(e.target.value)}
                 placeholder="Enter bot name (e.g., Alpha-01)"
-                className="flex-1 rounded-lg border border-white/14 bg-white/[0.03] px-4 py-2.5 text-sm text-text-primary placeholder:text-text-secondary backdrop-blur-md focus:outline-none focus:border-accent/45"
+                className="dash-admin-input flex-1 rounded-lg border border-white/14 bg-white/[0.03] px-4 py-2.5 text-sm text-text-primary placeholder:text-text-secondary backdrop-blur-md focus:outline-none focus:border-accent/45"
                 disabled={creating}
                 autoComplete="off"
               />
@@ -203,13 +203,13 @@ export default function AdminDashboard() {
               </div>
 
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
-                <div className="flex items-center gap-2 rounded-lg border border-white/14 bg-white/[0.03] px-3 py-2 backdrop-blur-md">
+                <div className="dash-admin-search-wrap flex items-center gap-2 rounded-lg border border-white/14 bg-white/[0.03] px-3 py-2 backdrop-blur-md">
                   <Search size={14} className="text-text-secondary" />
                   <input
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="Search bot by name, id, or API key"
-                    className="w-full bg-transparent text-sm text-text-primary placeholder:text-text-secondary outline-none"
+                    className="dash-admin-search-input w-full bg-transparent text-sm text-text-primary placeholder:text-text-secondary outline-none"
                   />
                 </div>
 
@@ -264,7 +264,7 @@ export default function AdminDashboard() {
                     filteredBots.map((bot) => (
                       <tr key={bot.id} className="dash-table-row">
                         <td className="px-6 py-4">
-                          <code className="block max-w-full truncate bg-white/[0.03] px-2 py-1 rounded text-xs text-text-secondary border border-white/10 font-mono">
+                          <code className="dash-admin-code block max-w-full truncate bg-white/[0.03] px-2 py-1 rounded text-xs text-text-secondary border border-white/10 font-mono">
                             {bot.id}
                           </code>
                         </td>
@@ -285,7 +285,7 @@ export default function AdminDashboard() {
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2 group">
-                            <code className="block min-w-0 flex-1 truncate bg-white/[0.03] px-2 py-1 rounded text-xs text-text-primary border border-white/10 font-mono select-all">
+                            <code className="dash-admin-code block min-w-0 flex-1 truncate bg-white/[0.03] px-2 py-1 rounded text-xs text-text-primary border border-white/10 font-mono select-all">
                               {bot.api_key}
                             </code>
                             <button 
