@@ -86,7 +86,7 @@ type IndicatorSeriesBucket = {
 
 // ─── Chart colour palettes ──────────────────────────────────────────────────
 const DARK_CHART = {
-  bg: "#131722",
+  bg: "#0a0e17",
   text: "#787b86",
   gridLine: "#1e222d",
   crosshair: "#758696",

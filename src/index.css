@@ -179,9 +179,9 @@
   padding: 8px 0;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(5, 5, 5, 0.78);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(5, 5, 5, 0.98);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   box-shadow: 0 0 34px rgba(99, 102, 241, 0.12), 0 18px 40px rgba(0, 0, 0, 0.62);
 }
 
@@ -343,9 +343,9 @@
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
-  background: rgba(5, 5, 5, 0.76);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(5, 5, 5, 0.97);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   box-shadow: 0 0 34px rgba(99, 102, 241, 0.12), 0 18px 40px rgba(0, 0, 0, 0.62);
 }
 
@@ -449,9 +449,9 @@
   left: 0;
   width: min(960px, 92vw);
   height: min(680px, 82vh);
-  background: rgba(5, 5, 5, 0.7);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  background: rgba(5, 5, 5, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
   box-shadow: 0 0 40px rgba(99, 102, 241, 0.15), 0 20px 40px rgba(0, 0, 0, 0.6);
@@ -1501,7 +1501,7 @@
   flex-direction: column;
   height: 100%;
   width: 100%;
-  background: #131722;
+  background: #0a0e17;
 }
 
 /* ─── Chart Body (Toolbar + Canvas) ───────────────────────────────────────── */
@@ -1792,9 +1792,9 @@ input[type='number'] {
   max-width: 600px;
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(5, 5, 5, 0.74);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  background: rgba(5, 5, 5, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   box-shadow: 0 0 40px rgba(99, 102, 241, 0.15), 0 20px 40px rgba(0, 0, 0, 0.6);
   display: flex;
   flex-direction: column;
@@ -2075,9 +2075,9 @@ input[type='number'] {
   flex-direction: column;
   overflow: hidden;
   border-radius: 16px;
-  background: rgba(5, 5, 5, 0.74);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  background: rgba(5, 5, 5, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 0 40px rgba(99, 102, 241, 0.15), 0 20px 40px rgba(0, 0, 0, 0.6);
   overflow-y: auto;
@@ -4291,9 +4291,7 @@ input[type='number'] {
 
 .light .tv-header-menu-surface {
   border-color: rgba(148, 163, 184, 0.35);
-  background:
-    linear-gradient(160deg, rgba(99, 102, 241, 0.1), rgba(255, 255, 255, 0) 42%),
-    rgba(255, 255, 255, 0.88);
+  background: rgba(255, 255, 255, 0.97);
   box-shadow: 0 18px 42px rgba(15, 23, 42, 0.16), 0 0 20px rgba(99, 102, 241, 0.1);
 }
 
@@ -4312,9 +4310,7 @@ input[type='number'] {
 
 .light .tv-dropdown-surface {
   border-color: rgba(148, 163, 184, 0.35);
-  background:
-    linear-gradient(160deg, rgba(99, 102, 241, 0.09), rgba(255, 255, 255, 0) 48%),
-    rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.96);
   box-shadow: 0 14px 32px rgba(15, 23, 42, 0.16);
 }
 
@@ -4335,6 +4331,29 @@ input[type='number'] {
 .light .tv-toolbar-dropdown-label {
   color: #787b86;
   border-bottom-color: #e0e3eb;
+}
+
+/* ── Toolbar Dropdown Buttons (Light Mode) ──────────────────────────────── */
+.light .tv-toolbar-dropdown button {
+  color: #131722 !important;
+}
+
+.light .tv-toolbar-dropdown button:hover {
+  color: #111827 !important;
+  background: rgba(99, 102, 241, 0.1) !important;
+}
+
+.light .tv-toolbar-dropdown button:hover svg {
+  color: #111827 !important;
+}
+
+.light .tv-toolbar-dropdown button.active {
+  color: #4338ca !important;
+  background: rgba(99, 102, 241, 0.15) !important;
+}
+
+.light .tv-toolbar-dropdown button.active svg {
+  color: #4338ca !important;
 }
 
 .light .tv-price-value {
