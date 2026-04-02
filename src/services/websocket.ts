@@ -73,7 +73,7 @@ function flushPendingCandles() {
  * on connect, so for reconnects/symbol changes we re-init the worker which
  * will use its rawCache. This is kept as a no-op for compatibility.
  */
-export function requestHistory(_symbol?: string) {
+export function requestHistory(_symbol?: string) { // eslint-disable-line @typescript-eslint/no-unused-vars
     // Backend does not support get_history — history arrives as individual candle messages on connect.
     // The worker's rawCache handles symbol switches via INIT.
 }

@@ -148,7 +148,7 @@ export function getParallelChannelOffset(
  * Generate Gann fan angles from origin
  */
 export function getGannFanLines(
-    x1: number, y1: number, x2: number, y2: number, width: number, _height: number
+    x1: number, y1: number, x2: number, y2: number, width: number, _height: number // eslint-disable-line @typescript-eslint/no-unused-vars
 ) {
     const angles = [
         { label: '1×8', ratio: 1 / 8 },

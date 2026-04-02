@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import useMarketStore from '../store/useMarketStore';
-import type { IChartApi } from 'lightweight-charts';
+import type { IChartApi, ISeriesApi } from 'lightweight-charts';
 import {
     calculateFibonacciLevels,
     calculateFibonacciExtension,
@@ -15,7 +15,10 @@ import {
 
 interface DrawingOverlayProps {
     chartRef: React.MutableRefObject<IChartApi | null>;
-    seriesRef: React.MutableRefObject<any | null>;
+    seriesRef: React.MutableRefObject<{
+        candle: ISeriesApi<"Candlestick"> | ISeriesApi<"Line"> | ISeriesApi<"Area"> | ISeriesApi<"Baseline">;
+        volume: ISeriesApi<"Histogram">;
+    } | null>;
     hideDrawings?: boolean;
 }
 
@@ -166,7 +169,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
         const x = clientX - rect.left;
         const y = clientY - rect.top;
 
-        let time = chartRef.current.timeScale().coordinateToTime(x as any) as number;
+        let time = chartRef.current.timeScale().coordinateToTime(x as number) as number;
         let price = seriesRef.current.candle.coordinateToPrice(y) as number;
 
         if (time === null || price === null) return null;
@@ -183,7 +186,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
 
     const requiredPoints = TOOL_POINT_COUNTS[activeTool] ?? 2;
 
-    const finishDrawing = (type: string, points: { time: number, price: number }[], text?: string, data?: any) => {
+    const finishDrawing = (type: string, points: { time: number, price: number }[], text?: string, data?: Record<string, unknown>) => {
         setDrawings([...drawings, { type, points, text, data }]);
         setActiveDrawing(null);
         setActiveTool('crosshair');
@@ -294,7 +297,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
     // Map logic
     const mapPoint = (time: number, price: number) => {
         if (!chartRef.current || !seriesRef.current) return { x: -1000, y: -1000 };
-        const x = chartRef.current.timeScale().timeToCoordinate(time as any) ?? -1000;
+        const x = chartRef.current.timeScale().timeToCoordinate(time as number) ?? -1000;
         const y = seriesRef.current.candle.priceToCoordinate(price) ?? -1000;
         return { x, y };
     };
@@ -316,7 +319,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
     const H = dimensions.h || 1000;
 
     // Render a single drawing
-    const renderDrawing = (d: { type: string; points: { time: number; price: number }[]; text?: string; data?: any }, i: number) => {
+    const renderDrawing = (d: { type: string; points: { time: number; price: number }[]; text?: string; data?: Record<string, unknown> }, i: number) => {
         const pts = d.points;
 
         // --- Pencil ---
@@ -1030,6 +1033,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
                 onTouchEnd={handlePointerUp}
                 onTouchCancel={handlePointerUp}
             >
+                {/* eslint-disable react-hooks/refs -- SVG overlay must synchronously map chart coordinates during render */}
                 {allDrawings.map((d, i) => renderDrawing(d, i))}
 
                 {activeTool === 'replay' && mousePos && (
@@ -1055,6 +1059,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
                 {mousePos && isInteractive && magnetMode !== 'off' && activeTool !== 'replay' && (
                     <circle cx={mapPoint(mousePos.time!, mousePos.price!).x} cy={mapPoint(mousePos.time!, mousePos.price!).y} r="4" fill="none" stroke="#6366f1" strokeWidth="2" />
                 )}
+                {/* eslint-enable react-hooks/refs */}
             </svg>
 
             {textEntry && (

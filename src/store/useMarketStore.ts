@@ -56,6 +56,14 @@ export interface Portfolio {
     totalValue: number;
 }
 
+export interface ShortSellingConfig {
+    enabled: boolean;
+    maxShortQtyPerSymbol: number;
+    maxTotalShortNotional: number;
+    minEquity: number;
+    maxShortNotionalToEquity: number;
+}
+
 export interface CrosshairData {
     open: number;
     high: number;
@@ -85,7 +93,7 @@ export interface Drawing {
     type: string;
     points: DrawingPoint[];
     text?: string;
-    data?: any;
+    data?: Record<string, unknown>;
 }
 
 export interface BotConfig {
@@ -99,19 +107,20 @@ export interface BotConfig {
     [key: string]: string | number | boolean | undefined;
 }
 
-export interface ShortSellingConfig {
-    enabled: boolean;
-    maxShortQtyPerSymbol: number;
-    maxTotalShortNotional: number;
-    minEquity: number;
-    maxShortNotionalToEquity: number;
-}
-
 export interface IndicatorDefinition {
     id: IndicatorId;
     label: string;
     category: 'Trend' | 'Volatility' | 'Volume' | 'Oscillator';
     description: string;
+}
+
+export interface CustomIndicatorScript {
+    id: string;
+    name: string;
+    source: string;
+    description?: string;
+    enabled: boolean;
+    createdAt: number;
 }
 
 export const INDICATOR_COLORS: Record<IndicatorId, string> = {
@@ -147,7 +156,7 @@ export const INDICATOR_COLORS: Record<IndicatorId, string> = {
     pvt: '#fcd34d',
     stoch: '#818cf8',
     stochrsi: '#6366f1',
-    cci: '#6366f1',
+    cci: '#7c3aed',
     mom: '#2dd4bf',
     wpr: '#34d399',
     ao: '#10b981',
@@ -261,6 +270,7 @@ interface MarketState {
     high24h: number;
     low24h: number;
     enabledIndicators: IndicatorId[];
+    customIndicatorScripts: CustomIndicatorScript[];
     chartType: string;
     watchlist: string[];
     activeTool: string;
@@ -277,7 +287,7 @@ interface MarketState {
     portfolio: Portfolio;
     openOrders: Order[];
     wsConnected: boolean;
-    shortSellingConfig: ShortSellingConfig;
+    shortSellingConfig: ShortSellingConfig | null;
 
     // Replay State
     isReplayMode: boolean;
@@ -299,6 +309,7 @@ interface MarketState {
     setSymbols: (symbols: string[]) => void;
     setTickers: (tickers: { symbol: string; name: string; category: string }[]) => void;
     setUserId: (uid: string | null) => void;
+    setShortSellingConfig: (cfg: ShortSellingConfig | null) => void;
     resetSymbolData: () => void;
     setCrosshairData: (data: CrosshairData | null) => void;
     setCandlesData: (candles: Candle[], latestCandle?: Candle | null) => void;
@@ -307,7 +318,6 @@ interface MarketState {
     setOrderBook: (bids: { price: number, qty: number }[], asks: { price: number, qty: number }[]) => void;
     addTrade: (trade: Trade) => void;
     setWsConnected: (connected: boolean) => void;
-    setShortSellingConfig: (config: Partial<ShortSellingConfig>) => void;
     addOrder: (order: Order) => void;
     removeOrder: (orderId: number) => void;
     setOpenOrders: (orders: Order[]) => void;
@@ -315,6 +325,10 @@ interface MarketState {
     toggleIndicator: (indicatorId: IndicatorId) => void;
     setIndicatorEnabled: (indicatorId: IndicatorId, enabled: boolean) => void;
     clearIndicators: () => void;
+    addCustomIndicatorScript: (script: { name: string; source: string; description?: string }) => void;
+    removeCustomIndicatorScript: (scriptId: string) => void;
+    setCustomIndicatorScriptEnabled: (scriptId: string, enabled: boolean) => void;
+    hydrateCustomIndicatorScripts: () => void;
     setChartType: (type: string) => void;
     addToWatchlist: (symbol: string) => void;
     removeFromWatchlist: (symbol: string) => void;
@@ -349,13 +363,77 @@ interface MarketState {
     removeNotification: (id: string) => void;
 }
 
-const initialPortfolio: Portfolio = {
-    cash: 100000,
-    holdings: [],
-    realizedPnl: 0,
-    unrealizedPnl: 0,
-    totalValue: 100000,
-};
+const PORTFOLIO_STORAGE_KEY = 'synthetic_bull_portfolio';
+const CUSTOM_INDICATORS_STORAGE_KEY = 'synthetic_bull_custom_indicators';
+
+function parseCustomIndicatorScripts(raw: string | null): CustomIndicatorScript[] {
+    if (!raw) return [];
+
+    try {
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return [];
+
+        return parsed
+            .map((item) => {
+                if (!item) return null;
+
+                const id = typeof item.id === 'string' ? item.id : `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+                const name = typeof item.name === 'string'
+                    ? item.name
+                    : (typeof item.scriptName === 'string' ? item.scriptName : 'Custom Script');
+                const source = typeof item.source === 'string'
+                    ? item.source
+                    : (typeof item.script === 'string' ? item.script : '');
+
+                if (!source.trim()) return null;
+
+                return {
+                    id,
+                    name,
+                    source,
+                    description: typeof item.description === 'string' ? item.description : '',
+                    enabled: typeof item.enabled === 'boolean' ? item.enabled : true,
+                    createdAt: typeof item.createdAt === 'number' ? item.createdAt : Date.now(),
+                } as CustomIndicatorScript;
+            })
+            .filter((item): item is CustomIndicatorScript => item !== null);
+    } catch (e) {
+        console.error('Failed to parse custom indicators from localStorage', e);
+        return [];
+    }
+}
+
+const initialPortfolio: Portfolio = (() => {
+    if (typeof window === 'undefined') return {
+        cash: 100000,
+        holdings: [],
+        realizedPnl: 0,
+        unrealizedPnl: 0,
+        totalValue: 100000,
+    };
+
+    const saved = localStorage.getItem(PORTFOLIO_STORAGE_KEY);
+    if (saved) {
+        try {
+            return JSON.parse(saved);
+        } catch (e) {
+            console.error('Failed to parse portfolio from localStorage', e);
+        }
+    }
+    return {
+        cash: 100000,
+        holdings: [],
+        realizedPnl: 0,
+        unrealizedPnl: 0,
+        totalValue: 100000,
+    };
+})();
+
+const initialCustomIndicatorScripts: CustomIndicatorScript[] = (() => {
+    if (typeof window === 'undefined') return [];
+
+    return parseCustomIndicatorScripts(localStorage.getItem(CUSTOM_INDICATORS_STORAGE_KEY));
+})();
 
 const useMarketStore = create<MarketState>((set) => ({
     candles: [],
@@ -373,6 +451,7 @@ const useMarketStore = create<MarketState>((set) => ({
     high24h: 0,
     low24h: 0,
     enabledIndicators: [],
+    customIndicatorScripts: initialCustomIndicatorScripts,
     chartType: 'Candles',
     watchlist: ['AAPL', 'BTC', 'ETH'],
     activeTool: 'crosshair',
@@ -388,13 +467,7 @@ const useMarketStore = create<MarketState>((set) => ({
     portfolio: initialPortfolio,
     openOrders: [],
     wsConnected: false,
-    shortSellingConfig: {
-        enabled: false,
-        maxShortQtyPerSymbol: 0,
-        maxTotalShortNotional: 0,
-        minEquity: 0,
-        maxShortNotionalToEquity: 0,
-    },
+    shortSellingConfig: null,
 
     isReplayMode: false,
     replayCandles: [],
@@ -427,6 +500,7 @@ const useMarketStore = create<MarketState>((set) => ({
     setSymbols: (symbols) => set({ symbols }),
     setTickers: (tickers) => set({ tickers }),
     setUserId: (uid) => set({ userId: uid }),
+    setShortSellingConfig: (cfg) => set({ shortSellingConfig: cfg }),
     resetSymbolData: () => set((state) => ({
         candles: [],
         latestCandle: null,
@@ -585,54 +659,46 @@ const useMarketStore = create<MarketState>((set) => ({
     }),
 
     setWsConnected: (connected) => set({ wsConnected: connected }),
-    setShortSellingConfig: (config) => set((state) => ({
-        shortSellingConfig: {
-            ...state.shortSellingConfig,
-            ...config,
-        },
-    })),
     addOrder: (order) => set((state) => ({ openOrders: [...state.openOrders, order] })),
     removeOrder: (orderId) => set((state) => ({ openOrders: state.openOrders.filter((o) => o.order_id !== orderId) })),
     setOpenOrders: (orders) => set({ openOrders: orders }),
-    setPortfolio: (p) => set(() => {
-        const holdings = (Array.isArray(p.holdings) ? p.holdings : [])
-            .map((h) => ({
-                asset: String(h.asset),
-                qty: Number(h.qty || 0),
-                avgPrice: Number(h.avgPrice || 0),
-                currentPrice: Number(h.currentPrice || 0),
-                marketValue: Number(h.marketValue || 0),
-                realizedPnl: Number(h.realizedPnl || 0),
-                unrealizedPnl: Number(h.unrealizedPnl || 0),
-            }))
-            .filter((h) =>
-                Number.isFinite(h.qty) &&
-                Number.isFinite(h.avgPrice) &&
-                Number.isFinite(h.currentPrice) &&
-                Number.isFinite(h.marketValue) &&
-                Number.isFinite(h.realizedPnl) &&
-                Number.isFinite(h.unrealizedPnl)
-            )
-            .sort((a, b) => a.asset.localeCompare(b.asset));
+    setPortfolio: (p) => {
+        set((state) => {
+            // Check if incoming portfolio is the default "reset" state (100k cash, no holdings, no P&L)
+            const isServerReset = p.holdings.length === 0 && p.cash === 100000 && p.realizedPnl === 0 && p.unrealizedPnl === 0;
+            const hasLocalData = state.portfolio.holdings.length > 0;
 
-        const cash = Number(p.cash || 0);
-        const totalMarketValue = holdings.reduce((sum, h) => sum + h.marketValue, 0);
-        const fallbackUnrealized = holdings.reduce((sum, h) => sum + h.unrealizedPnl, 0);
+            if (isServerReset && hasLocalData) {
+                console.log('Preserving local holdings - server appears to have reset');
+                return { portfolio: state.portfolio };
+            }
 
-        const realizedPnl = Number.isFinite(Number(p.realizedPnl)) ? Number(p.realizedPnl) : 0;
-        const unrealizedPnl = Number.isFinite(Number(p.unrealizedPnl)) ? Number(p.unrealizedPnl) : fallbackUnrealized;
-        const totalValue = Number.isFinite(Number(p.totalValue)) ? Number(p.totalValue) : (cash + totalMarketValue);
+            // Merge holdings: Keep existing ones if they aren't in the incoming update
+            const mergedHoldings = [...p.holdings];
+            const incomingAssets = new Set(p.holdings.map(h => h.asset));
 
-        return {
-            portfolio: {
-                cash,
-                holdings,
-                realizedPnl,
-                unrealizedPnl,
-                totalValue,
-            },
-        };
-    }),
+            for (const localH of state.portfolio.holdings) {
+                if (!incomingAssets.has(localH.asset)) {
+                    mergedHoldings.push(localH);
+                }
+            }
+
+            // Recalculate totals based on merged holdings
+            const totalMarketValue = mergedHoldings.reduce((sum, h) => sum + h.marketValue, 0);
+            const totalUnrealizedPnl = mergedHoldings.reduce((sum, h) => sum + h.unrealizedPnl, 0);
+            const updatedTotalValue = p.cash + totalMarketValue;
+
+            const updatedPortfolio = {
+                ...p,
+                holdings: mergedHoldings,
+                unrealizedPnl: totalUnrealizedPnl,
+                totalValue: updatedTotalValue
+            };
+
+            localStorage.setItem(PORTFOLIO_STORAGE_KEY, JSON.stringify(updatedPortfolio));
+            return { portfolio: updatedPortfolio };
+        });
+    },
 
     toggleIndicator: (indicatorId) => set((state) => ({
         enabledIndicators: state.enabledIndicators.includes(indicatorId)
@@ -649,6 +715,55 @@ const useMarketStore = create<MarketState>((set) => ({
     })),
 
     clearIndicators: () => set({ enabledIndicators: [] }),
+    addCustomIndicatorScript: ({ name, source, description }) => set((state) => {
+        const trimmedName = name.trim();
+        const trimmedSource = source.trim();
+        if (!trimmedName || !trimmedSource) return state;
+
+        const nextScripts: CustomIndicatorScript[] = [
+            ...state.customIndicatorScripts,
+            {
+                id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+                name: trimmedName,
+                source: trimmedSource,
+                description: description?.trim() || '',
+                enabled: true,
+                createdAt: Date.now(),
+            },
+        ];
+
+        if (typeof window !== 'undefined') {
+            localStorage.setItem(CUSTOM_INDICATORS_STORAGE_KEY, JSON.stringify(nextScripts));
+        }
+
+        return { customIndicatorScripts: nextScripts };
+    }),
+    removeCustomIndicatorScript: (scriptId) => set((state) => {
+        const nextScripts = state.customIndicatorScripts.filter((script) => script.id !== scriptId);
+
+        if (typeof window !== 'undefined') {
+            localStorage.setItem(CUSTOM_INDICATORS_STORAGE_KEY, JSON.stringify(nextScripts));
+        }
+
+        return { customIndicatorScripts: nextScripts };
+    }),
+    setCustomIndicatorScriptEnabled: (scriptId, enabled) => set((state) => {
+        const nextScripts = state.customIndicatorScripts.map((script) => (
+            script.id === scriptId ? { ...script, enabled } : script
+        ));
+
+        if (typeof window !== 'undefined') {
+            localStorage.setItem(CUSTOM_INDICATORS_STORAGE_KEY, JSON.stringify(nextScripts));
+        }
+
+        return { customIndicatorScripts: nextScripts };
+    }),
+    hydrateCustomIndicatorScripts: () => set(() => {
+        if (typeof window === 'undefined') return { customIndicatorScripts: [] };
+
+        const nextScripts = parseCustomIndicatorScripts(localStorage.getItem(CUSTOM_INDICATORS_STORAGE_KEY));
+        return { customIndicatorScripts: nextScripts };
+    }),
     setChartType: (type) => set({ chartType: type }),
     addToWatchlist: (symbol) => set((state) => ({
         watchlist: state.watchlist.includes(symbol) ? state.watchlist : [...state.watchlist, symbol]
@@ -672,51 +787,20 @@ const useMarketStore = create<MarketState>((set) => ({
         const previousPrice = state.prices[symbol] || price;
         useMarketStore.getState().checkAlerts(symbol, price, previousPrice);
 
-        const hasHolding = state.portfolio.holdings.some((h) => h.asset === symbol);
-        const nextPortfolio = hasHolding
-            ? (() => {
-                const holdings = state.portfolio.holdings.map((h) => {
-                    if (h.asset !== symbol) return h;
-                    const currentPrice = price;
-                    const marketValue = h.qty * currentPrice;
-                    const unrealizedPnl = h.qty * (currentPrice - h.avgPrice);
-                    return {
-                        ...h,
-                        currentPrice,
-                        marketValue,
-                        unrealizedPnl,
-                    };
-                });
-
-                const totalMarketValue = holdings.reduce((sum, h) => sum + h.marketValue, 0);
-                const totalUnrealizedPnl = holdings.reduce((sum, h) => sum + h.unrealizedPnl, 0);
-
-                return {
-                    ...state.portfolio,
-                    holdings,
-                    unrealizedPnl: totalUnrealizedPnl,
-                    totalValue: state.portfolio.cash + totalMarketValue,
-                };
-            })()
-            : null;
-
         if (symbol === state.currentSymbol) {
-            const nextState = {
+            return {
                 prices: nextPrices,
                 priceBaselines: nextPriceBaselines,
                 priceChanges: nextChanges,
                 lastPrice: price,
                 priceChange24h: liveChange,
             };
-            return nextPortfolio ? { ...nextState, portfolio: nextPortfolio } : nextState;
         }
-
-        const nextState = {
+        return {
             prices: nextPrices,
             priceBaselines: nextPriceBaselines,
             priceChanges: nextChanges,
         };
-        return nextPortfolio ? { ...nextState, portfolio: nextPortfolio } : nextState;
     }),
 
     setActiveTool: (tool) => set({ activeTool: tool }),

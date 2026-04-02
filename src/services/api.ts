@@ -5,7 +5,7 @@ async function requestJson(
     url: string,
     init?: RequestInit,
     timeoutMs: number = REQUEST_TIMEOUT_MS
-): Promise<any> {
+): Promise<unknown> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 

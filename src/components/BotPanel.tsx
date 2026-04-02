@@ -179,6 +179,7 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
     if (!running || !activeLapStartMs) return '00:00';
     const elapsedSeconds = Math.max(0, Math.floor((Date.now() - activeLapStartMs) / 1000));
     return formatDuration(elapsedSeconds);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running, activeLapStartMs, clockTick]);
 
   const visibleBots = useMemo(() => {
@@ -319,12 +320,14 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
 
   useEffect(() => {
     void syncActiveLapsForSelection(selectedBotIds);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedBotIds]);
 
   useEffect(() => {
     if (loadingBots) return;
     if (selectedBotIds.length > 0) return;
     void syncActiveLapsForSelection([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadingBots, bots, selectedBotIds.length]);
 
   const loadRuntime = async (botId: string, sessionId: string | null, requireSession = false) => {
@@ -401,6 +404,7 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
       void refreshSelectedRuntime();
     }, POLL_MS);
     return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedBotIds, running]);
 
   const toggleSelected = (botId: string) => {
