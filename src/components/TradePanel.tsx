@@ -11,11 +11,25 @@ export default function TradePanel() {
     const lastPrice = useMarketStore(state => state.lastPrice);
     const currentSymbol = useMarketStore(state => state.currentSymbol);
     const holdings = useMarketStore(state => state.portfolio.holdings);
+    const openOrders = useMarketStore(state => state.openOrders);
+    const userId = useMarketStore(state => state.userId);
+    const wsConnected = useMarketStore(state => state.wsConnected);
 
-    const availableQty = useMemo(() => {
+    const heldQty = useMemo(() => {
         const h = holdings.find(item => item.asset === currentSymbol);
         return h ? h.qty : 0;
     }, [holdings, currentSymbol]);
+
+    const reservedSellQty = useMemo(() => {
+        return openOrders
+            .filter((order) => order.symbol === currentSymbol && order.side === 'SELL' && order.remainingQty > 0)
+            .reduce((sum, order) => sum + order.remainingQty, 0);
+    }, [openOrders, currentSymbol]);
+
+    const sessionMode = useMemo<'connecting' | 'guest' | 'bot'>(() => {
+        if (!userId) return 'connecting';
+        return userId === 'frontend_user' ? 'guest' : 'bot';
+    }, [userId]);
 
     const bestBid = useMarketStore(state => state.orderBook.bids[0]?.price || 0);
     const bestAsk = useMarketStore(state => state.orderBook.asks[0]?.price || 0);
@@ -31,12 +45,16 @@ export default function TradePanel() {
         return '0.00';
     }, [price, qty, lastPrice, type]);
 
+    const numericQty = parseFloat(qty);
+    const numericPrice = parseFloat(price);
+    const canSubmit = wsConnected
+        && Number.isFinite(numericQty)
+        && numericQty > 0
+        && (type === 'market' || (Number.isFinite(numericPrice) && numericPrice > 0));
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        const numericQty = parseFloat(qty);
-        if (!qty || numericQty <= 0) return;
-        if (side === 'SELL' && numericQty > availableQty) return;
-        if (type === 'limit' && (!price || parseFloat(price) <= 0)) return;
+        if (!canSubmit) return;
 
         wsManager.send({
             type: 'place_order',
@@ -47,19 +65,9 @@ export default function TradePanel() {
             qty: parseFloat(qty)
         });
 
-        const numericPrice = parseFloat(price);
-        const isMarketable = type === 'market' || (
-            type === 'limit' && (
-                (side === 'BUY' && numericPrice >= bestAsk && bestAsk > 0) ||
-                (side === 'SELL' && numericPrice <= bestBid && bestBid > 0)
-            )
-        );
-
         useMarketStore.getState().addNotification(
-            !isMarketable
-                ? `Order for ${qty} ${currentSymbol} added to OPEN ORDER`
-                : `${side} order for ${qty} ${currentSymbol} executed successfully`,
-            'success'
+            `Submitted ${side} ${qty} ${currentSymbol}. Exchange will validate cash and short-risk limits.`,
+            'info'
         );
 
         setQty('');
@@ -123,14 +131,15 @@ export default function TradePanel() {
                         <label className="m-0">Quantity</label>
                         {side === 'SELL' && (
                             <span className="text-[10px] text-text-secondary">
-                                Available: <span className="text-text-primary font-mono">{availableQty}</span>
+                                Held: <span className="text-text-primary font-mono">{heldQty.toFixed(5)}</span>
+                                {'  '}Reserved: <span className="text-text-primary font-mono">{reservedSellQty.toFixed(5)}</span>
                             </span>
                         )}
                     </div>
                     <div className="tv-trade-input-wrap">
                         <input
                             type="number"
-                            step="1"
+                            step="0.00001"
                             min="0"
                             value={qty}
                             onChange={e => setQty(e.target.value)}
@@ -149,10 +158,27 @@ export default function TradePanel() {
                 <button
                     type="submit"
                     className={`tv-trade-submit ${side === 'BUY' ? 'buy' : 'sell'}`}
-                    disabled={side === 'SELL' && (parseFloat(qty) > availableQty || !qty || parseFloat(qty) <= 0)}
+                    disabled={!canSubmit}
                 >
-                    {side} {currentSymbol}
+                    {wsConnected ? `${side} ${currentSymbol}` : 'Connecting...'}
                 </button>
+
+                <div className="mt-3 rounded-md border border-border-subtle bg-bg-elevated/60 px-3 py-2 text-[11px] leading-4">
+                    <div className="font-semibold text-text-primary">
+                        {sessionMode === 'guest' && 'Session: Guest frontend_user (UI)'}
+                        {sessionMode === 'bot' && `Session: Bot ${userId}`}
+                        {sessionMode === 'connecting' && 'Session: Connecting...'}
+                    </div>
+                    <div className="mt-1 text-text-secondary">
+                        Guest UI uses guest_login. Bots authenticate via API key using auth.
+                    </div>
+                    <div className="mt-1 text-text-secondary">
+                        SELL can exceed held quantity and open a short. Validation happens on the exchange.
+                    </div>
+                    <div className="text-text-secondary">
+                        Limits enforced server-side: per-symbol short qty, total short notional, minimum equity, and short leverage ratio.
+                    </div>
+                </div>
             </form>
         </div>
     );
