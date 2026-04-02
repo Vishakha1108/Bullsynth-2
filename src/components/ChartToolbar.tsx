@@ -5,7 +5,7 @@ import {
     Plus, Circle, MousePointer2,
     MoveHorizontal, Minus, ArrowDown,
     Type, Ruler,
-    Trash2,
+    Trash2, Eraser,
     Waves, Pentagon, ArrowUpRight, Magnet, X,
     ArrowDownRight, Triangle, Pencil,
     Tag, MessageSquare, StickyNote,
@@ -83,8 +83,8 @@ export function ChartToolbar() {
     ];
 
     const lineTools: ToolOption[] = [
-        { id: 'trendline', icon: TrendLineIcon, label: `Trend Line (${formatShortcutLabel('Alt+T')})` },
-        { id: 'ray', icon: MoveHorizontal, label: `Ray (${formatShortcutLabel('Alt+H')})` },
+        { id: 'trendline', icon: TrendLineIcon, label: 'Trend Line' },
+        { id: 'ray', icon: MoveHorizontal, label: 'Ray' },
         { id: 'vertical_ray', icon: MoveVertical, label: 'Vertical Ray' },
         { id: 'horizontal_line', icon: Minus, label: 'Horizontal Line' },
         { id: 'vertical_line', icon: ArrowDown, label: 'Vertical Line' },
@@ -175,6 +175,13 @@ export function ChartToolbar() {
                 />
 
 
+                <button
+                    className={`tv-toolbar-clear-btn ${activeTool === 'eraser' ? 'active' : ''}`}
+                    onClick={() => setActiveTool(activeTool === 'eraser' ? 'crosshair' : 'eraser')}
+                    title="Eraser — click drawings to remove them"
+                >
+                    <Eraser size={18} />
+                </button>
                 <button
                     className="tv-toolbar-clear-btn"
                     onClick={() => { clearDrawings(); window.dispatchEvent(new CustomEvent('reset-chart-view')); }}

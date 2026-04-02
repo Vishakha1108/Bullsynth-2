@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import useMarketStore from '../store/useMarketStore';
+import type { Drawing } from '../store/useMarketStore';
 import type { IChartApi, ISeriesApi } from 'lightweight-charts';
 import {
     calculateFibonacciLevels,
@@ -20,18 +21,39 @@ interface DrawingOverlayProps {
         volume: ISeriesApi<"Histogram">;
     } | null>;
     hideDrawings?: boolean;
+    paneId?: string;
 }
 
-const NON_DRAWING_TOOLS = ['crosshair', 'dot', 'arrow', 'zoom'];
+const EMPTY_DRAWINGS: Drawing[] = [];
+const NON_DRAWING_TOOLS = ['crosshair', 'dot', 'arrow', 'zoom', 'eraser'];
 
-export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: DrawingOverlayProps) {
-    const drawings = useMarketStore(s => s.drawings);
-    const setDrawings = useMarketStore(s => s.setDrawings);
-    const clearDrawings = useMarketStore(s => s.clearDrawings);
+export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false, paneId }: DrawingOverlayProps) {
+    const layoutId = useMarketStore(s => s.layoutId);
+    const drawings = useMarketStore(s => (layoutId !== 'l1' && paneId ? s.paneDrawings[paneId] || EMPTY_DRAWINGS : s.drawings));
+    const setGlobalDrawings = useMarketStore(s => s.setDrawings);
+    const clearGlobalDrawings = useMarketStore(s => s.clearDrawings);
+    const setPaneDrawings = useMarketStore(s => s.setPaneDrawings);
+    const clearPaneDrawings = useMarketStore(s => s.clearPaneDrawings);
     const activeTool = useMarketStore(s => s.activeTool);
     const setActiveTool = useMarketStore(s => s.setActiveTool);
     const magnetMode = useMarketStore(s => s.magnetMode);
     const timeframe = useMarketStore(s => s.timeframe);
+
+    const writeDrawings = (nextDrawings: typeof drawings | ((prev: typeof drawings) => typeof drawings)) => {
+        if (layoutId !== 'l1' && paneId) {
+            setPaneDrawings(paneId, nextDrawings as any);
+            return;
+        }
+        setGlobalDrawings(nextDrawings as any);
+    };
+
+    const removeDrawings = () => {
+        if (layoutId !== 'l1' && paneId) {
+            clearPaneDrawings(paneId);
+            return;
+        }
+        clearGlobalDrawings();
+    };
 
     const [, setTrigger] = useState(0);
     const svgRef = useRef<SVGSVGElement>(null);
@@ -52,8 +74,8 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
     // Delete state
     const deleteLastDrawing = useCallback(() => {
         if (drawings.length === 0) return;
-        setDrawings(drawings.slice(0, -1));
-    }, [drawings, setDrawings]);
+        writeDrawings(drawings.slice(0, -1));
+    }, [drawings, writeDrawings]);
 
     // Sync dimensions
     useEffect(() => {
@@ -83,7 +105,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
 
         const getSignature = () => {
             const logicalRange = chart.timeScale().getVisibleLogicalRange();
-            const priceRange = candleSeries.priceScale().getVisiblePriceRange();
+            const priceRange = candleSeries.priceScale().getVisibleRange();
 
             // Keep raw precision so tiny pans/zoom deltas repaint immediately.
             const logicalFrom = logicalRange?.from ?? 0;
@@ -96,8 +118,8 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
             return [
                 logicalRange?.from ?? 'na',
                 logicalRange?.to ?? 'na',
-                priceRange?.top ?? 'na',
-                priceRange?.bottom ?? 'na',
+                priceRange?.from ?? 'na',
+                priceRange?.to ?? 'na',
                 barSpacing ?? 'na',
                 dimensions.w,
                 dimensions.h,
@@ -137,7 +159,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
         }
 
         if (previousTimeframeRef.current !== timeframe) {
-            clearDrawings();
+            removeDrawings();
             setActiveDrawing(null);
             setPencilPoints([]);
             setTextEntry(null);
@@ -145,7 +167,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
         }
 
         previousTimeframeRef.current = timeframe;
-    }, [timeframe, clearDrawings]);
+    }, [timeframe, removeDrawings]);
 
     // Clear UI state when drawings are cleared globally or via Event
     useEffect(() => {
@@ -160,7 +182,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
 
     useEffect(() => {
         if (!chartRef.current) return;
-        const isDrawing = !NON_DRAWING_TOOLS.includes(activeTool);
+        const isDrawing = !NON_DRAWING_TOOLS.includes(activeTool) || activeTool === 'eraser';
         chartRef.current.applyOptions({
             handleScroll: !isDrawing,
             handleScale: !isDrawing,
@@ -205,16 +227,34 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
     const requiredPoints = TOOL_POINT_COUNTS[activeTool] ?? 2;
 
     const finishDrawing = (type: string, points: { time: number, price: number }[], text?: string, data?: Record<string, unknown>) => {
-        setDrawings([...drawings, { type, points, text, data }]);
+        writeDrawings([...drawings, { type, points, text, data }]);
         setActiveDrawing(null);
         setActiveTool('crosshair');
     };
 
     const handlePointerDown = (e: React.MouseEvent | React.TouchEvent) => {
-        if (textEntry || NON_DRAWING_TOOLS.includes(activeTool)) return;
+        if (textEntry || (NON_DRAWING_TOOLS.includes(activeTool) && activeTool !== 'eraser')) return;
 
         const pt = getTimePrice(e);
         if (!pt) return;
+
+        // Eraser: find and remove nearest drawing within threshold
+        if (isEraserActive && drawings.length > 0) {
+            const HIT_THRESHOLD = 15; // pixels
+            let closestIdx = -1;
+            let closestDist = Infinity;
+            for (let i = 0; i < drawings.length; i++) {
+                const dist = getDrawingDistance(drawings[i], pt.x, pt.y);
+                if (dist < closestDist) {
+                    closestDist = dist;
+                    closestIdx = i;
+                }
+            }
+            if (closestIdx >= 0 && closestDist <= HIT_THRESHOLD) {
+                writeDrawings(drawings.filter((_, idx) => idx !== closestIdx));
+            }
+            return;
+        }
 
         if (activeTool === 'replay') {
             const allCandles = useMarketStore.getState().candles;
@@ -305,7 +345,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
         if (isDraggingPencil && activeTool === 'pencil') {
             setIsDraggingPencil(false);
             if (pencilPoints.length > 2) {
-                setDrawings([...drawings, { type: 'pencil', points: pencilPoints }]);
+                writeDrawings([...drawings, { type: 'pencil', points: pencilPoints }]);
             }
             setPencilPoints([]);
             // Removed setActiveTool('crosshair') so the user can keep brushing without clicking the tool again
@@ -315,7 +355,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
     // Map logic
     const mapPoint = (time: number, price: number) => {
         if (!chartRef.current || !seriesRef.current) return { x: -1000, y: -1000 };
-        const x = chartRef.current.timeScale().timeToCoordinate(time as number) ?? -1000;
+        const x = chartRef.current.timeScale().timeToCoordinate(time as any) ?? -1000;
         const y = seriesRef.current.candle.priceToCoordinate(price) ?? -1000;
         return { x, y };
     };
@@ -332,9 +372,39 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
         allDrawings.push({ type: 'pencil', points: pencilPoints });
     }
 
-    const isInteractive = !NON_DRAWING_TOOLS.includes(activeTool);
+    const isInteractive = !NON_DRAWING_TOOLS.includes(activeTool) || activeTool === 'eraser';
+    const isEraserActive = activeTool === 'eraser';
     const W = dimensions.w || 2000;
     const H = dimensions.h || 1000;
+
+    // Distance from point to line segment
+    const distToSegment = (px: number, py: number, x1: number, y1: number, x2: number, y2: number) => {
+        const dx = x2 - x1, dy = y2 - y1;
+        const lenSq = dx * dx + dy * dy;
+        if (lenSq === 0) return Math.hypot(px - x1, py - y1);
+        const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / lenSq));
+        return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+    };
+
+    const getDrawingDistance = (d: typeof drawings[0], clickX: number, clickY: number): number => {
+        const pts = d.points.map(p => mapPoint(p.time, p.price));
+        if (pts.length === 0) return Infinity;
+        // Horizontal/vertical lines span the chart — only measure perpendicular distance
+        if (d.type === 'horizontal_line' && pts.length >= 1) {
+            return Math.abs(clickY - pts[0].y);
+        }
+        if (d.type === 'vertical_line' && pts.length >= 1) {
+            return Math.abs(clickX - pts[0].x);
+        }
+        // Single-point drawings: distance to that point
+        if (pts.length === 1) return Math.hypot(clickX - pts[0].x, clickY - pts[0].y);
+        // Multi-point: minimum distance to any segment
+        let minDist = Infinity;
+        for (let j = 0; j < pts.length - 1; j++) {
+            minDist = Math.min(minDist, distToSegment(clickX, clickY, pts[j].x, pts[j].y, pts[j + 1].x, pts[j + 1].y));
+        }
+        return minDist;
+    };
 
     // Render a single drawing
     const renderDrawing = (d: { type: string; points: { time: number; price: number }[]; text?: string; data?: Record<string, unknown> }, i: number) => {
@@ -1048,7 +1118,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
         if (!textEntry) return;
         if (text) {
             if (textEntry.type === 'callout' && activeDrawing) {
-                setDrawings([
+                writeDrawings([
                     ...drawings,
                     {
                         type: 'callout',
@@ -1058,11 +1128,11 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
                 ]);
                 setActiveDrawing(null);
             } else if (textEntry.type === 'anchored_note') {
-                setDrawings([...drawings, { type: 'anchored_note', text, points: [{ time: textEntry.time, price: textEntry.price }] }]);
+                writeDrawings([...drawings, { type: 'anchored_note', text, points: [{ time: textEntry.time, price: textEntry.price }] }]);
             } else if (textEntry.type === 'note') {
-                setDrawings([...drawings, { type: 'note', text, points: [{ time: textEntry.time, price: textEntry.price }] }]);
+                writeDrawings([...drawings, { type: 'note', text, points: [{ time: textEntry.time, price: textEntry.price }] }]);
             } else {
-                setDrawings([...drawings, { type: 'text', text, points: [{ time: textEntry.time, price: textEntry.price }] }]);
+                writeDrawings([...drawings, { type: 'text', text, points: [{ time: textEntry.time, price: textEntry.price }] }]);
             }
         }
         setTextEntry(null);
@@ -1073,7 +1143,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
         <>
             <svg
                 ref={svgRef}
-                className={`absolute top-0 left-0 z-30 w-full h-full ${isInteractive ? 'pointer-events-auto cursor-crosshair' : 'pointer-events-none'}`}
+                className={`absolute top-0 left-0 z-30 w-full h-full ${isInteractive ? (isEraserActive ? 'pointer-events-auto cursor-pointer' : 'pointer-events-auto cursor-crosshair') : 'pointer-events-none'}`}
                 style={{ overflow: 'hidden' }}
                 onMouseDown={handlePointerDown}
                 onMouseMove={handlePointerMove}

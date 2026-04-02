@@ -75,7 +75,7 @@ import {
   calculateUltimateOscillator,
 } from "../lib/indicators";
 import ReplayControls from "./ReplayControls";
-import { ChartToolbar } from "./ChartToolbar";
+
 import { AlertModal } from "./AlertModal";
 import { DrawingOverlay } from "./DrawingOverlay";
 
@@ -83,6 +83,12 @@ type IndicatorSeriesBucket = {
   line: ISeriesApi<"Line">[];
   histogram: ISeriesApi<"Histogram">[];
 };
+
+// Stable empty arrays to prevent Zustand selector infinite re-render loops
+// (|| [] in selectors creates new refs every render when paneCandles[id] is undefined)
+const EMPTY_CANDLES: Candle[] = [];
+const EMPTY_INDICATORS: string[] = [];
+const EMPTY_DRAWINGS: import("../store/useMarketStore").Drawing[] = [];
 
 // ─── Chart colour palettes ──────────────────────────────────────────────────
 const DARK_CHART = {
@@ -290,7 +296,8 @@ export function TickerSearch() {
         closeSearch();
         if (symbol === currentSymbol) return;
         setCurrentSymbol(symbol);
-        useMarketStore.getState().clearCandles();
+        const marketState = useMarketStore.getState();
+        marketState.clearCandles(marketState.layoutId !== "l1" ? marketState.activePaneId : undefined);
         if (!isSymbolCached(symbol)) {
           requestHistory(symbol);
         }
@@ -413,7 +420,6 @@ export function TickerSearch() {
                         className={`tv-modal-item flex-1 ${isActive ? "active" : ""}`}
                         onClick={() => handleSelect(t.symbol)}
                         onMouseEnter={() => setActiveIndex(index)}
-                        onClick={() => handleSelect(t.symbol)}
                       >
                         <div className="tv-modal-item-left">
                           <div className="tv-modal-item-symbol">
@@ -469,11 +475,24 @@ export function TickerSearch() {
 }
 
 // ─── OHLCV Info Overlay ─────────────────────────────────────────────────────
-function OHLCVOverlay() {
+function OHLCVOverlay({ paneId }: { paneId?: string }) {
   const crosshairData = useMarketStore((s) => s.crosshairData);
-  const currentSymbol = useMarketStore((s) => s.currentSymbol);
-  const timeframe = useMarketStore((s) => s.timeframe);
-  const latestCandle = useMarketStore((s) => s.latestCandle);
+  const layoutId = useMarketStore((s) => s.layoutId);
+  const currentSymbol = useMarketStore((s) => (
+    layoutId !== 'l1' && paneId
+      ? s.paneConfigs[paneId]?.symbol || s.currentSymbol
+      : s.currentSymbol
+  ));
+  const timeframe = useMarketStore((s) => (
+    layoutId !== 'l1' && paneId
+      ? s.paneConfigs[paneId]?.timeframe || s.timeframe
+      : s.timeframe
+  ));
+  const latestCandle = useMarketStore((s) => (
+    layoutId !== 'l1' && paneId
+      ? (s.paneCandles[paneId]?.length > 0 ? s.paneCandles[paneId][s.paneCandles[paneId].length - 1] : null)
+      : s.latestCandle
+  ));
 
   const tf = TIMEFRAMES.find((t) => t.seconds === timeframe);
   const rawData = crosshairData || latestCandle;
@@ -625,16 +644,16 @@ class ChartErrorBoundary extends React.Component<
   }
 }
 
-export default function ChartContainer() {
+export default function ChartContainer({ paneId }: { paneId?: string } = {}) {
   return (
     <ChartErrorBoundary>
-      <Chart />
+      <Chart paneId={paneId} />
     </ChartErrorBoundary>
   );
 }
 
 // ─── Main Chart Component ───────────────────────────────────────────────────
-function Chart() {
+function Chart({ paneId }: { paneId?: string } = {}) {
   const { theme } = useTheme();
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -647,18 +666,19 @@ function Chart() {
     volume: ISeriesApi<"Histogram">;
   } | null>(null);
 
-  const candles = useMarketStore((s) => s.candles);
-  const historySequence = useMarketStore((s) => s.historySequence);
-  const enabledIndicators = useMarketStore((s) => s.enabledIndicators);
+  const layoutId = useMarketStore((s) => s.layoutId);
+  const candles = useMarketStore((s) => (layoutId !== "l1" && paneId ? s.paneCandles[paneId] || EMPTY_CANDLES : s.candles));
+  const historySequence = useMarketStore((s) => (layoutId !== "l1" && paneId ? s.paneHistorySequence[paneId] || 0 : s.historySequence));
+  const enabledIndicators = useMarketStore((s) => (layoutId !== "l1" && paneId ? s.paneConfigs[paneId]?.enabledIndicators || EMPTY_INDICATORS : s.enabledIndicators));
   const customIndicatorScripts = useMarketStore(
     (s) => s.customIndicatorScripts,
   );
-  const chartType = useMarketStore((s) => s.chartType);
-  const currentSymbol = useMarketStore((s) => s.currentSymbol);
+  const chartType = useMarketStore((s) => (layoutId !== "l1" && paneId ? s.paneConfigs[paneId]?.chartType || s.chartType : s.chartType));
+  const currentSymbol = useMarketStore((s) => (layoutId !== "l1" && paneId ? s.paneConfigs[paneId]?.symbol || s.currentSymbol : s.currentSymbol));
   const setCrosshairData = useMarketStore((s) => s.setCrosshairData);
   const activeTool = useMarketStore((s) => s.activeTool);
   const setActiveTool = useMarketStore((s) => s.setActiveTool);
-  const drawings = useMarketStore((s) => s.drawings);
+  const drawings = useMarketStore((s) => (layoutId !== "l1" && paneId ? s.paneDrawings[paneId] || EMPTY_DRAWINGS : s.drawings));
   const setDrawings = useMarketStore((s) => s.setDrawings);
   const clearDrawings = useMarketStore((s) => s.clearDrawings);
 
@@ -941,7 +961,8 @@ function Chart() {
     };
 
     // Init with existing candles if component mounts after websocket already received them
-    const existingCandles = useMarketStore.getState().candles;
+    const state = useMarketStore.getState();
+    const existingCandles = (layoutId !== "l1" && paneId ? state.paneCandles[paneId] || [] : state.candles);
     if (existingCandles.length > 0 && Array.isArray(existingCandles)) {
       mainSeries.setData(
         existingCandles.map(formatCandleData) as Parameters<
@@ -991,7 +1012,8 @@ function Chart() {
   // Batch data sync — triggers only on history load/clear (historySequence), not individual candle updates
   useEffect(() => {
     if (!seriesRef.current) return;
-    const currentCandles = useMarketStore.getState().candles;
+    const storeState = useMarketStore.getState();
+    const currentCandles = (layoutId !== "l1" && paneId ? storeState.paneCandles[paneId] || [] : storeState.candles);
 
     if (currentCandles.length === 0) {
       seriesRef.current.candle.setData([]);
@@ -1014,7 +1036,7 @@ function Chart() {
     // Scroll to latest candle — prevents "replay from start" on initial load
     chartRef.current?.timeScale().scrollToRealTime();
     lastSymbolRef.current = currentSymbol;
-  }, [historySequence, formatCandleData, currentSymbol]);
+  }, [historySequence, formatCandleData, currentSymbol, layoutId, paneId]);
 
   // Render compare symbols
   const compareSymbols = useMarketStore((s) => s.compareSymbols);
@@ -1376,7 +1398,11 @@ function Chart() {
   }, [activeTool]);
 
   // Real-time updates
-  const latestCandle = useMarketStore((s) => s.latestCandle);
+  const latestCandle = useMarketStore((s) => (
+    layoutId !== "l1" && paneId
+      ? (s.paneCandles[paneId]?.length > 0 ? s.paneCandles[paneId][s.paneCandles[paneId].length - 1] : null)
+      : s.latestCandle
+  ));
   useEffect(() => {
     if (!seriesRef.current || !latestCandle || !chartRef.current) return;
 
@@ -2363,16 +2389,16 @@ function Chart() {
     <div className="chart-root">
       {/* Main chart area */}
       <div className="chart-body">
-        <ChartToolbar />
         <div className="chart-canvas-wrap">
           {/* OHLCV overlay floats on top of chart */}
-          <OHLCVOverlay />
+          <OHLCVOverlay paneId={paneId} />
           <CompareOverlay />
           <IndicatorsOverlay />
           <DrawingOverlay
             chartRef={chartRef}
             seriesRef={seriesRef}
             hideDrawings={drawingsHidden}
+            paneId={paneId}
           />
           <div
             ref={chartContainerRef}

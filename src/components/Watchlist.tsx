@@ -17,8 +17,9 @@ export default function Watchlist({ onClose }: { onClose?: () => void }) {
     const handleSelect = (symbol: string) => {
         if (symbol === currentSymbol) return;
         setCurrentSymbol(symbol);
-        useMarketStore.getState().clearCandles();
-        const timeframeSec = useMarketStore.getState().timeframe;
+        const _st = useMarketStore.getState();
+        _st.clearCandles(_st.layoutId !== 'l1' ? _st.activePaneId : undefined);
+        const timeframeSec = _st.timeframe;
         candleWorker.postMessage({ type: 'INIT', payload: { timeframeSec, symbol } });
         if (!isSymbolCached(symbol)) {
             requestHistory(symbol);

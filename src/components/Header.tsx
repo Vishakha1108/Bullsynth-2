@@ -11,6 +11,7 @@ import useMarketStore, {
   TIMEFRAMES,
 } from "../store/useMarketStore";
 import { changeTimeframe } from "../services/websocket";
+import LayoutPicker from "./LayoutPicker";
 import { TickerSearch } from "./Chart";
 import { useTheme } from "../store/ThemeContext";
 import { formatShortcutLabel } from "../lib/platform";
@@ -43,6 +44,7 @@ import {
   Zap,
   Keyboard,
   Globe,
+  Grid3x3,
   Trash2,
 } from "lucide-react";
 
@@ -179,6 +181,9 @@ export default function Header() {
   const [isTimeframeOpen, setIsTimeframeOpen] = useState(false);
   const timeframeRef = useRef<HTMLDivElement>(null);
 
+  const [isLayoutOpen, setIsLayoutOpen] = useState(false);
+  const layoutRef = useRef<HTMLDivElement>(null);
+
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
@@ -268,12 +273,16 @@ export default function Header() {
       if (!timeframeRef.current?.contains(event.target as Node)) {
         setIsTimeframeOpen(false);
       }
+      if (!layoutRef.current?.contains(event.target as Node)) {
+        setIsLayoutOpen(false);
+      }
     };
 
     const handleShortcuts = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setIsIndicatorsOpen(false);
         setIsChartTypeOpen(false);
+        setIsLayoutOpen(false);
       }
 
       // Toggle indicators menu with '/'
@@ -534,6 +543,23 @@ export default function Header() {
               )}
             </div>
           )}
+        </div>
+
+        <div
+          className="tv-layout-wrap"
+          ref={layoutRef}
+          style={{ position: "relative" }}
+        >
+          <button
+            type="button"
+            className={`tv-header-btn ${isLayoutOpen ? "active" : ""}`}
+            onClick={() => setIsLayoutOpen((prev) => !prev)}
+            title="Layout"
+          >
+            <Grid3x3 size={20} />
+          </button>
+
+          {isLayoutOpen && <LayoutPicker onClose={() => setIsLayoutOpen(false)} />}
         </div>
 
         <div className="tv-header-separator" />

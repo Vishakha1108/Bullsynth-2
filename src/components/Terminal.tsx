@@ -7,11 +7,12 @@ import OrderBook from './OrderBook';
 import Watchlist from './Watchlist';
 import RightPanel from './RightPanel';
 import BottomBar from './BottomBar.tsx';
-import useMarketStore from '../store/useMarketStore';
+import useMarketStore, { LAYOUT_TEMPLATES } from '../store/useMarketStore';
 import { List, BookOpen, Bot, Wallet } from 'lucide-react';
 import Portfolio from './Portfolio';
 import BotPanel from './BotPanel';
 import NotificationContainer from './Notification';
+import { ChartToolbar } from './ChartToolbar';
 
 type SidebarTab = 'portfolio' | 'watchlist' | 'orderbook' | 'bot';
 
@@ -25,6 +26,9 @@ export default function Terminal() {
     const [searchParams] = useSearchParams();
     const setCurrentSymbol = useMarketStore((state) => state.setCurrentSymbol);
     const resetSymbolData = useMarketStore((state) => state.resetSymbolData);
+    const layoutId = useMarketStore((state) => state.layoutId);
+    const activePaneId = useMarketStore((state) => state.activePaneId);
+    const setActivePaneId = useMarketStore((state) => state.setActivePaneId);
 
     useEffect(() => {
         wsManager.connect();
@@ -87,13 +91,47 @@ export default function Terminal() {
 
             {/* Main Content Area */}
             <div className="flex-1 flex min-h-0 relative">
-                {/* Chart area takes full width minus right panel */}
-                <div className="flex-1 flex flex-col min-w-0 min-h-0 transition-all duration-300">
-                    {/* Chart (takes remaining space) */}
-                    <div className="flex-1 min-h-0 relative">
-                        <Chart />
-                    </div>
+                {/* Drawing Tools Sidebar (Global) */}
+                <ChartToolbar />
 
+                {/* Layout-based chart grid area takes full width minus right panel */}
+                <div className="flex-1 flex flex-col min-w-0 min-h-0 transition-all duration-300">
+                    {/* Get the layout template for the current layout ID */}
+                    {(() => {
+                        const layout = LAYOUT_TEMPLATES.find(l => l.id === layoutId) || LAYOUT_TEMPLATES[0];
+                        return (
+                            <div
+                                className="flex-1 min-h-0 relative"
+                                style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: layout.gridTemplateColumns,
+                                    gridTemplateRows: layout.gridTemplateRows,
+                                    gridTemplateAreas: layout.gridTemplateAreas,
+                                    gap: '1px',
+                                    background: '#2a2e39', // gap/divider colour
+                                }}
+                            >
+                                {/* Render Chart for each pane in the layout */}
+                                {layout.paneAreaNames.map((areaName, i) => {
+                                    const isActive = areaName === activePaneId;
+                                    return (
+                                        <div
+                                            key={`pane-${i}`}
+                                            style={{
+                                                gridArea: areaName,
+                                                position: 'relative',
+                                            }}
+                                            className="flex flex-col min-h-0 overflow-hidden bg-bg-terminal cursor-pointer transition-all"
+                                            onClick={() => setActivePaneId(areaName)}
+                                        >
+                                            <Chart paneId={areaName} />
+                                            {isActive && <div className="absolute inset-0 border-2 border-[#2962ff] pointer-events-none z-50"></div>}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        );
+                    })()}
                 </div>
 
                 {/* Collapsible Right Area Container */}

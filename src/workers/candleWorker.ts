@@ -7,265 +7,106 @@ export interface Candle {
     volume: number;
 }
 
-let history: Candle[] = [];
-let timeframeSec = 60; // Default 1 minute
+// State maps to handle multiple independent symbol-timeframe aggregations
+const histories = new Map<string, Candle[]>();
+const timeframes = new Map<string, number>();
+const rawCache: Record<string, Candle[]> = {};
+
+function getContextKey(symbol: string, timeframe: number): string {
+    return `${symbol}-${timeframe}`;
+}
 
 function normalizeTimestampToSec(input: unknown): number {
     if (typeof input === 'string') {
-        const trimmed = input.trim();
-        if (!trimmed) return Math.floor(Date.now() / 1000);
-
-        const numeric = Number(trimmed);
+        const numeric = Number(input.trim());
         if (Number.isFinite(numeric) && numeric > 0) {
             return Math.floor(numeric < 1e12 ? numeric : numeric / 1000);
         }
-
-        const parsed = Date.parse(trimmed);
-        if (Number.isFinite(parsed) && parsed > 0) {
-            return Math.floor(parsed / 1000);
-        }
-
-        return history.length > 0 ? history[history.length - 1].time : Math.floor(Date.now() / 1000);
+        const parsed = Date.parse(input);
+        if (Number.isFinite(parsed) && parsed > 0) return Math.floor(parsed / 1000);
+        return Math.floor(Date.now() / 1000);
     }
-
     const value = Number(input ?? 0);
-    if (!Number.isFinite(value) || value <= 0) return history.length > 0 ? history[history.length - 1].time : Math.floor(Date.now() / 1000);
+    if (!Number.isFinite(value) || value <= 0) return Math.floor(Date.now() / 1000);
     return Math.floor(value < 1e12 ? value : value / 1000);
 }
 
-const rawCache: Record<string, Candle[]> = {};
-let currentSymbol = 'AAPL';
+function aggregateCandles(raw: Candle[], timeframe: number): Candle[] {
+    const history: Candle[] = [];
+    for (const c of raw) {
+        const normalizedSec = normalizeTimestampToSec(c.time);
+        const candleTime = Math.floor(normalizedSec / timeframe) * timeframe;
+        if (!Number.isFinite(candleTime)) continue;
+
+        const last = history[history.length - 1];
+        if (!last || candleTime > last.time) {
+            history.push({ ...c, time: candleTime });
+        } else if (candleTime === last.time) {
+            last.high = Math.max(last.high, c.high);
+            last.low = Math.min(last.low, c.low);
+            last.close = c.close;
+            last.volume += c.volume;
+        }
+    }
+    return history.slice(-2000);
+}
 
 self.onmessage = (e) => {
     const { type, payload } = e.data;
+    const symbol = payload?.symbol;
+    const timeframe = Number(payload?.timeframeSec || 60);
+    const key = getContextKey(symbol, timeframe);
 
     if (type === 'INIT') {
-        timeframeSec = Number(payload?.timeframeSec) > 0 ? Number(payload.timeframeSec) : 60;
-        if (payload?.symbol) currentSymbol = payload.symbol;
-        
-        history = [];
-        self.postMessage({ type: 'CLEAR' });
-
-        const raw = rawCache[currentSymbol] || [];
-        for (const c of raw) {
-            const sourceTime = c.time;
-            const normalizedSec = normalizeTimestampToSec(sourceTime);
-            const candleTime = Math.floor(normalizedSec / timeframeSec) * timeframeSec;
-
-            if (!Number.isFinite(candleTime)) continue;
-
-            const lastCandle = history.length > 0 ? history[history.length - 1] : null;
-
-            if (lastCandle && !Number.isFinite(lastCandle.time)) {
-                history = [];
-            }
-
-            if (!lastCandle || candleTime > lastCandle.time) {
-                history.push({
-                    time: candleTime,
-                    open: c.open,
-                    high: c.high,
-                    low: c.low,
-                    close: c.close,
-                    volume: c.volume,
-                });
-            } else if (candleTime === lastCandle.time) {
-                lastCandle.high = Math.max(lastCandle.high, c.high);
-                lastCandle.low = Math.min(lastCandle.low, c.low);
-                lastCandle.close = c.close;
-                lastCandle.volume += c.volume;
-            }
-        }
-
-        if (history.length > 2000) history = history.slice(-2000);
-        self.postMessage({ type: 'HISTORY_UPDATE', candles: history });
+        timeframes.set(key, timeframe);
+        const raw = rawCache[symbol] || [];
+        const history = aggregateCandles(raw, timeframe);
+        histories.set(key, history);
+        self.postMessage({ type: 'HISTORY_UPDATE', candles: history, symbol, timeframeSec: timeframe });
     }
     else if (type === 'HISTORY') {
-        const rawCandles: Candle[] = Array.isArray(payload)
-            ? payload
-            : (Array.isArray(payload?.candles) ? payload.candles : []);
-        const payloadSym: string = Array.isArray(payload)
-            ? currentSymbol
-            : (payload?.symbol || currentSymbol);
-        
-        if (!rawCandles.length) {
-            return;
-        }
+        const rawCandles: Candle[] = Array.isArray(payload) ? payload : (payload?.candles || []);
+        if (symbol) rawCache[symbol] = rawCandles.slice(-5000);
 
-        if (payloadSym) {
-            rawCache[payloadSym] = rawCandles.slice(-5000);
-        }
-
-        if (payloadSym === currentSymbol) {
-            history = []; // Reset history
-            
-            for (const c of rawCandles) {
-            const sourceTime = c.time;
-            const normalizedSec = normalizeTimestampToSec(sourceTime);
-            const candleTime = Math.floor(normalizedSec / timeframeSec) * timeframeSec;
-
-            if (!Number.isFinite(candleTime)) continue;
-
-            const lastCandle = history.length > 0 ? history[history.length - 1] : null;
-
-            if (lastCandle && !Number.isFinite(lastCandle.time)) {
-                history = [];
-            }
-
-            if (!lastCandle || candleTime > lastCandle.time) {
-                history.push({
-                    time: candleTime,
-                    open: c.open,
-                    high: c.high,
-                    low: c.low,
-                    close: c.close,
-                    volume: c.volume,
-                });
-            } else if (candleTime === lastCandle.time) {
-                lastCandle.high = Math.max(lastCandle.high, c.high);
-                lastCandle.low = Math.min(lastCandle.low, c.low);
-                lastCandle.close = c.close;
-                lastCandle.volume += c.volume;
-            }
-        }
-
-            if (history.length > 2000) history = history.slice(-2000);
-            self.postMessage({ type: 'HISTORY_UPDATE', candles: history });
-        }
+        const history = aggregateCandles(rawCandles, timeframe);
+        histories.set(key, history);
+        self.postMessage({ type: 'HISTORY_UPDATE', candles: history, symbol, timeframeSec: timeframe });
     }
-    else if (type === 'GET_COMPARE_HISTORY') {
-        const sym = payload?.symbol;
-        if (!sym) return;
-        const raw = rawCache[sym] || [];
-        
-        const aggregated: Candle[] = [];
-        for (const c of raw) {
-            const candleTime = Math.floor(normalizeTimestampToSec(c.time) / timeframeSec) * timeframeSec;
-            if (!Number.isFinite(candleTime)) continue;
-            
-            const lastCandle = aggregated.length > 0 ? aggregated[aggregated.length - 1] : null;
-
-            if (!lastCandle || candleTime > lastCandle.time) {
-                aggregated.push({ ...c, time: candleTime });
-            } else if (candleTime === lastCandle.time) {
-                lastCandle.high = Math.max(lastCandle.high, c.high);
-                lastCandle.low = Math.min(lastCandle.low, c.low);
-                lastCandle.close = c.close;
-                lastCandle.volume += c.volume;
-            }
-        }
-        self.postMessage({ type: 'COMPARE_HISTORY_UPDATE', symbol: sym, candles: aggregated });
-    }
-    else if (type === 'TICK') {
-        const trade = payload;
-        if (trade.symbol && trade.symbol !== currentSymbol) return;
-        const timeInSeconds = normalizeTimestampToSec(trade?.timestamp ?? trade?.time ?? trade?.ts);
-        const c = {
-            time: timeInSeconds,
-            open: trade.price,
-            high: trade.price,
-            low: trade.price,
-            close: trade.price,
-            volume: trade.qty,
-        };
-        const candleTime = Math.floor(c.time / timeframeSec) * timeframeSec;
-
-        if (!Number.isFinite(candleTime)) {
-            return;
-        }
-
-        const lastCandle = history.length > 0 ? history[history.length - 1] : null;
-
-        if (lastCandle && !Number.isFinite(lastCandle.time)) {
-            history = [];
-        }
-
-        if (!lastCandle || candleTime > lastCandle.time) {
-            if (lastCandle && candleTime > lastCandle.time + timeframeSec) {
-                let fillTime = lastCandle.time + timeframeSec;
-                if ((candleTime - fillTime) / timeframeSec > 500) {
-                    fillTime = candleTime - 500 * timeframeSec;
-                }
-
-                while (fillTime < candleTime) {
-                    const fillerCandle: Candle = {
-                        time: fillTime,
-                        open: lastCandle.close,
-                        high: lastCandle.close,
-                        low: lastCandle.close,
-                        close: lastCandle.close,
-                        volume: 0,
-                    };
-                    history.push(fillerCandle);
-                    if (history.length > 2000) history = history.slice(-2000);
-                    self.postMessage({ type: 'CANDLE_UPDATE', candle: fillerCandle, isNew: true });
-                    fillTime += timeframeSec;
-                }
-            }
-
-            const newCandle: Candle = {
-                time: candleTime,
-                open: trade.price,
-                high: trade.price,
-                low: trade.price,
-                close: trade.price,
-                volume: trade.qty,
-            };
-            history.push(newCandle);
-            if (history.length > 2000) {
-                history = history.slice(-2000);
-            }
-            self.postMessage({ type: 'CANDLE_UPDATE', candle: newCandle, isNew: true });
-        } else {
-            lastCandle.high = Math.max(lastCandle.high, trade.price);
-            lastCandle.low = Math.min(lastCandle.low, trade.price);
-            lastCandle.close = trade.price;
-            lastCandle.volume += trade.qty;
-            self.postMessage({ type: 'CANDLE_UPDATE', candle: { ...lastCandle }, isNew: false });
-        }
-    }
-    else if (type === 'CANDLE_1S') {
+    else if (type === 'TICK' || type === 'CANDLE_1S') {
         const c = payload;
         const sym = c.symbol;
         if (!sym) return;
 
+        // Store in raw cache
         if (!rawCache[sym]) rawCache[sym] = [];
-        rawCache[sym].push(c);
+        const tickCandle = type === 'TICK' ? {
+            time: normalizeTimestampToSec(c.timestamp || c.time),
+            open: c.price, high: c.price, low: c.price, close: c.price, volume: c.qty
+        } : c;
+
+        rawCache[sym].push(tickCandle);
         if (rawCache[sym].length > 5000) rawCache[sym] = rawCache[sym].slice(-5000);
 
-        if (sym !== currentSymbol) return;
+        // Update all active histories for this symbol
+        for (const [ctxKey, history] of histories.entries()) {
+            if (!ctxKey.startsWith(`${sym}-`)) continue;
+            const tf = timeframes.get(ctxKey) || 60;
+            const normalizedSec = normalizeTimestampToSec(tickCandle.time);
+            const candleTime = Math.floor(normalizedSec / tf) * tf;
 
-        const normalizedSec = normalizeTimestampToSec(c.time);
-        const candleTime = Math.floor(normalizedSec / timeframeSec) * timeframeSec;
-
-        if (!Number.isFinite(candleTime)) {
-            return;
-        }
-
-        const lastCandle = history.length > 0 ? history[history.length - 1] : null;
-
-        if (lastCandle && !Number.isFinite(lastCandle.time)) {
-            history = [];
-        }
-
-        if (!lastCandle || candleTime > lastCandle.time) {
-            const newCandle: Candle = {
-                time: candleTime,
-                open: c.open,
-                high: c.high,
-                low: c.low,
-                close: c.close,
-                volume: c.volume,
-            };
-            history.push(newCandle);
-            if (history.length > 2000) history = history.slice(-2000);
-            self.postMessage({ type: 'CANDLE_UPDATE', candle: newCandle, isNew: true });
-        } else if (candleTime === lastCandle.time) {
-            lastCandle.high = Math.max(lastCandle.high, c.high);
-            lastCandle.low = Math.min(lastCandle.low, c.low);
-            lastCandle.close = c.close;
-            lastCandle.volume += c.volume;
-            self.postMessage({ type: 'CANDLE_UPDATE', candle: { ...lastCandle }, isNew: false });
+            const lastCandle = history[history.length - 1];
+            if (!lastCandle || candleTime > lastCandle.time) {
+                const newCandle = { ...tickCandle, time: candleTime };
+                history.push(newCandle);
+                if (history.length > 2000) history.shift();
+                self.postMessage({ type: 'CANDLE_UPDATE', candle: newCandle, isNew: true, symbol: sym, timeframeSec: tf });
+            } else if (candleTime === lastCandle.time) {
+                lastCandle.high = Math.max(lastCandle.high, tickCandle.high || tickCandle.price);
+                lastCandle.low = Math.min(lastCandle.low, tickCandle.low || tickCandle.price);
+                lastCandle.close = tickCandle.close || tickCandle.price;
+                lastCandle.volume += (tickCandle.volume || tickCandle.qty);
+                self.postMessage({ type: 'CANDLE_UPDATE', candle: { ...lastCandle }, isNew: false, symbol: sym, timeframeSec: tf });
+            }
         }
     }
 };

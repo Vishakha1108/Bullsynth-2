@@ -63,7 +63,7 @@ export function ToolPopover({ options, activeToolId, onSelect }: ToolPopoverProp
                     {options.map((opt) => (
                         <button
                             key={opt.id}
-                            className={`w-full flex items-center gap-3 px-4 py-2 text-sm text-text-secondary hover:text-white hover:bg-white/10 transition-colors ${activeToolId === opt.id ? 'active text-[#6366f1] bg-white/5' : ''}`}
+                            className={`tv-toolbar-dropdown-item w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors ${activeToolId === opt.id ? 'active' : ''}`}
                             onClick={() => {
                                 onSelect(opt.id, opt.action);
                                 setIsOpen(false);
