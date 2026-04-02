@@ -79,6 +79,7 @@ export function TickerSearch() {
     const [mode, setMode] = useState<'search' | 'compare'>('search');
     const [query, setQuery] = useState('');
     const [tab, setTab] = useState('All');
+    const [activeIndex, setActiveIndex] = useState(0);
 
     const currentSymbol = useMarketStore(s => s.currentSymbol);
     const setCurrentSymbol = useMarketStore(s => s.setCurrentSymbol);
@@ -196,6 +197,19 @@ export function TickerSearch() {
         });
     }, [query, tab, tickers]);
 
+    useEffect(() => {
+        if (!isOpen) return;
+        setActiveIndex(0);
+    }, [query, tab, mode, isOpen]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        setActiveIndex((current) => {
+            if (filtered.length === 0) return 0;
+            return Math.min(current, filtered.length - 1);
+        });
+    }, [isOpen, filtered.length]);
+
     const handleSelect = useCallback((symbol: string) => {
         if (mode === 'compare') {
             if (compareSymbols.includes(symbol)) {
@@ -219,6 +233,28 @@ export function TickerSearch() {
             }
         }
     }, [mode, currentSymbol, compareSymbols, addCompareSymbol, setCurrentSymbol, closeSearch]);
+
+    const handleKeyboardNavigation = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (filtered.length === 0) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setActiveIndex((prev) => (prev + 1) % filtered.length);
+            return;
+        }
+
+        if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setActiveIndex((prev) => (prev - 1 + filtered.length) % filtered.length);
+            return;
+        }
+
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const selected = filtered[activeIndex] || filtered[0];
+            if (selected) handleSelect(selected.symbol);
+        }
+    }, [filtered, activeIndex, handleSelect]);
 
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
@@ -248,6 +284,7 @@ export function TickerSearch() {
                                     placeholder="Search stocks, crypto, or synthetic..."
                                     value={query}
                                     onChange={(e) => setQuery(e.target.value)}
+                                    onKeyDown={handleKeyboardNavigation}
                                 />
                                 {query && (
                                     <button className="tv-modal-clear-btn" onClick={() => setQuery('')}>
@@ -274,12 +311,15 @@ export function TickerSearch() {
                                 <div className="tv-modal-empty">No symbols match your criteria</div>
                             ) : (
                                 filtered.map(t => {
+                                    const index = filtered.findIndex((item) => item.symbol === t.symbol);
                                     const isWatched = watchlist.includes(t.symbol);
+                                    const isActive = index === activeIndex;
                                     return (
                                         <div key={t.symbol} className="tv-modal-item-wrapper flex items-center group">
                                             <button
-                                                className="tv-modal-item flex-1"
+                                                className={`tv-modal-item flex-1 ${isActive ? 'active' : ''}`}
                                                 onClick={() => handleSelect(t.symbol)}
+                                                onMouseEnter={() => setActiveIndex(index)}
                                             >
                                                 <div className="tv-modal-item-left">
                                                     <div className="tv-modal-item-symbol">
