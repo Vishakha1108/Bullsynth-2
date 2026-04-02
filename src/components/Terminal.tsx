@@ -114,6 +114,7 @@ export default function Terminal() {
                                 {/* Render Chart for each pane in the layout */}
                                 {layout.paneAreaNames.map((areaName, i) => {
                                     const isActive = areaName === activePaneId;
+                                    const isMultiPane = layout.paneAreaNames.length > 1;
                                     return (
                                         <div
                                             key={`pane-${i}`}
@@ -125,7 +126,7 @@ export default function Terminal() {
                                             onClick={() => setActivePaneId(areaName)}
                                         >
                                             <Chart paneId={areaName} />
-                                            {isActive && <div className="absolute inset-0 border-2 border-[#2962ff] pointer-events-none z-50"></div>}
+                                            {isMultiPane && isActive && <div className="absolute inset-0 border-2 border-[#2962ff] pointer-events-none z-[5]"></div>}
                                         </div>
                                     );
                                 })}

@@ -23,7 +23,7 @@ export default function Portfolio({ onClose }: { onClose?: () => void }) {
             </div>
 
             <div className="flex-1 overflow-y-auto styling-scrollbar p-3">
-            <div className="mb-3 h-px bg-gradient-to-r from-[#6366f132] via-[#2563eb16] to-transparent" />
+            <div className="mb-3 h-px bg-linear-to-r from-[#6366f132] via-[#2563eb16] to-transparent" />
 
             <div className="tv-portfolio-stats">
                 <div className="tv-portfolio-stat">

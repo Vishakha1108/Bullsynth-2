@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import useMarketStore from '../store/useMarketStore';
 import type { Drawing } from '../store/useMarketStore';
-import type { IChartApi, ISeriesApi } from 'lightweight-charts';
+import type { IChartApi, ISeriesApi, Logical, UTCTimestamp } from 'lightweight-charts';
 import {
     calculateFibonacciLevels,
     calculateFibonacciExtension,
@@ -39,21 +39,21 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false, pane
     const magnetMode = useMarketStore(s => s.magnetMode);
     const timeframe = useMarketStore(s => s.timeframe);
 
-    const writeDrawings = (nextDrawings: typeof drawings | ((prev: typeof drawings) => typeof drawings)) => {
+    const writeDrawings = useCallback((nextDrawings: Drawing[] | ((prev: Drawing[]) => Drawing[])) => {
         if (layoutId !== 'l1' && paneId) {
-            setPaneDrawings(paneId, nextDrawings as any);
+            setPaneDrawings(paneId, nextDrawings);
             return;
         }
-        setGlobalDrawings(nextDrawings as any);
-    };
+        setGlobalDrawings(nextDrawings);
+    }, [layoutId, paneId, setPaneDrawings, setGlobalDrawings]);
 
-    const removeDrawings = () => {
+    const removeDrawings = useCallback(() => {
         if (layoutId !== 'l1' && paneId) {
             clearPaneDrawings(paneId);
             return;
         }
         clearGlobalDrawings();
-    };
+    }, [layoutId, paneId, clearPaneDrawings, clearGlobalDrawings]);
 
     const [, setTrigger] = useState(0);
     const svgRef = useRef<SVGSVGElement>(null);
@@ -104,26 +104,30 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false, pane
         };
 
         const getSignature = () => {
-            const logicalRange = chart.timeScale().getVisibleLogicalRange();
-            const priceRange = candleSeries.priceScale().getVisibleRange();
+            try {
+                const logicalRange = chart.timeScale().getVisibleLogicalRange();
+                const priceRange = candleSeries.priceScale().getVisibleRange();
 
-            // Keep raw precision so tiny pans/zoom deltas repaint immediately.
-            const logicalFrom = logicalRange?.from ?? 0;
-            const logicalX0 = chart.timeScale().logicalToCoordinate(logicalFrom as any);
-            const logicalX1 = chart.timeScale().logicalToCoordinate((logicalFrom + 1) as any);
-            const barSpacing = logicalX0 != null && logicalX1 != null
-                ? (logicalX1 - logicalX0)
-                : null;
+                // Keep raw precision so tiny pans/zoom deltas repaint immediately.
+                const logicalFrom = logicalRange?.from ?? 0;
+                const logicalX0 = chart.timeScale().logicalToCoordinate(logicalFrom as Logical);
+                const logicalX1 = chart.timeScale().logicalToCoordinate((logicalFrom + 1) as Logical);
+                const barSpacing = logicalX0 != null && logicalX1 != null
+                    ? (logicalX1 - logicalX0)
+                    : null;
 
-            return [
-                logicalRange?.from ?? 'na',
-                logicalRange?.to ?? 'na',
-                priceRange?.from ?? 'na',
-                priceRange?.to ?? 'na',
-                barSpacing ?? 'na',
-                dimensions.w,
-                dimensions.h,
-            ].join('|');
+                return [
+                    logicalRange?.from ?? 'na',
+                    logicalRange?.to ?? 'na',
+                    priceRange?.from ?? 'na',
+                    priceRange?.to ?? 'na',
+                    barSpacing ?? 'na',
+                    dimensions.w,
+                    dimensions.h,
+                ].join('|');
+            } catch {
+                return lastSignature;
+            }
         };
 
         const tick = () => {
@@ -355,7 +359,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false, pane
     // Map logic
     const mapPoint = (time: number, price: number) => {
         if (!chartRef.current || !seriesRef.current) return { x: -1000, y: -1000 };
-        const x = chartRef.current.timeScale().timeToCoordinate(time as any) ?? -1000;
+        const x = chartRef.current.timeScale().timeToCoordinate(time as UTCTimestamp) ?? -1000;
         const y = seriesRef.current.candle.priceToCoordinate(price) ?? -1000;
         return { x, y };
     };
