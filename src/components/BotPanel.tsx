@@ -76,6 +76,30 @@ function formatDuration(totalSeconds: number): string {
   return `${mm}:${ss}`;
 }
 
+function toDateTimeLocalValue(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+function parseDateTimeInput(value: string): number | null {
+  if (!value) return null;
+  const ms = new Date(value).getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function formatDateTimeShort(ms: number): string {
+  return new Date(ms).toLocaleString([], {
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 function findActiveLapSession(sessions: BotSession[]): BotSession | null {
   return sessions.find((s) => s.session_type === 'lap' && s.status === 'active') ?? null;
 }
@@ -99,6 +123,7 @@ type BotRuntime = {
 };
 
 type ActionPhase = 'idle' | 'starting' | 'stopping';
+type RunMode = 'manual' | 'scheduled';
 
 const EMPTY_RUNTIME: BotRuntime = {
   kpi: null,
@@ -112,6 +137,10 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
   const [bots, setBots] = useState<AdminBot[]>([]);
   const [query, setQuery] = useState('');
   const [selectedBotIds, setSelectedBotIds] = useState<string[]>(readStoredSelectedBotIds);
+  const [runMode, setRunMode] = useState<RunMode>('manual');
+  const [scheduleArmed, setScheduleArmed] = useState(false);
+  const [scheduleStartInput, setScheduleStartInput] = useState('');
+  const [scheduleEndInput, setScheduleEndInput] = useState('');
   const [running, setRunning] = useState(false);
   const [loadingBots, setLoadingBots] = useState(true);
   const [actionPhase, setActionPhase] = useState<ActionPhase>('idle');
@@ -146,18 +175,89 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
     return `${selectedBotIds.length} bots selected`;
   }, [bots, selectedBotIds]);
 
+  const scheduleStartMs = useMemo(() => parseDateTimeInput(scheduleStartInput), [scheduleStartInput]);
+  const scheduleEndMs = useMemo(() => parseDateTimeInput(scheduleEndInput), [scheduleEndInput]);
+
+  const scheduleValidationError = useMemo(() => {
+    if (runMode !== 'scheduled') return null;
+    if (running) return 'Stop the current lap before arming a schedule';
+    if (selectedBotIds.length === 0) return 'Select at least one bot';
+    if (!scheduleStartMs) return 'Choose a schedule start time';
+    if (!scheduleEndMs) return 'Choose a schedule end time';
+    if (scheduleEndMs <= scheduleStartMs) return 'End time must be after start time';
+    if (scheduleEndMs <= Date.now()) return 'End time must be in the future';
+    return null;
+  }, [runMode, running, selectedBotIds.length, scheduleStartMs, scheduleEndMs]);
+
+  const scheduleStatus = useMemo(() => {
+    if (runMode !== 'scheduled') {
+      return {
+        label: 'Manual mode: start and stop laps yourself.',
+        toneClass: 'border-border-subtle/60 bg-bg-terminal/45 text-text-secondary',
+      };
+    }
+
+    if (!scheduleStartMs || !scheduleEndMs) {
+      return {
+        label: 'Set start and end times to enable scheduling.',
+        toneClass: 'border-border-subtle/60 bg-bg-terminal/45 text-text-secondary',
+      };
+    }
+
+    const now = Date.now();
+    if (!scheduleArmed) {
+      return {
+        label: `Window set: ${formatDateTimeShort(scheduleStartMs)} to ${formatDateTimeShort(scheduleEndMs)}.`,
+        toneClass: 'border-border-subtle/60 bg-bg-terminal/45 text-text-secondary',
+      };
+    }
+
+    if (running) {
+      const remaining = Math.max(0, Math.floor((scheduleEndMs - now) / 1000));
+      return {
+        label:
+          remaining > 0
+            ? `Scheduled lap running. Auto-stop in ${formatDuration(remaining)}.`
+            : 'Scheduled end reached. Stopping lap...',
+        toneClass: 'border-bull/30 bg-bull/10 text-bull',
+      };
+    }
+
+    if (now < scheduleStartMs) {
+      const untilStart = Math.max(0, Math.floor((scheduleStartMs - now) / 1000));
+      return {
+        label: `Armed. Auto-start in ${formatDuration(untilStart)}.`,
+        toneClass: 'border-accent/30 bg-accent/10 text-accent',
+      };
+    }
+
+    if (now >= scheduleEndMs) {
+      return {
+        label: 'Scheduled window elapsed before lap start. Please set a new window.',
+        toneClass: 'border-bear/30 bg-bear/10 text-bear',
+      };
+    }
+
+    return {
+      label: 'Inside scheduled window. Starting lap...',
+      toneClass: 'border-accent/30 bg-accent/10 text-accent',
+    };
+  }, [runMode, scheduleArmed, scheduleStartMs, scheduleEndMs, running, clockTick]);
+
   const startDisabledReason = useMemo(() => {
+    if (runMode === 'scheduled' && scheduleArmed) return 'Schedule armed';
     if (running) return 'Lap already running';
     if (actionLoading) return actionPhase === 'starting' ? 'Starting...' : 'Stopping in progress...';
     if (selectedBotIds.length === 0) return 'Select at least one bot';
     return null;
-  }, [running, actionLoading, actionPhase, selectedBotIds.length]);
+  }, [runMode, scheduleArmed, running, actionLoading, actionPhase, selectedBotIds.length]);
 
   const stopDisabledReason = useMemo(() => {
     if (actionLoading) return actionPhase === 'starting' ? 'Start in progress...' : 'Stopping...';
+    if (runMode === 'scheduled' && scheduleArmed && !running) return 'Waiting for scheduled start';
     if (!running) return 'No active lap';
     return null;
-  }, [running, actionLoading, actionPhase]);
+  }, [runMode, scheduleArmed, running, actionLoading, actionPhase]);
 
   const hasLapSnapshot = useMemo(
     () => selectedBotIds.some((botId) => Boolean(runtimeByBot[botId]?.sessionId)),
@@ -176,11 +276,19 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
   }, [runtimeByBot, selectedBotIds]);
 
   const lapTimerLabel = useMemo(() => {
-    if (!running || !activeLapStartMs) return '00:00';
+    if (!running || !activeLapStartMs) {
+      if (runMode === 'scheduled' && scheduleArmed && scheduleStartMs) {
+        const untilStart = Math.max(0, Math.floor((scheduleStartMs - Date.now()) / 1000));
+        if (untilStart > 0) {
+          return `T-${formatDuration(untilStart)}`;
+        }
+      }
+      return '00:00';
+    }
     const elapsedSeconds = Math.max(0, Math.floor((Date.now() - activeLapStartMs) / 1000));
     return formatDuration(elapsedSeconds);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [running, activeLapStartMs, clockTick]);
+  }, [running, activeLapStartMs, clockTick, runMode, scheduleArmed, scheduleStartMs]);
 
   const visibleBots = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -206,6 +314,27 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
       setSelectorOpen(false);
     }
   }, [running]);
+
+  useEffect(() => {
+    if (scheduleArmed) {
+      setSelectorOpen(false);
+    }
+  }, [scheduleArmed]);
+
+  useEffect(() => {
+    if (runMode !== 'scheduled') {
+      setScheduleArmed(false);
+      return;
+    }
+
+    if (!scheduleStartInput || !scheduleEndInput) {
+      const start = new Date(Date.now() + 60 * 1000);
+      start.setSeconds(0, 0);
+      const end = new Date(start.getTime() + 15 * 60 * 1000);
+      setScheduleStartInput(toDateTimeLocalValue(start));
+      setScheduleEndInput(toDateTimeLocalValue(end));
+    }
+  }, [runMode, scheduleStartInput, scheduleEndInput]);
 
   const loadBots = async () => {
     setLoadingBots(true);
@@ -238,10 +367,13 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
   }, [selectedBotIds]);
 
   useEffect(() => {
-    if (!running || !activeLapStartMs) return;
+    const shouldTickForLap = running && Boolean(activeLapStartMs);
+    const shouldTickForSchedule = runMode === 'scheduled' && scheduleArmed;
+
+    if (!shouldTickForLap && !shouldTickForSchedule) return;
     const timer = setInterval(() => setClockTick((prev) => prev + 1), 1000);
     return () => clearInterval(timer);
-  }, [running, activeLapStartMs]);
+  }, [running, activeLapStartMs, runMode, scheduleArmed]);
 
   const fetchActiveLapSessions = async (botIds: string[]) => {
     return await Promise.all(
@@ -408,14 +540,14 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
   }, [selectedBotIds, running]);
 
   const toggleSelected = (botId: string) => {
-    if (running) return;
+    if (running || scheduleArmed) return;
     setSelectedBotIds((prev) =>
       prev.includes(botId) ? prev.filter((id) => id !== botId) : [...prev, botId]
     );
   };
 
   const selectAllVisibleBots = () => {
-    if (running || visibleBots.length === 0) return;
+    if (running || scheduleArmed || visibleBots.length === 0) return;
 
     setSelectedBotIds((prev) => {
       const next = [...prev];
@@ -429,17 +561,40 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
   };
 
   const clearSelectedBots = () => {
-    if (running) return;
+    if (running || scheduleArmed) return;
     setSelectedBotIds([]);
   };
 
-  const handleStart = async () => {
-    if (selectedBotIds.length === 0) {
-      setPanelError('Select at least one bot to compare.');
+  const setQuickSchedule = (startDelayMinutes: number, durationMinutes: number) => {
+    const start = new Date(Date.now() + startDelayMinutes * 60 * 1000);
+    start.setSeconds(0, 0);
+    const end = new Date(start.getTime() + durationMinutes * 60 * 1000);
+    setScheduleStartInput(toDateTimeLocalValue(start));
+    setScheduleEndInput(toDateTimeLocalValue(end));
+  };
+
+  const armSchedule = () => {
+    if (scheduleValidationError) {
+      setPanelError(scheduleValidationError);
       return;
     }
 
-    if (actionLoading) return;
+    setScheduleArmed(true);
+    setPanelError(null);
+  };
+
+  const disarmSchedule = () => {
+    setScheduleArmed(false);
+    setPanelError(null);
+  };
+
+  const handleStart = async (): Promise<boolean> => {
+    if (selectedBotIds.length === 0) {
+      setPanelError('Select at least one bot to compare.');
+      return false;
+    }
+
+    if (actionLoading) return false;
 
     setActionPhase('starting');
     setPanelError(null);
@@ -524,17 +679,24 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
         setPanelError(null);
       }
       setApiConnected(true);
+      return startedCount > 0;
     } catch (err) {
       setApiConnected(false);
       setPanelError(parseErrorMessage(err));
       setRunning(false);
+      return false;
     } finally {
       setActionPhase('idle');
     }
   };
 
-  const handleStop = async () => {
-    if (actionLoading) return;
+  const handleStop = async (options?: { disarmSchedule?: boolean }): Promise<boolean> => {
+    if (actionLoading) return false;
+
+    const shouldDisarmSchedule = options?.disarmSchedule ?? true;
+    if (shouldDisarmSchedule) {
+      setScheduleArmed(false);
+    }
 
     setActionPhase('stopping');
     setPanelError(null);
@@ -608,13 +770,48 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
 
       setRuntimeByBot(Object.fromEntries(nextRuntimeEntries) as Record<string, BotRuntime>);
       setApiConnected(true);
+      return true;
     } catch (err) {
       setApiConnected(false);
       setPanelError(parseErrorMessage(err));
+      return false;
     } finally {
       setActionPhase('idle');
     }
   };
+
+  useEffect(() => {
+    if (runMode !== 'scheduled' || !scheduleArmed) return;
+    if (!scheduleStartMs || !scheduleEndMs) return;
+    if (selectedBotIds.length === 0) return;
+    if (actionLoading) return;
+
+    const now = Date.now();
+
+    if (running) {
+      if (now >= scheduleEndMs) {
+        setScheduleArmed(false);
+        void handleStop({ disarmSchedule: false });
+      }
+      return;
+    }
+
+    if (now >= scheduleEndMs) {
+      setScheduleArmed(false);
+      setPanelError('Scheduled window elapsed before lap could start.');
+      return;
+    }
+
+    if (now >= scheduleStartMs) {
+      void (async () => {
+        const started = await handleStart();
+        if (!started) {
+          setScheduleArmed(false);
+        }
+      })();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runMode, scheduleArmed, scheduleStartMs, scheduleEndMs, selectedBotIds.length, running, actionLoading, clockTick]);
 
   return (
     <div className="tv-side-accent tv-side-accent-bot flex h-full flex-col border-l border-border-subtle bg-bg-terminal text-text-primary font-sans">
@@ -665,13 +862,17 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
             <div ref={selectorRef} className="relative">
               <button
                 type="button"
-                disabled={running || loadingBots}
+                disabled={running || loadingBots || scheduleArmed}
                 onClick={() => setSelectorOpen((prev) => !prev)}
-                className="flex w-full items-center justify-between gap-3 rounded-lg border border-white/14 bg-white/[0.04] px-3 py-2 text-left backdrop-blur-md transition-colors hover:border-white/24 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+                className="flex w-full items-center justify-between gap-3 rounded-lg border border-white/14 bg-white/4 px-3 py-2 text-left backdrop-blur-md transition-colors hover:border-white/24 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
               >
                 <div className="min-w-0">
                   <div className="text-[10px] font-semibold uppercase tracking-[0.09em] text-text-secondary">
-                    {loadingBots ? 'Loading bots...' : 'Multi-select dropdown'}
+                    {loadingBots
+                      ? 'Loading bots...'
+                      : scheduleArmed
+                        ? 'Selection locked while schedule is armed'
+                        : 'Multi-select dropdown'}
                   </div>
                   <div className="truncate text-sm font-semibold text-text-primary">{selectedBotsSummary}</div>
                 </div>
@@ -681,10 +882,10 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
                 />
               </button>
 
-              {selectorOpen && !running && (
+              {selectorOpen && !running && !scheduleArmed && (
                 <div className="absolute z-40 mt-2 w-full overflow-hidden rounded-xl border border-white/12 bg-linear-to-b from-[#0e1120ee] via-bg-elevated/95 to-bg-terminal/95 shadow-[0_14px_32px_rgba(8,12,20,0.55)] backdrop-blur-xl">
                   <div className="border-b border-border-subtle/80 p-2">
-                    <div className="flex items-center gap-2 rounded-md border border-white/12 bg-white/[0.04] px-2.5 py-2 backdrop-blur-md">
+                    <div className="flex items-center gap-2 rounded-md border border-white/12 bg-white/4 px-2.5 py-2 backdrop-blur-md">
                       <Search size={13} className="text-text-secondary" />
                       <input
                         value={query}
@@ -732,7 +933,7 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
                             className={`mb-1 flex w-full items-start gap-2 rounded-md border px-2 py-2 text-left transition-colors backdrop-blur-sm cursor-pointer ${
                               selected
                                 ? 'border-accent/36 bg-accent/10'
-                                : 'border-transparent bg-white/[0.025] hover:border-white/14 hover:bg-white/[0.06]'
+                                : 'border-transparent bg-white/2.5 hover:border-white/14 hover:bg-white/6'
                             }`}
                           >
                             <span
@@ -777,12 +978,12 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
                       type="button"
                       key={botId}
                       onClick={() => toggleSelected(botId)}
-                      disabled={running}
+                      disabled={running || scheduleArmed}
                       className="inline-flex max-w-full items-center gap-1 rounded-md border border-accent/30 bg-accent/10 px-2 py-1 text-[11px] font-semibold text-text-primary backdrop-blur-md disabled:cursor-not-allowed disabled:opacity-70 cursor-pointer"
                     >
                       <Bot size={11} className="shrink-0 text-accent" />
                       <span className="truncate">{bot?.name ?? botId}</span>
-                      {!running && <X size={11} className="shrink-0 text-text-secondary" />}
+                      {!running && !scheduleArmed && <X size={11} className="shrink-0 text-text-secondary" />}
                     </button>
                   );
                 })
@@ -806,6 +1007,111 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
               </button>
             </div>
 
+            <div className="mb-2.5 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setRunMode('manual')}
+                disabled={running || actionLoading}
+                className={`rounded-md border px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] transition-colors disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer ${
+                  runMode === 'manual'
+                    ? 'border-accent/40 bg-accent/10 text-accent'
+                    : 'border-border-subtle/70 bg-bg-terminal/40 text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                Manual
+              </button>
+              <button
+                type="button"
+                onClick={() => setRunMode('scheduled')}
+                disabled={running || actionLoading}
+                className={`rounded-md border px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] transition-colors disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer ${
+                  runMode === 'scheduled'
+                    ? 'border-accent/40 bg-accent/10 text-accent'
+                    : 'border-border-subtle/70 bg-bg-terminal/40 text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                Scheduled
+              </button>
+            </div>
+
+            {runMode === 'scheduled' && (
+              <div className="mb-2.5 rounded-lg border border-border-subtle/70 bg-bg-terminal/50 p-2.5">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-text-secondary">Schedule Window</div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setQuickSchedule(1, 10)}
+                      disabled={scheduleArmed || actionLoading}
+                      className="rounded border border-border-subtle/70 bg-bg-elevated/60 px-2 py-1 text-[10px] font-semibold text-text-secondary transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+                    >
+                      +1m / 10m
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setQuickSchedule(5, 15)}
+                      disabled={scheduleArmed || actionLoading}
+                      className="rounded border border-border-subtle/70 bg-bg-elevated/60 px-2 py-1 text-[10px] font-semibold text-text-secondary transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+                    >
+                      +5m / 15m
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-text-secondary">Start</span>
+                    <input
+                      type="datetime-local"
+                      value={scheduleStartInput}
+                      onChange={(e) => setScheduleStartInput(e.target.value)}
+                      disabled={scheduleArmed || actionLoading}
+                      className="rounded-md border border-border-subtle/70 bg-bg-elevated/60 px-2.5 py-2 text-xs text-text-primary outline-none transition-colors focus:border-accent/40 disabled:cursor-not-allowed disabled:opacity-60"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-text-secondary">End</span>
+                    <input
+                      type="datetime-local"
+                      value={scheduleEndInput}
+                      onChange={(e) => setScheduleEndInput(e.target.value)}
+                      disabled={scheduleArmed || actionLoading}
+                      className="rounded-md border border-border-subtle/70 bg-bg-elevated/60 px-2.5 py-2 text-xs text-text-primary outline-none transition-colors focus:border-accent/40 disabled:cursor-not-allowed disabled:opacity-60"
+                    />
+                  </label>
+                </div>
+
+                {scheduleValidationError && !scheduleArmed && (
+                  <div className="mt-2 rounded border border-bear/25 bg-bear/10 px-2.5 py-1.5 text-[10px] text-bear">
+                    {scheduleValidationError}
+                  </div>
+                )}
+
+                <div className={`mt-2 rounded border px-2.5 py-1.5 text-[10px] font-semibold ${scheduleStatus.toneClass}`}>
+                  {scheduleStatus.label}
+                </div>
+
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={armSchedule}
+                    disabled={scheduleArmed || actionLoading || Boolean(scheduleValidationError)}
+                    className="tv-glass-btn w-full py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-accent disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+                  >
+                    Arm Schedule
+                  </button>
+                  <button
+                    type="button"
+                    onClick={disarmSchedule}
+                    disabled={!scheduleArmed || actionLoading}
+                    className="tv-glass-btn w-full py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-text-secondary hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+                  >
+                    Disarm
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="rounded-lg border border-border-subtle/70 bg-bg-terminal/50 px-3 py-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-text-secondary">
@@ -818,29 +1124,36 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
               </div>
               <div className="mt-1 text-[10px] text-text-secondary">
                 {running
-                  ? 'Live polling every 3 seconds'
-                  : hasLapSnapshot
-                    ? 'Showing the last lap snapshot'
-                    : 'Start a lap to collect comparable KPI'}
+                  ? runMode === 'scheduled'
+                    ? 'Live polling every 3 seconds (scheduled run)'
+                    : 'Live polling every 3 seconds'
+                  : runMode === 'scheduled' && scheduleArmed
+                    ? 'Schedule armed; timer shows countdown to auto-start'
+                    : hasLapSnapshot
+                      ? 'Showing the last lap snapshot'
+                      : 'Start a lap to collect comparable KPI'}
               </div>
             </div>
 
+            <div className="mt-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-text-secondary">
+              {runMode === 'scheduled' ? 'Manual Override' : 'Run Controls'}
+            </div>
             <div className="mt-2.5 grid grid-cols-2 gap-2">
               <button
                 onClick={handleStart}
-                disabled={running || actionLoading || selectedBotIds.length === 0}
+                disabled={running || actionLoading || selectedBotIds.length === 0 || scheduleArmed}
                 className="tv-glass-btn w-full py-2.5 text-xs font-semibold uppercase tracking-[0.07em] text-bull border-bull/55 bg-linear-to-br from-bull/28 to-bull/14 hover:from-bull/35 hover:to-bull/18 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
               >
                 <Play size={13} />
-                Start
+                {runMode === 'scheduled' ? 'Start Now' : 'Start'}
               </button>
               <button
-                onClick={handleStop}
+                onClick={() => void handleStop()}
                 disabled={!running || actionLoading}
                 className="tv-glass-btn tv-glass-btn-danger w-full py-2.5 text-xs font-semibold uppercase tracking-[0.07em] text-bear disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
               >
                 <Square size={13} />
-                Stop
+                {runMode === 'scheduled' ? 'Stop Now' : 'Stop'}
               </button>
             </div>
 
