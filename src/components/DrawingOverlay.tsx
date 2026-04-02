@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import useMarketStore from '../store/useMarketStore';
 import type { IChartApi, ISeriesApi } from 'lightweight-charts';
 import {
@@ -48,6 +48,12 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
     const [textEntry, setTextEntry] = useState<{ x: number, y: number, time: number, price: number, type: string } | null>(null);
     const textInputRef = useRef<HTMLInputElement>(null);
     const previousTimeframeRef = useRef<number | null>(null);
+
+    // Delete state
+    const deleteLastDrawing = useCallback(() => {
+        if (drawings.length === 0) return;
+        setDrawings(drawings.slice(0, -1));
+    }, [drawings, setDrawings]);
 
     // Sync dimensions
     useEffect(() => {
@@ -160,6 +166,18 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
             handleScale: !isDrawing,
         });
     }, [activeTool, chartRef]);
+
+    // Handle Delete key to remove the latest drawing quickly
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.key === 'Delete' || e.key === 'Backspace') && !textEntry && !activeDrawing) {
+                e.preventDefault();
+                deleteLastDrawing();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [activeDrawing, textEntry, deleteLastDrawing]);
 
     const getTimePrice = (e: React.MouseEvent | React.TouchEvent) => {
         if (!chartRef.current || !seriesRef.current || !svgRef.current) return null;

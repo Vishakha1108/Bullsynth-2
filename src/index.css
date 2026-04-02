@@ -1074,6 +1074,7 @@
 .tv-side-accent {
   position: relative;
   isolation: isolate;
+  overflow-x: hidden;
   --tv-side-blob-a: rgba(99, 102, 241, 0.1);
   --tv-side-blob-b: rgba(37, 99, 235, 0.05);
 }
@@ -1132,6 +1133,7 @@
   height: 100%;
   font-size: 12px;
   user-select: none;
+  overflow-x: hidden;
   background: linear-gradient(180deg, rgba(99, 102, 241, 0.045) 0%, rgba(37, 99, 235, 0.02) 16%, transparent 36%);
 }
 
@@ -2357,6 +2359,7 @@ input[type='number'] {
 .tv-trade-panel {
   position: relative;
   overflow: hidden;
+  overflow-x: hidden;
   padding: 12px;
   border-bottom: 1px solid #2a2e39;
   background: linear-gradient(165deg, rgba(99, 102, 241, 0.045) 0%, rgba(17, 17, 17, 0.9) 42%, rgba(0, 0, 0, 0.95) 100%);
@@ -4110,6 +4113,18 @@ input[type='number'] {
   @apply bg-white/10 text-white rounded-[10px];
 }
 
+/* ── Sidebar active icon & label (dark) ──────────────────────────────────── */
+.sidebar-icon-active {
+  background: #1e1b4b;
+  border-color: #4338ca;
+  color: #a5b4fc;
+  box-shadow: 0 0 14px rgba(99, 102, 241, 0.35);
+}
+
+.sidebar-label-active {
+  color: #a5b4fc;
+}
+
 /* ── Dashboard section headers ───────────────────────────────────────────── */
 .dash-section-header {
   @apply border-b border-white/5 bg-transparent;
@@ -5335,6 +5350,17 @@ input[type='number'] {
   background: rgba(99, 102, 241, 0.12);
   color: #6366f1;
   border-color: rgba(99, 102, 241, 0.18);
+}
+
+.light .sidebar-icon-active {
+  background: rgba(99, 102, 241, 0.14);
+  border-color: rgba(99, 102, 241, 0.35);
+  color: #4f46e5;
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.18);
+}
+
+.light .sidebar-label-active {
+  color: #4f46e5;
 }
 
 .light .dash-section-header {

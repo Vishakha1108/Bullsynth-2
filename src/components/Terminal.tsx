@@ -101,13 +101,13 @@ export default function Terminal() {
                     {panelLayout === 1 && (
                         <>
                             {/* Top Section: Information View */}
-                            <div className={`min-h-0 overflow-hidden flex flex-col min-w-[320px] ${(singleTab === 'orderbook' || singleTab === 'portfolio') ? 'flex-none border-b border-border-subtle' : 'flex-1'}`}>
+                            <div className={`min-h-0 overflow-hidden overflow-x-hidden flex flex-col min-w-[320px] max-w-[320px] ${(singleTab === 'orderbook' || singleTab === 'portfolio') ? 'flex-none border-b border-border-subtle' : 'flex-1'}`}>
                                 {renderTabContent(singleTab)}
                             </div>
 
                             {/* Bottom Section: Action View (TradePanel) - Only visible with Order Book */}
                             {singleTab === 'orderbook' && (
-                                <div className="flex-1 min-h-0 overflow-y-auto styling-scrollbar bg-bg-terminal min-w-[320px]">
+                                <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden styling-scrollbar bg-bg-terminal min-w-[320px] max-w-[320px]">
                                     <RightPanel />
                                 </div>
                             )}
@@ -176,39 +176,47 @@ export default function Terminal() {
                     )}
 
                     <button
-                        className={`w-12 h-16 rounded flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${toolbarTabIsActive('portfolio') ? 'bg-border-subtle text-text-primary shadow-inner' : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated'}`}
+                        className="w-12 flex flex-col items-center gap-1.5 cursor-pointer group"
                         onClick={() => handleToolbarTabSelect('portfolio')}
                         title="Portfolio"
                     >
-                        <Wallet size={21} />
-                        <span className="text-[10px] font-semibold leading-none">Portfolio</span>
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all border ${toolbarTabIsActive('portfolio') ? 'sidebar-icon-active' : 'bg-bg-elevated border-border-subtle text-text-secondary group-hover:text-text-primary group-hover:border-text-secondary/30'}`}>
+                            <Wallet size={20} />
+                        </div>
+                        <span className={`text-[10px] font-semibold leading-none transition-colors ${toolbarTabIsActive('portfolio') ? 'sidebar-label-active' : 'text-text-secondary group-hover:text-text-primary'}`}>Portfolio</span>
                     </button>
 
                     <button
-                        className={`w-12 h-16 rounded flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${toolbarTabIsActive('watchlist') ? 'bg-border-subtle text-text-primary shadow-inner' : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated'}`}
+                        className="w-12 flex flex-col items-center gap-1.5 cursor-pointer group"
                         onClick={() => handleToolbarTabSelect('watchlist')}
                         title="Watchlist"
                     >
-                        <List size={21} />
-                        <span className="text-[10px] font-semibold leading-none">Watchlist</span>
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all border ${toolbarTabIsActive('watchlist') ? 'sidebar-icon-active' : 'bg-bg-elevated border-border-subtle text-text-secondary group-hover:text-text-primary group-hover:border-text-secondary/30'}`}>
+                            <List size={20} />
+                        </div>
+                        <span className={`text-[10px] font-semibold leading-none transition-colors ${toolbarTabIsActive('watchlist') ? 'sidebar-label-active' : 'text-text-secondary group-hover:text-text-primary'}`}>Watchlist</span>
                     </button>
 
                     <button
-                        className={`w-12 h-16 rounded flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${toolbarTabIsActive('orderbook') ? 'bg-border-subtle text-text-primary shadow-inner' : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated'}`}
+                        className="w-12 flex flex-col items-center gap-1.5 cursor-pointer group"
                         onClick={() => handleToolbarTabSelect('orderbook')}
                         title="Order Book"
                     >
-                        <BookOpen size={21} />
-                        <span className="text-[10px] font-semibold leading-[1.1] text-center">Order<br />Book</span>
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all border ${toolbarTabIsActive('orderbook') ? 'sidebar-icon-active' : 'bg-bg-elevated border-border-subtle text-text-secondary group-hover:text-text-primary group-hover:border-text-secondary/30'}`}>
+                            <BookOpen size={20} />
+                        </div>
+                        <span className={`text-[10px] font-semibold leading-[1.1] text-center transition-colors ${toolbarTabIsActive('orderbook') ? 'sidebar-label-active' : 'text-text-secondary group-hover:text-text-primary'}`}>Order<br />Book</span>
                     </button>
 
                     <button
-                        className={`w-12 h-16 rounded flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${toolbarTabIsActive('bot') ? 'bg-border-subtle text-text-primary shadow-inner' : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated'}`}
+                        className="w-12 flex flex-col items-center gap-1.5 cursor-pointer group"
                         onClick={() => handleToolbarTabSelect('bot')}
                         title="Trading Bots"
                     >
-                        <Bot size={21} />
-                        <span className="text-[10px] font-semibold leading-none">Bots</span>
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all border ${toolbarTabIsActive('bot') ? 'sidebar-icon-active' : 'bg-bg-elevated border-border-subtle text-text-secondary group-hover:text-text-primary group-hover:border-text-secondary/30'}`}>
+                            <Bot size={20} />
+                        </div>
+                        <span className={`text-[10px] font-semibold leading-none transition-colors ${toolbarTabIsActive('bot') ? 'sidebar-label-active' : 'text-text-secondary group-hover:text-text-primary'}`}>Bots</span>
                     </button>
 
                     <button
