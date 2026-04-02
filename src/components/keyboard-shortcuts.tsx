@@ -159,7 +159,7 @@ export function KeyboardShortcutsModal() {
       >
         {/* Resize Handle on the left edge */}
         <div
-          className="absolute top-0 left-0 w-2 h-full cursor-col-resize hover:bg-[#2962ff]/30 z-10 transition-colors"
+          className="absolute top-0 left-0 w-2 h-full cursor-col-resize hover:bg-[#6366f1]/30 z-10 transition-colors"
           onMouseDown={handleMouseDown}
         />
 
@@ -168,8 +168,8 @@ export function KeyboardShortcutsModal() {
           isLight ? 'border-gray-200' : 'border-[#2a2e39]'
         }`}>
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg ${isLight ? 'bg-blue-50' : 'bg-[#2962ff]/10'}`}>
-              <Keyboard size={18} className={isLight ? 'text-blue-600' : 'text-[#2962ff]'} />
+            <div className={`p-2 rounded-lg ${isLight ? 'bg-blue-50' : 'bg-[#6366f1]/10'}`}>
+              <Keyboard size={18} className={isLight ? 'text-blue-600' : 'text-[#6366f1]'} />
             </div>
             <h2 className={`text-lg font-semibold ${isLight ? 'text-gray-800' : 'text-[#d1d4dc]'}`}>
               Keyboard shortcuts

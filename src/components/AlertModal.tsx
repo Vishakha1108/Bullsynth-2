@@ -1,9 +1,23 @@
-import { useState, useRef } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import useMarketStore from '../store/useMarketStore';
 import type { Alert } from '../store/useMarketStore';
 
-export function AlertModal({ onClose }: { onClose: () => void }) {
+export type AlertModalAnchorRect = {
+    top: number;
+    left: number;
+    right: number;
+    bottom: number;
+    width: number;
+    height: number;
+};
+
+type AlertModalProps = {
+    onClose: () => void;
+    anchorRect?: AlertModalAnchorRect | null;
+};
+
+export function AlertModal({ onClose, anchorRect }: AlertModalProps) {
     const currentSymbol = useMarketStore(s => s.currentSymbol);
     const lastPrice = useMarketStore(s => s.lastPrice);
     const addAlert = useMarketStore(s => s.addAlert);
@@ -12,8 +26,45 @@ export function AlertModal({ onClose }: { onClose: () => void }) {
     const [price, setPrice] = useState(lastPrice.toFixed(2));
     const [type, setType] = useState<'crossing' | 'above' | 'below'>('crossing');
     const inputRef = useRef<HTMLInputElement>(null);
+    const modalRef = useRef<HTMLDivElement>(null);
+    const [position, setPosition] = useState({ top: 68, left: 16 });
 
     const activeAlerts = alerts.filter((a: Alert) => a.active);
+
+    useLayoutEffect(() => {
+        const updatePosition = () => {
+            const margin = 12;
+            const modalWidth = modalRef.current?.offsetWidth ?? 400;
+            const modalHeight = modalRef.current?.offsetHeight ?? 520;
+
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+
+            let left = viewportWidth - modalWidth - 70;
+            let top = 68;
+
+            if (anchorRect) {
+                left = anchorRect.right - modalWidth;
+                top = anchorRect.bottom + 10;
+
+                if (top + modalHeight > viewportHeight - margin) {
+                    const openAboveTop = anchorRect.top - modalHeight - 10;
+                    top = openAboveTop > margin
+                        ? openAboveTop
+                        : Math.max(margin, viewportHeight - modalHeight - margin);
+                }
+            }
+
+            left = Math.min(Math.max(margin, left), viewportWidth - modalWidth - margin);
+            top = Math.min(Math.max(margin, top), viewportHeight - modalHeight - margin);
+
+            setPosition({ top, left });
+        };
+
+        updatePosition();
+        window.addEventListener('resize', updatePosition);
+        return () => window.removeEventListener('resize', updatePosition);
+    }, [anchorRect, activeAlerts.length]);
 
     const handleCreate = () => {
         const targetPrice = parseFloat(price);
@@ -36,11 +87,13 @@ export function AlertModal({ onClose }: { onClose: () => void }) {
 
     return (
         <div
-            className="tv-alert-overlay"
+            className="tv-alert-overlay tv-alert-overlay-transparent"
             onClick={onClose}
         >
             <div
-                className="tv-alert-modal"
+                ref={modalRef}
+                className="tv-alert-modal tv-alert-modal-anchored"
+                style={{ top: `${position.top}px`, left: `${position.left}px` }}
                 onClick={e => e.stopPropagation()}
             >
                 {/* Header Section */}
@@ -124,7 +177,7 @@ export function AlertModal({ onClose }: { onClose: () => void }) {
                                 {activeAlerts.map((a: Alert) => (
                                     <div key={a.id} className="tv-alert-row">
                                         <div className="flex items-center gap-2">
-                                            <span className={`w-1.5 h-1.5 rounded-full ${a.type === 'above' ? 'bg-bull' : a.type === 'below' ? 'bg-bear' : 'bg-[#2962ff]'}`} />
+                                            <span className={`w-1.5 h-1.5 rounded-full ${a.type === 'above' ? 'bg-bull' : a.type === 'below' ? 'bg-bear' : 'bg-[#6366f1]'}`} />
                                             <span className="tv-alert-row-symbol">{a.symbol}</span>
                                             <span className="tv-alert-row-type">{a.type === 'crossing' ? '⇅' : a.type === 'above' ? '↑' : '↓'}</span>
                                             <span className="tv-alert-row-price">${a.targetPrice.toFixed(2)}</span>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentType, type MouseEvent as ReactMouseEvent } from 'react';
 import useMarketStore, { INDICATOR_COLORS, INDICATOR_LIBRARY, TIMEFRAMES } from '../store/useMarketStore';
 import { changeTimeframe } from '../services/websocket';
 import { TickerSearch } from './Chart';
@@ -117,6 +117,27 @@ export default function Header() {
 
     const livePriceChange = priceChanges[currentSymbol] ?? priceChange24h;
 
+    const openAlertDialog = (event?: ReactMouseEvent<HTMLButtonElement>) => {
+        const rect = event?.currentTarget?.getBoundingClientRect();
+        if (rect) {
+            window.dispatchEvent(new CustomEvent('open-alert-dialog', {
+                detail: {
+                    anchorRect: {
+                        top: rect.top,
+                        left: rect.left,
+                        right: rect.right,
+                        bottom: rect.bottom,
+                        width: rect.width,
+                        height: rect.height,
+                    },
+                },
+            }));
+            return;
+        }
+
+        window.dispatchEvent(new CustomEvent('open-alert-dialog'));
+    };
+
     useEffect(() => {
         const onOutsideClick = (event: MouseEvent) => {
             if (!menuRef.current?.contains(event.target as Node)) {
@@ -186,33 +207,33 @@ export default function Header() {
                     </button>
 
                     {isMenuOpen && (
-                        <div className="absolute top-[120%] left-0 w-64 bg-bg-elevated border border-border-subtle rounded-md shadow-lg z-50 py-2 flex flex-col text-[14px]">
-                            <button className="flex items-center gap-3 px-4 py-2.5 hover:bg-border-subtle transition-colors text-left" onClick={() => { setIsMenuOpen(false); navigate('/'); }}>
+                        <div className="tv-header-menu-surface">
+                            <button className="tv-header-menu-item" onClick={() => { setIsMenuOpen(false); navigate('/'); }}>
                                 <Home size={18} className="text-text-secondary" />
                                 <span>Home</span>
                             </button>
-                            <button className="flex items-center gap-3 px-4 py-2.5 hover:bg-border-subtle transition-colors text-left" onClick={() => setIsMenuOpen(false)}>
+                            <button className="tv-header-menu-item" onClick={() => setIsMenuOpen(false)}>
                                 <HelpCircle size={18} className="text-text-secondary" />
                                 <span>Help Center</span>
                             </button>
-                            <button className="flex items-center gap-3 px-4 py-2.5 hover:bg-border-subtle transition-colors text-left" onClick={() => setIsMenuOpen(false)}>
+                            <button className="tv-header-menu-item" onClick={() => setIsMenuOpen(false)}>
                                 <Zap size={18} className="text-text-secondary" />
                                 <span>What's new</span>
                             </button>
                             
-                            <div className="h-px bg-border-subtle my-1 w-full" />
+                            <div className="tv-header-menu-separator" />
                             
-                            <button className="flex items-center justify-between px-4 py-2.5 hover:bg-border-subtle transition-colors text-left" onClick={() => toggleTheme()}>
+                            <button className="tv-header-menu-item tv-header-menu-item-between" onClick={() => toggleTheme()}>
                                 <div className="flex items-center gap-3">
                                     {theme === 'dark' ? <Moon size={18} className="text-text-secondary" /> : <Sun size={18} className="text-text-secondary" />}
                                     <span>Dark color theme</span>
                                 </div>
-                                <div className={`w-8 h-4 rounded-full p-0.5 transition-colors relative flex items-center ${theme === 'dark' ? 'bg-[#2962ff]' : 'bg-border-strong'}`}>
+                                <div className={`w-8 h-4 rounded-full p-0.5 transition-colors relative flex items-center ${theme === 'dark' ? 'bg-[#6366f1]' : 'bg-border-strong'}`}>
                                     <div className={`w-3 h-3 rounded-full bg-white absolute transition-transform ${theme === 'dark' ? 'translate-x-4' : 'translate-x-0'}`} />
                                 </div>
                             </button>
 
-                            <button className="flex items-center justify-between px-4 py-2.5 hover:bg-border-subtle transition-colors text-left" onClick={() => setIsMenuOpen(false)}>
+                            <button className="tv-header-menu-item tv-header-menu-item-between" onClick={() => setIsMenuOpen(false)}>
                                 <div className="flex items-center gap-3">
                                     <Globe size={18} className="text-text-secondary" />
                                     <span>Language</span>
@@ -220,9 +241,9 @@ export default function Header() {
                                 <ChevronDown size={16} className="text-text-muted -rotate-90" />
                             </button>
 
-                            <div className="h-px bg-border-subtle my-1 w-full" />
+                            <div className="tv-header-menu-separator" />
                             
-                            <button className="flex items-center justify-between px-4 py-2.5 hover:bg-border-subtle transition-colors text-left" onClick={() => { setIsMenuOpen(false); window.dispatchEvent(new CustomEvent('open-keyboard-shortcuts')); }}>
+                            <button className="tv-header-menu-item tv-header-menu-item-between" onClick={() => { setIsMenuOpen(false); window.dispatchEvent(new CustomEvent('open-keyboard-shortcuts')); }}>
                                 <div className="flex items-center gap-3">
                                     <Keyboard size={18} className="text-text-secondary" />
                                     <span>Keyboard shortcuts</span>
@@ -238,7 +259,7 @@ export default function Header() {
                 {/* Symbol selector split trigger */}
                 <div className="flex items-center mx-1 gap-1">
                     <button
-                        className="tv-header-btn text-text-primary hover:text-white flex items-center gap-2 bg-border-subtle rounded-md px-3 py-1"
+                        className="tv-header-btn text-text-primary flex items-center gap-2 px-3"
                         onClick={() => window.dispatchEvent(new CustomEvent('open-ticker-search', { detail: { mode: 'search' } }))}
                     >
                         <Search size={16} />
@@ -246,7 +267,7 @@ export default function Header() {
                         <span className="text-xs text-text-muted ml-1 hidden sm:inline">Search</span>
                     </button>
                     <button 
-                        className="tv-header-btn text-text-secondary hover:text-white flex items-center justify-center p-1 rounded-md border border-border-subtle"
+                        className="tv-header-btn text-text-secondary flex items-center justify-center px-2"
                         title="Compare Symbol"
                         onClick={() => window.dispatchEvent(new CustomEvent('open-ticker-search', { detail: { mode: 'compare' } }))}
                     >
@@ -458,7 +479,7 @@ export default function Header() {
 
                 <button 
                     type="button" 
-                    className={`tv-header-btn icon-text ${activeTool === 'replay' || isReplayMode ? 'active text-[#2962ff]!' : 'text-text-primary'}`}
+                    className={`tv-header-btn icon-text ${activeTool === 'replay' || isReplayMode ? 'active text-[#6366f1]!' : 'text-text-primary'}`}
                     onClick={() => {
                         if (isReplayMode || activeTool === 'replay') {
                             stopReplay();
@@ -489,7 +510,7 @@ export default function Header() {
                     type="button" 
                     className="tv-header-btn icon-text" 
                     title={`Create Alert (${formatShortcutLabel('Alt+A')})`}
-                    onClick={() => window.dispatchEvent(new CustomEvent('open-alert-dialog'))}
+                    onClick={openAlertDialog}
                 >
                     <Bell size={21} />
                     <span>Alert</span>

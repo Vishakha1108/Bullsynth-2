@@ -37,6 +37,9 @@ export default function Terminal() {
             {/* Top Header Bar (TradingView style) */}
             <Header />
 
+            {/* Subtle divider so header and chart sections are clearly separated */}
+            <div className="h-px w-full bg-border-subtle/80" />
+
             {/* Main Content Area */}
             <div className="flex-1 flex min-h-0 relative">
                 {/* Chart area takes full width minus right panel */}
@@ -69,7 +72,7 @@ export default function Terminal() {
                 {/* Thin Far-Right Icon Toolbar (Always visible) */}
                 <div className="w-14 bg-bg-terminal border-l border-border-subtle flex flex-col items-center py-4 gap-4 flex-none z-10 transition-colors">
                     <button
-                        className={`w-12 h-16 rounded flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${sidebarTab === 'portfolio' && isRightPanelOpen ? 'bg-border-subtle text-text-primary shadow-inner' : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated'}`}
+                        className={`tv-side-icon-btn ${sidebarTab === 'portfolio' && isRightPanelOpen ? 'active' : ''}`}
                         onClick={() => {
                             if (sidebarTab === 'portfolio' && isRightPanelOpen) {
                                 setIsRightPanelOpen(false);
@@ -85,7 +88,7 @@ export default function Terminal() {
                     </button>
 
                     <button
-                        className={`w-12 h-16 rounded flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${sidebarTab === 'watchlist' && isRightPanelOpen ? 'bg-border-subtle text-text-primary shadow-inner' : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated'}`}
+                        className={`tv-side-icon-btn ${sidebarTab === 'watchlist' && isRightPanelOpen ? 'active' : ''}`}
                         onClick={() => {
                             if (sidebarTab === 'watchlist' && isRightPanelOpen) {
                                 setIsRightPanelOpen(false);
@@ -101,7 +104,7 @@ export default function Terminal() {
                     </button>
 
                     <button
-                        className={`w-12 h-16 rounded flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${sidebarTab === 'orderbook' && isRightPanelOpen ? 'bg-border-subtle text-text-primary shadow-inner' : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated'}`}
+                        className={`tv-side-icon-btn ${sidebarTab === 'orderbook' && isRightPanelOpen ? 'active' : ''}`}
                         onClick={() => {
                             if (sidebarTab === 'orderbook' && isRightPanelOpen) {
                                 setIsRightPanelOpen(false);
@@ -117,7 +120,7 @@ export default function Terminal() {
                     </button>
 
                     <button
-                        className={`w-12 h-16 rounded flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${sidebarTab === 'bot' && isRightPanelOpen ? 'bg-border-subtle text-text-primary shadow-inner' : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated'}`}
+                        className={`tv-side-icon-btn ${sidebarTab === 'bot' && isRightPanelOpen ? 'active' : ''}`}
                         onClick={() => {
                             if (sidebarTab === 'bot' && isRightPanelOpen) {
                                 setIsRightPanelOpen(false);

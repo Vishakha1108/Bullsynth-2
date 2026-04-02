@@ -172,11 +172,11 @@ export function ChartToolbar() {
                 />
 
                 <button
-                    className="w-10 h-10 flex items-center justify-center rounded hover:bg-border-subtle/50 transition-colors text-text-secondary hover:text-red-400"
+                    className="tv-toolbar-clear-btn"
                     onClick={() => { clearDrawings(); window.dispatchEvent(new CustomEvent('reset-chart-view')); }}
                     title={`Clear All Drawings (${formatShortcutLabel('Alt+C')})`}
                 >
-                    <Trash2 size={20} />
+                    <Trash2 size={18} />
                 </button>
             </div>
         </div>

@@ -34,10 +34,10 @@ export function ToolPopover({ options, activeToolId, onSelect }: ToolPopoverProp
     }, [isOpen]);
 
     return (
-        <div ref={containerRef} className="relative flex items-center w-full justify-center group mb-1">
-            <div className="flex items-center w-[42px] h-[38px] bg-transparent border border-transparent hover:bg-border-subtle/50 rounded cursor-pointer relative overflow-hidden transition-colors">
+        <div ref={containerRef} className="relative flex items-center w-full justify-center group mb-1.5">
+            <div className="tv-toolbar-combo">
                 <button
-                    className={`flex-1 h-full flex items-center justify-center text-text-secondary hover:text-text-primary ${isGroupActive ? 'text-[#2962ff]!' : ''}`}
+                    className={`tv-toolbar-combo-main ${isGroupActive ? 'active' : ''}`}
                     title={activeOption.label}
                     onClick={() => {
                         onSelect(activeOption.id, activeOption.action);
@@ -47,7 +47,7 @@ export function ToolPopover({ options, activeToolId, onSelect }: ToolPopoverProp
                     <activeOption.icon size={22} />
                 </button>
                 <button
-                    className={`w-[14px] h-full flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-border-subtle/80 border-l border-transparent ${isOpen ? 'bg-border-subtle/80' : ''}`}
+                    className={`tv-toolbar-combo-caret ${isOpen ? 'open' : ''}`}
                     onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
@@ -63,13 +63,13 @@ export function ToolPopover({ options, activeToolId, onSelect }: ToolPopoverProp
                     {options.map((opt) => (
                         <button
                             key={opt.id}
-                            className={`w-full flex items-center gap-3 px-4 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-border-subtle/30 transition-colors ${activeToolId === opt.id ? 'active text-[#2962ff]' : ''}`}
+                            className={`w-full flex items-center gap-3 px-4 py-2 text-sm text-text-secondary hover:text-white hover:bg-white/10 transition-colors ${activeToolId === opt.id ? 'active text-[#6366f1] bg-white/5' : ''}`}
                             onClick={() => {
                                 onSelect(opt.id, opt.action);
                                 setIsOpen(false);
                             }}
                         >
-                            <opt.icon size={18} className={activeToolId === opt.id ? 'text-[#2962ff]' : ''} />
+                            <opt.icon size={18} className={activeToolId === opt.id ? 'text-[#6366f1]' : ''} />
                             {opt.label}
                         </button>
                     ))}

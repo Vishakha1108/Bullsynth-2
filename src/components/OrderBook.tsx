@@ -17,7 +17,7 @@ const OrderBook = React.memo(function OrderBook({ onClose }: { onClose?: () => v
     const spreadPct = topBids[0]?.price ? (spread / topBids[0].price * 100) : 0;
 
     return (
-        <div className="tv-orderbook">
+        <div className="tv-orderbook tv-side-accent tv-side-accent-orderbook">
             {/* Header */}
             <div className="tv-ob-header">
                 <div className="tv-ob-modes">

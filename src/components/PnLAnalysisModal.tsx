@@ -253,8 +253,8 @@ Response:
                       <Area
                         type="monotone"
                         dataKey="pnl"
-                        stroke="#2962ff"
-                        fill="#2962ff"
+                        stroke="#6366f1"
+                        fill="#6366f1"
                         fillOpacity={0.22}
                         strokeWidth={2}
                         dot={false}

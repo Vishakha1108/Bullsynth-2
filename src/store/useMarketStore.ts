@@ -139,7 +139,7 @@ export const INDICATOR_COLORS: Record<IndicatorId, string> = {
     pvt: '#fcd34d',
     stoch: '#818cf8',
     stochrsi: '#6366f1',
-    cci: '#7c3aed',
+    cci: '#6366f1',
     mom: '#2dd4bf',
     wpr: '#34d399',
     ao: '#10b981',

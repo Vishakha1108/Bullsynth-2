@@ -39,9 +39,9 @@ export default function Watchlist({ onClose }: { onClose?: () => void }) {
     }, [currentSymbol]);
 
     return (
-        <div className="flex flex-col h-full bg-bg-terminal text-text-primary font-sans border-l border-border-subtle">
+        <div className="tv-side-accent tv-side-accent-watchlist flex flex-col h-full bg-bg-terminal text-text-primary font-sans border-l border-border-subtle">
             {/* Watchlist Header */}
-            <div className="flex items-center justify-between px-3 py-2 border-b border-border-subtle bg-bg-elevated">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-border-subtle bg-linear-to-r from-bg-elevated via-bg-elevated/85 to-bg-terminal">
                 <div className="flex items-center gap-2 cursor-pointer hover:bg-border-subtle px-1.5 py-0.5 rounded transition-colors">
                     <span className="text-xs font-bold text-text-primary">Watchlist</span>
                     <TrendingDown size={12} className="text-text-primary" />
@@ -60,7 +60,7 @@ export default function Watchlist({ onClose }: { onClose?: () => void }) {
             </div>
 
             {/* Watchlist Table Header */}
-            <div className="flex px-3 py-1 text-[10px] text-text-secondary font-bold uppercase tracking-tight border-b border-border-subtle">
+            <div className="flex px-3 py-1 text-[10px] text-text-secondary font-bold uppercase tracking-tight border-b border-border-subtle bg-linear-to-r from-[#6366f10b] via-transparent to-[#2563eb06]">
                 <span className="flex-1">Symbol</span>
                 <span className="w-16 text-right">Last</span>
                 <span className="w-12 text-right">Chg</span>
@@ -84,11 +84,11 @@ export default function Watchlist({ onClose }: { onClose?: () => void }) {
                     return (
                         <div
                             key={symbol}
-                            className={`flex items-center px-3 py-2 border-b border-border-subtle cursor-pointer transition-colors group ${isActive ? 'bg-border-subtle' : 'hover:bg-bg-elevated'}`}
+                            className={`flex items-center px-3 py-2 border-b border-border-subtle cursor-pointer transition-colors group ${isActive ? 'bg-linear-to-r from-[#6366f112] via-[#6366f10a] to-transparent border-[#6366f122]' : 'hover:bg-bg-elevated/85 hover:border-[#6366f114]'}`}
                             onClick={() => handleSelect(symbol)}
                         >
                             <div className="flex-1 flex items-center gap-2 min-w-0">
-                                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white ${symbol === 'BTC' ? 'bg-[#f7931a]' : symbol === 'ETH' ? 'bg-[#627eea]' : 'bg-[#2962ff]'}`}>
+                                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white ${symbol === 'BTC' ? 'bg-[#f7931a]' : symbol === 'ETH' ? 'bg-[#627eea]' : 'bg-[#6366f1]'}`}>
                                     {symbol[0]}
                                 </div>
                                 <div className={`text-xs font-bold truncate ${isActive ? 'text-text-primary' : 'text-text-secondary'}`}>{symbol}</div>
@@ -111,10 +111,10 @@ export default function Watchlist({ onClose }: { onClose?: () => void }) {
             </div>
 
             {/* Symbol Detail Section (Bottom) */}
-            <div className="border-t border-border-subtle bg-bg-terminal p-4 flex flex-col gap-3 min-h-80">
+            <div className="border-t border-border-subtle bg-linear-to-b from-bg-terminal via-bg-terminal to-[#04050b] p-4 flex flex-col gap-3 min-h-80">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white ${currentSymbol === 'BTC' ? 'bg-[#f7931a]' : 'bg-[#2962ff]'}`}>
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white ${currentSymbol === 'BTC' ? 'bg-[#f7931a]' : 'bg-[#6366f1]'}`}>
                             {currentSymbol[0]}
                         </div>
                         <span className="text-sm font-bold text-text-primary uppercase">{currentSymbol}</span>
@@ -144,7 +144,7 @@ export default function Watchlist({ onClose }: { onClose?: () => void }) {
                 </div>
 
                 {/* News/Action mock bar */}
-                <div className="bg-bg-elevated rounded-md p-2 flex items-center gap-3 cursor-pointer hover:bg-border-subtle transition-colors border border-transparent hover:border-[#363a45]">
+                <div className="bg-linear-to-r from-bg-elevated via-bg-elevated/95 to-[#0a1020] rounded-md p-2 flex items-center gap-3 cursor-pointer hover:bg-border-subtle transition-colors border border-[#6366f116] hover:border-[#6366f130]">
                     <div className="w-8 h-8 rounded bg-bear/20 flex items-center justify-center text-bear">
                         <Info size={16} />
                     </div>

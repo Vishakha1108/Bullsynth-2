@@ -83,7 +83,7 @@ function findActiveLapSession(sessions: BotSession[]): BotSession | null {
 function Metric({ label, value, positive }: { label: string; value: string; positive?: boolean }) {
   const color = positive === undefined ? 'text-text-primary' : positive ? 'text-bull' : 'text-bear';
   return (
-    <div className="bg-bg-elevated/60 p-2.5 rounded-lg border border-border-subtle">
+    <div className="rounded-lg border border-border-subtle bg-linear-to-br from-bg-elevated/80 via-bg-elevated/65 to-[#090d19]/80 p-2.5 shadow-[inset_0_0_0_1px_rgba(99,102,241,0.08)]">
       <div className="text-[9px] text-text-secondary uppercase font-bold tracking-tight">{label}</div>
       <div className={`text-sm font-mono font-bold mt-0.5 ${color}`}>{value}</div>
     </div>
@@ -124,6 +124,7 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
   const [selectorOpen, setSelectorOpen] = useState(false);
 
   const actionLoading = actionPhase !== 'idle';
+  const sectionShellClass = 'rounded-xl border border-border-subtle/80 bg-linear-to-br from-[#6366f10a] via-bg-elevated/20 to-bg-terminal/40 p-3';
 
   useEffect(() => {
     runtimeRef.current = runtimeByBot;
@@ -612,8 +613,8 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
   };
 
   return (
-    <div className="flex h-full flex-col border-l border-border-subtle bg-bg-terminal text-text-primary font-sans">
-      <div className="flex items-start justify-between border-b border-border-subtle bg-linear-to-r from-bg-elevated to-bg-terminal px-3 py-2.5">
+    <div className="tv-side-accent tv-side-accent-bot flex h-full flex-col border-l border-border-subtle bg-bg-terminal text-text-primary font-sans">
+      <div className="flex items-start justify-between border-b border-border-subtle bg-linear-to-r from-[#6366f112] via-bg-elevated to-bg-terminal px-3 py-2.5">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-accent/25 bg-accent/10">
             <BarChart3 size={14} className="text-accent" />
@@ -647,7 +648,7 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
             </div>
           )}
 
-          <section className="rounded-xl border border-border-subtle/80 bg-bg-elevated/20 p-3">
+          <section className={sectionShellClass}>
             <div className="mb-2 flex items-center justify-between">
               <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-text-secondary">
                 Step 1 · Select Bots
@@ -662,7 +663,7 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
                 type="button"
                 disabled={running || loadingBots}
                 onClick={() => setSelectorOpen((prev) => !prev)}
-                className="flex w-full items-center justify-between gap-3 rounded-lg border border-border-subtle bg-bg-terminal/70 px-3 py-2 text-left transition-colors hover:border-text-secondary/35 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+                className="flex w-full items-center justify-between gap-3 rounded-lg border border-white/14 bg-white/[0.04] px-3 py-2 text-left backdrop-blur-md transition-colors hover:border-white/24 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
               >
                 <div className="min-w-0">
                   <div className="text-[10px] font-semibold uppercase tracking-[0.09em] text-text-secondary">
@@ -677,9 +678,9 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
               </button>
 
               {selectorOpen && !running && (
-                <div className="absolute z-40 mt-2 w-full overflow-hidden rounded-xl border border-border-subtle bg-bg-elevated shadow-[0_14px_32px_rgba(8,12,20,0.55)]">
+                <div className="absolute z-40 mt-2 w-full overflow-hidden rounded-xl border border-white/12 bg-linear-to-b from-[#0e1120ee] via-bg-elevated/95 to-bg-terminal/95 shadow-[0_14px_32px_rgba(8,12,20,0.55)] backdrop-blur-xl">
                   <div className="border-b border-border-subtle/80 p-2">
-                    <div className="flex items-center gap-2 rounded-md border border-border-subtle bg-bg-terminal/80 px-2.5 py-2">
+                    <div className="flex items-center gap-2 rounded-md border border-white/12 bg-white/[0.04] px-2.5 py-2 backdrop-blur-md">
                       <Search size={13} className="text-text-secondary" />
                       <input
                         value={query}
@@ -724,16 +725,16 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
                             type="button"
                             key={bot.id}
                             onClick={() => toggleSelected(bot.id)}
-                            className={`mb-1 flex w-full items-start gap-2 rounded-md border px-2 py-2 text-left transition-colors cursor-pointer ${
+                            className={`mb-1 flex w-full items-start gap-2 rounded-md border px-2 py-2 text-left transition-colors backdrop-blur-sm cursor-pointer ${
                               selected
-                                ? 'border-accent/45 bg-accent/12'
-                                : 'border-transparent bg-bg-terminal/40 hover:border-border-subtle hover:bg-bg-terminal/70'
+                                ? 'border-accent/36 bg-accent/10'
+                                : 'border-transparent bg-white/[0.025] hover:border-white/14 hover:bg-white/[0.06]'
                             }`}
                           >
                             <span
                               className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
                                 selected
-                                  ? 'border-[#2962ff] bg-[#2962ff] text-white'
+                                  ? 'border-[#6366f1] bg-[#6366f1] text-white'
                                   : 'border-border-subtle text-transparent'
                               }`}
                             >
@@ -773,7 +774,7 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
                       key={botId}
                       onClick={() => toggleSelected(botId)}
                       disabled={running}
-                      className="inline-flex max-w-full items-center gap-1 rounded-md border border-accent/30 bg-accent/12 px-2 py-1 text-[11px] font-semibold text-text-primary disabled:cursor-not-allowed disabled:opacity-70 cursor-pointer"
+                      className="inline-flex max-w-full items-center gap-1 rounded-md border border-accent/30 bg-accent/10 px-2 py-1 text-[11px] font-semibold text-text-primary backdrop-blur-md disabled:cursor-not-allowed disabled:opacity-70 cursor-pointer"
                     >
                       <Bot size={11} className="shrink-0 text-accent" />
                       <span className="truncate">{bot?.name ?? botId}</span>
@@ -785,7 +786,7 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
             </div>
           </section>
 
-          <section className="rounded-xl border border-border-subtle/80 bg-bg-elevated/20 p-3">
+          <section className={sectionShellClass}>
             <div className="mb-2 flex items-center justify-between">
               <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-text-secondary">
                 Step 2 · Lap Controls
@@ -794,7 +795,7 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
                 type="button"
                 onClick={() => void syncActiveLapsForSelection(selectedBotIds)}
                 disabled={actionLoading}
-                className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-accent transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+                className="tv-glass-btn px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-accent hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
               >
                 <RefreshCw size={11} />
                 Sync
@@ -824,7 +825,7 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
               <button
                 onClick={handleStart}
                 disabled={running || actionLoading || selectedBotIds.length === 0}
-                className="flex w-full items-center justify-center gap-2 rounded-lg border border-bull/70 bg-bull/16 py-2.5 text-xs font-semibold uppercase tracking-[0.07em] text-bull transition-colors hover:bg-bull/24 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+                className="tv-glass-btn w-full py-2.5 text-xs font-semibold uppercase tracking-[0.07em] text-bull border-bull/55 bg-linear-to-br from-bull/28 to-bull/14 hover:from-bull/35 hover:to-bull/18 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
               >
                 <Play size={13} />
                 Start
@@ -832,7 +833,7 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
               <button
                 onClick={handleStop}
                 disabled={!running || actionLoading}
-                className="flex w-full items-center justify-center gap-2 rounded-lg border border-bear/70 bg-bear/16 py-2.5 text-xs font-semibold uppercase tracking-[0.07em] text-bear transition-colors hover:bg-bear/24 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+                className="tv-glass-btn tv-glass-btn-danger w-full py-2.5 text-xs font-semibold uppercase tracking-[0.07em] text-bear disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
               >
                 <Square size={13} />
                 Stop
@@ -851,7 +852,7 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
             )}
           </section>
 
-          <section className="rounded-xl border border-border-subtle/80 bg-bg-elevated/20 p-3">
+          <section className={sectionShellClass}>
             <div className="mb-2 flex items-center justify-between">
               <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-text-secondary">Compared Bots KPI</div>
               <span className="text-[10px] text-text-secondary font-mono">
