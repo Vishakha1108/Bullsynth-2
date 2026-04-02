@@ -339,33 +339,13 @@ interface MarketState {
     removeNotification: (id: string) => void;
 }
 
-const PORTFOLIO_STORAGE_KEY = 'synthetic_bull_portfolio';
-
-const initialPortfolio: Portfolio = (() => {
-    if (typeof window === 'undefined') return {
-        cash: 100000,
-        holdings: [],
-        realizedPnl: 0,
-        unrealizedPnl: 0,
-        totalValue: 100000,
-    };
-
-    const saved = localStorage.getItem(PORTFOLIO_STORAGE_KEY);
-    if (saved) {
-        try {
-            return JSON.parse(saved);
-        } catch (e) {
-            console.error('Failed to parse portfolio from localStorage', e);
-        }
-    }
-    return {
-        cash: 100000,
-        holdings: [],
-        realizedPnl: 0,
-        unrealizedPnl: 0,
-        totalValue: 100000,
-    };
-})();
+const initialPortfolio: Portfolio = {
+    cash: 100000,
+    holdings: [],
+    realizedPnl: 0,
+    unrealizedPnl: 0,
+    totalValue: 100000,
+};
 
 const useMarketStore = create<MarketState>((set) => ({
     candles: [],
@@ -591,43 +571,45 @@ const useMarketStore = create<MarketState>((set) => ({
     addOrder: (order) => set((state) => ({ openOrders: [...state.openOrders, order] })),
     removeOrder: (orderId) => set((state) => ({ openOrders: state.openOrders.filter((o) => o.order_id !== orderId) })),
     setOpenOrders: (orders) => set({ openOrders: orders }),
-    setPortfolio: (p) => {
-        set((state) => {
-            // Check if incoming portfolio is the default "reset" state (100k cash, no holdings, no P&L)
-            const isServerReset = p.holdings.length === 0 && p.cash === 100000 && p.realizedPnl === 0 && p.unrealizedPnl === 0;
-            const hasLocalData = state.portfolio.holdings.length > 0;
+    setPortfolio: (p) => set(() => {
+        const holdings = (Array.isArray(p.holdings) ? p.holdings : [])
+            .map((h) => ({
+                asset: String(h.asset),
+                qty: Number(h.qty || 0),
+                avgPrice: Number(h.avgPrice || 0),
+                currentPrice: Number(h.currentPrice || 0),
+                marketValue: Number(h.marketValue || 0),
+                realizedPnl: Number(h.realizedPnl || 0),
+                unrealizedPnl: Number(h.unrealizedPnl || 0),
+            }))
+            .filter((h) =>
+                Number.isFinite(h.qty) &&
+                Number.isFinite(h.avgPrice) &&
+                Number.isFinite(h.currentPrice) &&
+                Number.isFinite(h.marketValue) &&
+                Number.isFinite(h.realizedPnl) &&
+                Number.isFinite(h.unrealizedPnl)
+            )
+            .sort((a, b) => a.asset.localeCompare(b.asset));
 
-            if (isServerReset && hasLocalData) {
-                console.log('Preserving local holdings - server appears to have reset');
-                return { portfolio: state.portfolio };
-            }
+        const cash = Number(p.cash || 0);
+        const totalMarketValue = holdings.reduce((sum, h) => sum + h.marketValue, 0);
+        const fallbackUnrealized = holdings.reduce((sum, h) => sum + h.unrealizedPnl, 0);
 
-            // Merge holdings: Keep existing ones if they aren't in the incoming update
-            const mergedHoldings = [...p.holdings];
-            const incomingAssets = new Set(p.holdings.map(h => h.asset));
+        const realizedPnl = Number.isFinite(Number(p.realizedPnl)) ? Number(p.realizedPnl) : 0;
+        const unrealizedPnl = Number.isFinite(Number(p.unrealizedPnl)) ? Number(p.unrealizedPnl) : fallbackUnrealized;
+        const totalValue = Number.isFinite(Number(p.totalValue)) ? Number(p.totalValue) : (cash + totalMarketValue);
 
-            for (const localH of state.portfolio.holdings) {
-                if (!incomingAssets.has(localH.asset)) {
-                    mergedHoldings.push(localH);
-                }
-            }
-
-            // Recalculate totals based on merged holdings
-            const totalMarketValue = mergedHoldings.reduce((sum, h) => sum + h.marketValue, 0);
-            const totalUnrealizedPnl = mergedHoldings.reduce((sum, h) => sum + h.unrealizedPnl, 0);
-            const updatedTotalValue = p.cash + totalMarketValue;
-
-            const updatedPortfolio = {
-                ...p,
-                holdings: mergedHoldings,
-                unrealizedPnl: totalUnrealizedPnl,
-                totalValue: updatedTotalValue
-            };
-
-            localStorage.setItem(PORTFOLIO_STORAGE_KEY, JSON.stringify(updatedPortfolio));
-            return { portfolio: updatedPortfolio };
-        });
-    },
+        return {
+            portfolio: {
+                cash,
+                holdings,
+                realizedPnl,
+                unrealizedPnl,
+                totalValue,
+            },
+        };
+    }),
 
     toggleIndicator: (indicatorId) => set((state) => ({
         enabledIndicators: state.enabledIndicators.includes(indicatorId)

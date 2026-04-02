@@ -1,24 +1,44 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { useEffect, useRef } from 'react';
+import { lazy, Suspense, useEffect, useRef } from 'react';
 import LandingPage from './components/LandingPage';
-import Terminal from './components/Terminal';
-import Dashboard from './components/Dashboard';
-import AdminDashboard from './components/AdminDashboard';
-import BotDetails from './components/BotDetails';
 import { ThemeProvider } from './store/ThemeContext';
 import { KeyboardShortcutsModal } from './components/keyboard-shortcuts';
+
+const Terminal = lazy(() => import('./components/Terminal'));
+const Dashboard = lazy(() => import('./components/Dashboard'));
+const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
+const BotDetails = lazy(() => import('./components/BotDetails'));
 
 function App() {
   const blobRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const handleMove = (e: MouseEvent) => {
+    let rafId = 0;
+    let latestX = 0;
+    let latestY = 0;
+
+    const draw = () => {
+      rafId = 0;
       if (blobRef.current) {
-        blobRef.current.style.background = `radial-gradient(600px circle at ${e.clientX}px ${e.clientY}px, rgba(124, 58, 237, 0.12), transparent 40%)`;
+        blobRef.current.style.background = `radial-gradient(600px circle at ${latestX}px ${latestY}px, rgba(124, 58, 237, 0.12), transparent 40%)`;
       }
     };
+
+    const handleMove = (e: MouseEvent) => {
+      latestX = e.clientX;
+      latestY = e.clientY;
+      if (!rafId) {
+        rafId = requestAnimationFrame(draw);
+      }
+    };
+
     window.addEventListener('mousemove', handleMove);
-    return () => window.removeEventListener('mousemove', handleMove);
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+      }
+    };
   }, []);
 
   return (
@@ -32,13 +52,15 @@ function App() {
         <div className="relative z-10 flex-1 flex flex-col w-full">
           <BrowserRouter>
             <KeyboardShortcutsModal />
-            <Routes>
-              <Route path="/" element={<LandingPage />} />
-              <Route path="/terminal" element={<Terminal />} />
-              <Route path="/user/dashboard" element={<Dashboard />} />
-              <Route path="/admin/dashboard" element={<AdminDashboard />} />    
-              <Route path="/admin/dashboard/bot/:id" element={<BotDetails />} />
-            </Routes>
+            <Suspense fallback={<div className="flex h-screen items-center justify-center text-text-secondary text-sm">Loading...</div>}>
+              <Routes>
+                <Route path="/" element={<LandingPage />} />
+                <Route path="/terminal" element={<Terminal />} />
+                <Route path="/user/dashboard" element={<Dashboard />} />
+                <Route path="/admin/dashboard" element={<AdminDashboard />} />
+                <Route path="/admin/dashboard/bot/:id" element={<BotDetails />} />
+              </Routes>
+            </Suspense>
           </BrowserRouter>
         </div>
       </div>

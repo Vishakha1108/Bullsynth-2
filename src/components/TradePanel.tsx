@@ -47,19 +47,9 @@ export default function TradePanel() {
             qty: parseFloat(qty)
         });
 
-        const numericPrice = parseFloat(price);
-        const isMarketable = type === 'market' || (
-            type === 'limit' && (
-                (side === 'BUY' && numericPrice >= bestAsk && bestAsk > 0) ||
-                (side === 'SELL' && numericPrice <= bestBid && bestBid > 0)
-            )
-        );
-
         useMarketStore.getState().addNotification(
-            !isMarketable
-                ? `Order for ${qty} ${currentSymbol} added to OPEN ORDER`
-                : `${side} order for ${qty} ${currentSymbol} executed successfully`,
-            'success'
+            `${side} ${type.toUpperCase()} order submitted: ${qty} ${currentSymbol}`,
+            'info'
         );
 
         setQty('');

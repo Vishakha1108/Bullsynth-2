@@ -50,7 +50,9 @@ export default function Portfolio({ onClose }: { onClose?: () => void }) {
                     {portfolio.holdings.map((h, i) => (
                         <div key={i} className="tv-portfolio-holding-row">
                             <span className="tv-portfolio-holding-asset">{h.asset}</span>
-                            <span>{h.qty}</span>
+                            <span className="font-mono tabular-nums">
+                                {h.qty.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 5 })}
+                            </span>
                             <span>${h.avgPrice.toFixed(2)}</span>
                         </div>
                     ))}

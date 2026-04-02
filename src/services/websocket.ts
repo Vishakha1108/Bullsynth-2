@@ -115,9 +115,28 @@ class WSManager {
     private ws: WebSocket | null = null;
     private reconnectDelay = 1000;
     private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    private accountSyncTimer: ReturnType<typeof setTimeout> | null = null;
+    private accountSyncQueued = false;
 
     constructor(url: string) {
         this.url = url;
+    }
+
+    private queueAccountSync(delayMs = 80) {
+        if (this.accountSyncQueued && delayMs > 0) {
+            return;
+        }
+
+        this.accountSyncQueued = true;
+        if (this.accountSyncTimer) {
+            clearTimeout(this.accountSyncTimer);
+        }
+        this.accountSyncTimer = setTimeout(() => {
+            this.accountSyncTimer = null;
+            this.accountSyncQueued = false;
+            this.send({ type: 'get_portfolio' });
+            this.send({ type: 'get_open_orders' });
+        }, delayMs);
     }
 
     connect() {
@@ -148,6 +167,7 @@ class WSManager {
 
             // Ask for symbol list in case welcome arrives before UI is ready.
             this.send({ type: 'get_symbols' });
+            this.queueAccountSync(0);
         };
 
         this.ws.onmessage = (event) => {
@@ -196,12 +216,18 @@ class WSManager {
                 if (msgType === 'trade') {
                     const price = Number(msg.price || 0);
                     const sym = String(msg.symbol || state.currentSymbol);
+                    const involvesUser = Boolean(state.userId && (msg.buyer === state.userId || msg.seller === state.userId));
+
                     if (sym === state.currentSymbol && state.candles.length > 0) {
                         const openPrice = state.candles[0].open;
                         const change = openPrice > 0 ? ((price - openPrice) / openPrice) * 100 : 0;
                         state.setPrice(sym, price, change);
                     } else {
                         state.setPrice(sym, price);
+                    }
+
+                    if (involvesUser) {
+                        this.queueAccountSync();
                     }
 
                     if (sym !== state.currentSymbol) return;
@@ -234,6 +260,11 @@ class WSManager {
                         type: 'TICK',
                         payload: { price: trade.price, qty: trade.qty, timestamp: ts, symbol: trade.symbol }
                     });
+                    return;
+                }
+
+                if (msgType === 'ack' || msgType === 'cancel_ack') {
+                    this.queueAccountSync();
                     return;
                 }
 
@@ -367,6 +398,11 @@ class WSManager {
         this.ws.onclose = () => {
             this.ws = null;
             fetchedSymbols.clear();
+            if (this.accountSyncTimer) {
+                clearTimeout(this.accountSyncTimer);
+                this.accountSyncTimer = null;
+            }
+            this.accountSyncQueued = false;
             if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
             for (const k of Object.keys(pendingCandles)) delete pendingCandles[k];
             useMarketStore.getState().setWsConnected(false);

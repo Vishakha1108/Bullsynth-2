@@ -64,7 +64,6 @@ export default function Dashboard() {
   const portfolio = useMarketStore((s) => s.portfolio);
   const openOrders = useMarketStore((s) => s.openOrders);
   const wsConnected = useMarketStore((s) => s.wsConnected);
-  const removeOrder = useMarketStore((s) => s.removeOrder);
 
   useEffect(() => {
     if (!wsConnected) {
@@ -76,11 +75,8 @@ export default function Dashboard() {
     if (wsConnected) {
       wsManager.send({ type: 'get_portfolio' });
       wsManager.send({ type: 'get_open_orders' });
-      symbols.forEach((sym) => {
-        wsManager.send({ type: 'get_history', symbol: sym });
-      });
     }
-  }, [wsConnected, symbols]);
+  }, [wsConnected]);
 
   const totalPnl = portfolio.realizedPnl + portfolio.unrealizedPnl;
   const pnlPercent = portfolio.totalValue > 0 ? (totalPnl / portfolio.totalValue) * 100 : 0;
@@ -112,9 +108,8 @@ export default function Dashboard() {
 
   const topMover = marketData[0] ?? null;
 
-  const handleCancelOrder = (orderId: number) => {
-    wsManager.send({ type: 'cancel_order', order_id: orderId });
-    removeOrder(orderId);
+  const handleCancelOrder = (orderId: number, symbol: string) => {
+    wsManager.send({ type: 'cancel_order', symbol, order_id: orderId });
   };
 
   return (
@@ -441,7 +436,7 @@ export default function Dashboard() {
                           </div>
                         </div>
                         <button
-                          onClick={() => handleCancelOrder(order.order_id)}
+                          onClick={() => handleCancelOrder(order.order_id, order.symbol)}
                           className="w-7 h-7 rounded-md flex items-center justify-center text-text-secondary hover:text-bear hover:bg-bear/10 transition-all cursor-pointer"
                           title="Cancel order"
                         >
