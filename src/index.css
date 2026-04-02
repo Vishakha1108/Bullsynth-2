@@ -380,8 +380,12 @@
   min-width: 160px;
 }
 
-.tv-toolbar-dropdown {
-  min-width: 120px;
+.tv-dropdown-surface.tv-toolbar-dropdown {
+  min-width: 220px;
+  top: 0;
+  left: 100%;
+  margin-top: -6px;
+  margin-left: 6px;
 }
 
 .tv-dropdown-option {
@@ -1576,13 +1580,14 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  position: relative;
+  z-index: 50;
   width: 48px;
   min-width: 48px;
   padding: 8px 0;
   gap: 4px;
   background: #000000;
   border-right: 1px solid #222222;
-  /* Removed overflow-y: auto to prevent clipping of absolute menus */
   overflow: visible;
 }
 
@@ -1628,20 +1633,17 @@ input[type='number'] {
 .tv-toolbar-combo {
   display: flex;
   align-items: center;
-  width: 40px;
+  position: relative;
+  width: 48px;
   height: 38px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
-  overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: transparent;
 }
 
 .tv-toolbar-combo-main {
-  flex: 1;
-  height: 100%;
+  width: 32px;
+  height: 34px;
+  margin-left: 8px;
+  border-radius: 6px;
   border: none;
   background: transparent;
   display: flex;
@@ -1653,32 +1655,43 @@ input[type='number'] {
 }
 
 .tv-toolbar-combo-main:hover {
+  background: rgba(255, 255, 255, 0.08);
   color: var(--color-text-primary);
 }
 
 .tv-toolbar-combo-main.active {
   color: #6366f1;
-  background: rgba(99, 102, 241, 0.12);
 }
 
 .tv-toolbar-combo-caret {
-  width: 14px;
-  height: 100%;
+  position: absolute;
+  right: 0px;
+  width: 8px;
+  height: 34px;
+  top: 2px;
+  border-radius: 0 6px 6px 0;
   border: none;
-  border-left: 1px solid rgba(255, 255, 255, 0.12);
   background: transparent;
   color: var(--color-text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: color 0.16s ease, background 0.16s ease;
+  transition: color 0.16s ease, background 0.16s ease, opacity 0.2s ease;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.tv-toolbar-combo:hover .tv-toolbar-combo-caret,
+.tv-toolbar-combo-caret.open {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .tv-toolbar-combo-caret:hover,
 .tv-toolbar-combo-caret.open {
+  background: rgba(255, 255, 255, 0.08);
   color: var(--color-text-primary);
-  background: rgba(255, 255, 255, 0.1);
 }
 
 .tv-toolbar-clear-btn {
@@ -4804,9 +4817,8 @@ input[type='number'] {
   background: linear-gradient(145deg, rgba(99, 102, 241, 0.18), rgba(59, 130, 246, 0.12));
 }
 
-.light .tv-toolbar-combo {
-  border-color: rgba(148, 163, 184, 0.35);
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(241, 245, 249, 0.84));
+.light .tv-toolbar-combo-main {
+  background: transparent;
 }
 
 .light .tv-toolbar-combo-main,
@@ -4814,20 +4826,19 @@ input[type='number'] {
   color: #5d606b;
 }
 
-.light .tv-toolbar-combo-main:hover,
+.light .tv-toolbar-combo-main:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: #131722;
+}
+
 .light .tv-toolbar-combo-caret:hover,
 .light .tv-toolbar-combo-caret.open {
+  background: rgba(0, 0, 0, 0.08);
   color: #131722;
-  background: rgba(99, 102, 241, 0.08);
 }
 
 .light .tv-toolbar-combo-main.active {
   color: #3730a3;
-  background: rgba(99, 102, 241, 0.12);
-}
-
-.light .tv-toolbar-combo-caret {
-  border-left-color: rgba(148, 163, 184, 0.3);
 }
 
 .light .tv-toolbar-clear-btn {
