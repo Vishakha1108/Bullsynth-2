@@ -1,11 +1,11 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
 const REQUEST_TIMEOUT_MS = 12000;
 
-async function requestJson(
+async function requestJson<T>(
     url: string,
     init?: RequestInit,
     timeoutMs: number = REQUEST_TIMEOUT_MS
-): Promise<unknown> {
+): Promise<T> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -15,7 +15,7 @@ async function requestJson(
             const err = await res.json().catch(() => ({}));
             throw new Error(err.detail || `HTTP ${res.status}`);
         }
-        return await res.json();
+        return (await res.json()) as T;
     } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') {
             throw new Error(`Request timed out (${timeoutMs}ms)`);
@@ -50,11 +50,11 @@ export async function fetchTickers(): Promise<Ticker[]> {
 }
 
 export async function fetchBots(): Promise<Bot[]> {
-    return await requestJson(`${API_BASE}/api/bots`);
+    return await requestJson<Bot[]>(`${API_BASE}/api/bots`);
 }
 
 export async function fetchBot(botId: string): Promise<Bot> {
-    return await requestJson(`${API_BASE}/api/bots/${botId}`);
+    return await requestJson<Bot>(`${API_BASE}/api/bots/${botId}`);
 }
 
 export async function createBot(name: string): Promise<Bot> {
@@ -96,11 +96,11 @@ export interface DepositResponse {
 
 export async function fetchBotTrades(botId: string, sessionId?: string): Promise<BotTrade[]> {
     const query = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : '';
-    return await requestJson(`${API_BASE}/api/bots/${botId}/trades${query}`);
+    return await requestJson<BotTrade[]>(`${API_BASE}/api/bots/${botId}/trades${query}`);
 }
 
 export async function fetchBotPortfolio(botId: string): Promise<BotPortfolio> {
-    return await requestJson(`${API_BASE}/api/bots/${botId}/portfolio`);
+    return await requestJson<BotPortfolio>(`${API_BASE}/api/bots/${botId}/portfolio`);
 }
 
 export async function depositFunds(botId: string, amount: number): Promise<DepositResponse> {
@@ -163,21 +163,21 @@ export async function fetchBotKPI(botId: string, sessionId?: string): Promise<Bo
     if (sessionId) {
         url += `?session_id=${sessionId}`;
     }
-    return await requestJson(url);
+    return await requestJson<BotKPIResponse>(url);
 }
 
 export async function fetchBotSessions(botId: string): Promise<BotSession[]> {
-    return await requestJson(`${API_BASE}/api/bots/${botId}/sessions`);
+    return await requestJson<BotSession[]>(`${API_BASE}/api/bots/${botId}/sessions`);
 }
 
 export async function startLapSession(botId: string): Promise<BotSession> {
-    return await requestJson(`${API_BASE}/api/bots/${botId}/sessions/start`, {
+    return await requestJson<BotSession>(`${API_BASE}/api/bots/${botId}/sessions/start`, {
         method: 'POST',
     });
 }
 
 export async function stopLapSession(botId: string): Promise<BotSession> {
-    return await requestJson(`${API_BASE}/api/bots/${botId}/sessions/stop`, {
+    return await requestJson<BotSession>(`${API_BASE}/api/bots/${botId}/sessions/stop`, {
         method: 'POST',
     });
 }
