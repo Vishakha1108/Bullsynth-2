@@ -31,6 +31,29 @@ function normalizeTimestampToSec(input: unknown): number {
     return Math.floor(value < 1e12 ? value : value / 1000);
 }
 
+function mergeRawCache(existing: Candle[], incoming: Candle[]): Candle[] {
+    if (incoming.length === 0) return existing.slice(-5000);
+
+    const merged = [...existing, ...incoming]
+        .map((candle) => ({
+            ...candle,
+            time: normalizeTimestampToSec(candle.time),
+        }))
+        .sort((a, b) => a.time - b.time);
+
+    const deduped: Candle[] = [];
+    for (const candle of merged) {
+        const last = deduped[deduped.length - 1];
+        if (last && last.time === candle.time) {
+            deduped[deduped.length - 1] = candle;
+        } else {
+            deduped.push(candle);
+        }
+    }
+
+    return deduped.slice(-5000);
+}
+
 function aggregateCandles(raw: Candle[], timeframe: number): Candle[] {
     const history: Candle[] = [];
     for (const c of raw) {
@@ -53,11 +76,12 @@ function aggregateCandles(raw: Candle[], timeframe: number): Candle[] {
 
 self.onmessage = (e) => {
     const { type, payload } = e.data;
-    const symbol = payload?.symbol;
-    const timeframe = Number(payload?.timeframeSec || 60);
-    const key = getContextKey(symbol, timeframe);
+    const symbol = typeof payload?.symbol === 'string' ? payload.symbol : undefined;
+    const timeframe = Number(payload?.timeframeSec || 1);
 
     if (type === 'INIT') {
+        if (!symbol) return;
+        const key = getContextKey(symbol, timeframe);
         timeframes.set(key, timeframe);
         const raw = rawCache[symbol] || [];
         const history = aggregateCandles(raw, timeframe);
@@ -65,16 +89,30 @@ self.onmessage = (e) => {
         self.postMessage({ type: 'HISTORY_UPDATE', candles: history, symbol, timeframeSec: timeframe });
     }
     else if (type === 'HISTORY') {
+        if (!symbol) return;
+        const key = getContextKey(symbol, timeframe);
         const rawCandles: Candle[] = Array.isArray(payload) ? payload : (payload?.candles || []);
-        if (symbol) rawCache[symbol] = rawCandles.slice(-5000);
+        rawCache[symbol] = mergeRawCache(rawCache[symbol] || [], rawCandles);
 
-        const history = aggregateCandles(rawCandles, timeframe);
+        const history = aggregateCandles(rawCache[symbol], timeframe);
         histories.set(key, history);
         self.postMessage({ type: 'HISTORY_UPDATE', candles: history, symbol, timeframeSec: timeframe });
     }
+    else if (type === 'CACHE_HISTORY') {
+        if (!symbol) return;
+        const rawCandles: Candle[] = Array.isArray(payload) ? payload : (payload?.candles || []);
+        rawCache[symbol] = mergeRawCache(rawCache[symbol] || [], rawCandles);
+    }
+    else if (type === 'GET_COMPARE_HISTORY') {
+        if (!symbol) return;
+        const compareTimeframe = Number(payload?.timeframeSec || 1);
+        const cached = rawCache[symbol] || [];
+        const history = aggregateCandles(cached, compareTimeframe);
+        self.postMessage({ type: 'COMPARE_HISTORY_UPDATE', candles: history, symbol, timeframeSec: compareTimeframe });
+    }
     else if (type === 'TICK' || type === 'CANDLE_1S') {
         const c = payload;
-        const sym = c.symbol;
+        const sym = typeof c?.symbol === 'string' ? c.symbol : undefined;
         if (!sym) return;
 
         // Store in raw cache

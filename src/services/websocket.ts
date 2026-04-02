@@ -338,9 +338,12 @@ class WSManager {
                         state.setPrice(msg.symbol, closePrice, change);
                     }
 
+                    // Keep worker raw cache warm for all symbols so compare backfill is instant.
+                    candleWorker.postMessage({ type: 'CACHE_HISTORY', payload: { symbol: msg.symbol, candles } });
+
                     if (msg.symbol === state.currentSymbol) {
                         fetchedSymbols.add(msg.symbol);
-                        candleWorker.postMessage({ type: 'HISTORY', payload: { symbol: msg.symbol, candles } });
+                        candleWorker.postMessage({ type: 'HISTORY', payload: { symbol: msg.symbol, candles, timeframeSec: state.timeframe } });
                     } else {
                         if (state.compareSymbols.includes(msg.symbol)) {
                             state.setCompareCandles(msg.symbol, candles);
