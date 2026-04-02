@@ -229,6 +229,28 @@ export default function Header() {
     return groups;
   }, [indicatorQuery]);
 
+  const renderIndicatorPlaceholder = (
+    title: string,
+    description: string,
+    actionLabel?: string,
+    onAction?: () => void,
+  ) => (
+    <div className="tv-indicators-empty-state">
+      <div className="tv-indicators-empty-logo" />
+      <h4>{title}</h4>
+      <p>{description}</p>
+      {actionLabel && onAction && (
+        <button
+          type="button"
+          className="tv-indicators-empty-button"
+          onClick={onAction}
+        >
+          {actionLabel}
+        </button>
+      )}
+    </div>
+  );
+
   const openCreateScriptModal = (template = SCRIPT_TEMPLATES[0]) => {
     setScriptNameInput(template.scriptName);
     setScriptDescriptionInput(template.description);
@@ -726,7 +748,7 @@ export default function Header() {
                       </div>
                     </>
                   ) : activeIndicatorSection === "My scripts" ? (
-                    <div className="tv-indicators-list styling-scrollbar">
+                    <div className={`tv-indicators-list styling-scrollbar ${customIndicatorScripts.length === 0 ? 'tv-indicators-list-empty' : ''}`}>
                       <div className="tv-indicators-content-toolbar tv-indicators-content-toolbar-compact">
                         <p>{customIndicatorScripts.length} scripts</p>
                         <button
@@ -739,11 +761,11 @@ export default function Header() {
                       </div>
 
                       {customIndicatorScripts.length === 0 ? (
-                        <div className="tv-indicators-empty-state pt-10!">
+                        <div className="tv-indicators-empty-state tv-indicators-empty-state-centered">
+                          <div className="tv-indicators-empty-logo" />
                           <h4>No personal scripts, yet</h4>
                           <p>
-                            Build your own indicator in JavaScript and render it
-                            directly on the chart.
+                            Build your own indicator in JavaScript and render it directly on the chart.
                           </p>
                           <button
                             type="button"
@@ -800,22 +822,48 @@ export default function Header() {
                         ))
                       )}
                     </div>
+                  ) : activeIndicatorSection === "Invite-only" ? (
+                    renderIndicatorPlaceholder(
+                      "No invite-only scripts, yet",
+                      "Scripts shared with you will appear here when available.",
+                    )
+                  ) : activeIndicatorSection === "Purchased" ? (
+                    renderIndicatorPlaceholder(
+                      "No purchased scripts, yet",
+                      "Your purchased indicators will show up here once you add them to this workspace.",
+                    )
+                  ) : activeIndicatorSection === "Fundamentals" ? (
+                    renderIndicatorPlaceholder(
+                      "Fundamentals are not added yet",
+                      "This branch currently focuses on technical studies. Fundamental indicators can be added here later.",
+                    )
+                  ) : activeIndicatorSection === "Editors' picks" ? (
+                    renderIndicatorPlaceholder(
+                      "No editor picks loaded",
+                      "Featured community scripts can be surfaced here once the catalog is connected.",
+                    )
+                  ) : activeIndicatorSection === "Top" ? (
+                    renderIndicatorPlaceholder(
+                      "No top scripts loaded",
+                      "Top-rated community indicators can be listed here once available.",
+                    )
+                  ) : activeIndicatorSection === "Trending" ? (
+                    renderIndicatorPlaceholder(
+                      "No trending scripts loaded",
+                      "Trending community indicators can be shown here once the feed is connected.",
+                    )
+                  ) : activeIndicatorSection === "Store" ? (
+                    renderIndicatorPlaceholder(
+                      "Store is not connected yet",
+                      "Browseable community indicators can be added here once the store data is available.",
+                    )
                   ) : (
-                    <div className="tv-indicators-empty-state">
-                      <div className="tv-indicators-empty-logo" />
-                      <h4>No personal scripts, yet</h4>
-                      <p>
-                        Start creating your own indicators and strategies with
-                        Pine Script, or remix an existing one to make it yours.
-                      </p>
-                      <button
-                        type="button"
-                        className="tv-indicators-empty-button"
-                        onClick={() => openCreateScriptModal()}
-                      >
-                        Create script
-                      </button>
-                    </div>
+                    renderIndicatorPlaceholder(
+                      "No personal scripts, yet",
+                      "Start creating your own indicators and strategies with Pine Script, or remix an existing one to make it yours.",
+                      "Create script",
+                      () => openCreateScriptModal(),
+                    )
                   )}
                 </section>
               </div>
