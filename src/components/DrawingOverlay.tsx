@@ -104,26 +104,30 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false, pane
         };
 
         const getSignature = () => {
-            const logicalRange = chart.timeScale().getVisibleLogicalRange();
-            const priceRange = candleSeries.priceScale().getVisibleRange();
+            try {
+                const logicalRange = chart.timeScale().getVisibleLogicalRange();
+                const priceRange = candleSeries.priceScale().getVisibleRange();
 
-            // Keep raw precision so tiny pans/zoom deltas repaint immediately.
-            const logicalFrom = logicalRange?.from ?? 0;
-            const logicalX0 = chart.timeScale().logicalToCoordinate(logicalFrom as any);
-            const logicalX1 = chart.timeScale().logicalToCoordinate((logicalFrom + 1) as any);
-            const barSpacing = logicalX0 != null && logicalX1 != null
-                ? (logicalX1 - logicalX0)
-                : null;
+                // Keep raw precision so tiny pans/zoom deltas repaint immediately.
+                const logicalFrom = logicalRange?.from ?? 0;
+                const logicalX0 = chart.timeScale().logicalToCoordinate(logicalFrom as any);
+                const logicalX1 = chart.timeScale().logicalToCoordinate((logicalFrom + 1) as any);
+                const barSpacing = logicalX0 != null && logicalX1 != null
+                    ? (logicalX1 - logicalX0)
+                    : null;
 
-            return [
-                logicalRange?.from ?? 'na',
-                logicalRange?.to ?? 'na',
-                priceRange?.from ?? 'na',
-                priceRange?.to ?? 'na',
-                barSpacing ?? 'na',
-                dimensions.w,
-                dimensions.h,
-            ].join('|');
+                return [
+                    logicalRange?.from ?? 'na',
+                    logicalRange?.to ?? 'na',
+                    priceRange?.from ?? 'na',
+                    priceRange?.to ?? 'na',
+                    barSpacing ?? 'na',
+                    dimensions.w,
+                    dimensions.h,
+                ].join('|');
+            } catch {
+                return lastSignature;
+            }
         };
 
         const tick = () => {

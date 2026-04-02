@@ -4233,6 +4233,44 @@ input[type='number'] {
   background: rgba(42, 46, 57, 0.3);
 }
 
+/* ── Layout Picker (dark defaults) ───────────────────────────────────────── */
+.layout-picker-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 260;
+  padding: 12px;
+  min-width: 200px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(5, 5, 5, 0.97);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 0 34px rgba(99, 102, 241, 0.12), 0 18px 40px rgba(0, 0, 0, 0.62);
+}
+
+.layout-picker-item {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.layout-picker-item--active {
+  background: linear-gradient(145deg, rgba(99, 102, 241, 0.2), rgba(37, 99, 235, 0.1));
+  border-color: rgba(99, 102, 241, 0.34);
+}
+
+.layout-picker-divider {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.layout-picker-toggle {
+  background: #363a45;
+}
+
+.layout-picker-toggle--on {
+  background: #2962ff;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    LIGHT MODE OVERRIDES  (.light on <html>)
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -4337,6 +4375,38 @@ input[type='number'] {
   border-color: rgba(148, 163, 184, 0.35);
   background: rgba(255, 255, 255, 0.97);
   box-shadow: 0 18px 42px rgba(15, 23, 42, 0.16), 0 0 20px rgba(99, 102, 241, 0.1);
+}
+
+/* ── Layout Picker (light) ───────────────────────────────────────────────── */
+.light .layout-picker-panel {
+  border-color: rgba(148, 163, 184, 0.35);
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.16), 0 0 20px rgba(99, 102, 241, 0.1);
+}
+
+.light .layout-picker-item {
+  border-color: rgba(148, 163, 184, 0.35);
+}
+
+.light .layout-picker-item--active {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(59, 130, 246, 0.16));
+  border-color: rgba(99, 102, 241, 0.35);
+}
+
+.light .layout-picker-item svg rect {
+  stroke: #787b86;
+}
+
+.light .layout-picker-divider {
+  border-color: rgba(148, 163, 184, 0.3);
+}
+
+.light .layout-picker-toggle {
+  background: #d1d4dc;
+}
+
+.light .layout-picker-toggle--on {
+  background: #6366f1;
 }
 
 .light .tv-header-menu-item {
