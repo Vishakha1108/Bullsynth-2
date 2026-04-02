@@ -269,7 +269,7 @@ export default function AdminDashboard() {
                           </code>
                         </td>
                         <td className="px-6 py-4 font-medium text-text-primary">
-                          <Link to={`/admin/dashboard/bot/${bot.id}`} className="hover:text-accent hover:underline flex items-center gap-2 transition-colors">
+                          <Link to={`/admin/dashboard/bot/${bot.id}`} className="hover:underline flex items-center gap-2 transition-colors">
                             {bot.name}
                           </Link>
                         </td>

@@ -297,6 +297,25 @@ export default function BotDetails() {
     );
   }
 
+  if (loading && !bot) {
+    return (
+      <div className="min-h-screen bg-bg-terminal text-text-primary">
+        <Navbar />
+        <div className="flex-1 flex flex-col items-center justify-center" style={{ minHeight: 'calc(100vh - 60px)' }}>
+          <div className="relative w-12 h-12 mb-4">
+            <div className="absolute inset-0 rounded-full border-2 border-white/10" />
+            <div
+              className="absolute inset-0 rounded-full border-2 border-transparent border-t-[#6366f1]"
+              style={{ animation: 'spin 0.8s linear infinite' }}
+            />
+          </div>
+          <p className="text-sm text-text-secondary animate-pulse">Loading bot details…</p>
+        </div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-bg-terminal text-text-primary overflow-y-auto styling-scrollbar">
       <Navbar />
@@ -305,7 +324,7 @@ export default function BotDetails() {
           <div>
             <Link
               to="/admin/dashboard"
-              className="flex items-center gap-1 text-[11px] text-text-secondary hover:text-accent transition-colors mb-2 w-fit"
+              className="flex items-center gap-1 text-[11px] text-text-secondary hover:underline transition-colors mb-2 w-fit"
             >
               <ArrowLeft size={12} /> Back to Dashboard
             </Link>

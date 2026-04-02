@@ -33,10 +33,10 @@ function StatCard({ label, value, icon: Icon, change, subtitle, valueColor }: {
       <div
         className="pointer-events-none absolute inset-0 opacity-80"
         style={{
-          background: 'radial-gradient(circle at top right, rgba(99,102,241,0.3) 0%, rgba(37,99,235,0.14) 42%, transparent 72%)',
+          background: 'radial-gradient(circle at top right, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.015) 42%, transparent 72%)',
         }}
       />
-      <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-linear-to-r from-transparent via-[#6366f199] to-transparent" />
+      <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-linear-to-r from-transparent via-white/10 to-transparent" />
       <div className="relative flex items-center justify-between">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">{label}</span>
         <div className="w-8 h-8 rounded-md dash-icon-bg flex items-center justify-center text-text-secondary border border-white/10">
@@ -106,7 +106,7 @@ export default function Dashboard() {
     };
   }, [marketData]);
 
-  const topMover = marketData[0] ?? null;
+
 
   const handleCancelOrder = (orderId: number, symbol: string) => {
     wsManager.send({ type: 'cancel_order', symbol, order_id: orderId });
@@ -118,18 +118,18 @@ export default function Dashboard() {
 
       <main className="relative flex-1 min-h-0 overflow-hidden">
         <div className="pointer-events-none absolute inset-0">
-          <div className="absolute -top-24 left-[24%] h-72 w-72 rounded-full bg-[#6366f130] blur-[120px]" />
-          <div className="absolute bottom-8 right-[8%] h-80 w-80 rounded-full bg-[#2563eb26] blur-[130px]" />
+          <div className="absolute -top-24 left-[24%] h-72 w-72 rounded-full bg-white/[0.02] blur-[120px]" />
+          <div className="absolute bottom-8 right-[8%] h-80 w-80 rounded-full bg-white/[0.015] blur-[130px]" />
         </div>
 
         <div className="relative h-full overflow-y-auto styling-scrollbar">
           <div className="mx-auto flex w-full max-w-[1760px] flex-col gap-5 px-4 pb-5 pt-4 sm:px-6 lg:px-8">
 
             <section className="dash-card relative overflow-hidden border-white/12 bg-white/4.5 px-5 py-5 sm:px-6">
-              <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-linear-to-r from-transparent via-[#6366f1aa] to-transparent" />
+              <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-linear-to-r from-transparent via-white/10 to-transparent" />
               <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.35fr_1fr]">
                 <div>
-                  <span className="inline-flex items-center gap-2 rounded-full border border-[#6366f14d] bg-[#6366f117] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#a5b4fc]">
+                  <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#a5b4fc]">
                     <Zap size={12} />
                     Workspace Control Center
                   </span>
@@ -147,15 +147,7 @@ export default function Dashboard() {
                       <ExternalLink size={13} />
                       Open Terminal
                     </button>
-                    <button
-                      type="button"
-                      disabled={!topMover}
-                      onClick={() => topMover && navigate(`/terminal?symbol=${topMover.symbol}`)}
-                      className="tv-glass-btn tv-glass-btn-accent px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.08em] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
-                    >
-                      <TrendingUp size={13} />
-                      {topMover ? `Trade Top Mover ${topMover.symbol}` : 'Top Mover Unavailable'}
-                    </button>
+
                   </div>
                 </div>
 
@@ -217,7 +209,7 @@ export default function Dashboard() {
 
               {/* Holdings */}
               <div className="xl:col-span-8 dash-card overflow-hidden border-white/12 bg-white/[0.035] flex flex-col">
-                <div className="px-5 py-3 dash-section-header flex items-center justify-between bg-linear-to-r from-[#6366f126] via-transparent to-transparent">
+                <div className="px-5 py-3 dash-section-header flex items-center justify-between bg-linear-to-r from-white/[0.03] via-transparent to-transparent">
                   <h2 className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Holdings Matrix</h2>
                   <span className="text-[10px] font-mono text-text-secondary">{portfolio.holdings.length} positions</span>
                 </div>
@@ -349,7 +341,7 @@ export default function Dashboard() {
 
             {/* Market Overview (3 cols) */}
             <div className="lg:col-span-3 dash-card overflow-hidden flex flex-col min-h-0 border-white/12 bg-white/[0.035]">
-              <div className="px-5 py-3 dash-section-header flex items-center justify-between bg-linear-to-r from-[#2563eb1f] via-transparent to-transparent">
+              <div className="px-5 py-3 dash-section-header flex items-center justify-between bg-linear-to-r from-white/[0.03] via-transparent to-transparent">
                 <h2 className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Market Overview</h2>
                 <div className="flex items-center gap-2">
                   <div className={`w-1.5 h-1.5 rounded-full ${wsConnected ? 'bg-bull' : 'bg-bear'}`} />
@@ -410,7 +402,7 @@ export default function Dashboard() {
 
             {/* Open Orders (2 cols) */}
             <div className="lg:col-span-2 dash-card overflow-hidden flex flex-col min-h-0 border-white/12 bg-white/[0.035]">
-              <div className="px-5 py-3 dash-section-header flex items-center justify-between bg-linear-to-r from-[#6366f11f] via-transparent to-transparent">
+              <div className="px-5 py-3 dash-section-header flex items-center justify-between bg-linear-to-r from-white/[0.03] via-transparent to-transparent">
                 <h2 className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Open Orders</h2>
                 <span className="text-[10px] font-mono text-text-secondary">{openOrders.length} active</span>
               </div>

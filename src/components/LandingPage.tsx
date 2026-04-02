@@ -208,16 +208,21 @@ export default function LandingPage() {
                 </section>
 
                 {/* ── Harness the power of AI ─────────────────────────────────── */}
-                <section className="landing-capabilities max-w-7xl mx-auto px-6 mb-32">
-                    <div className="mb-12">
+                <section className="landing-capabilities max-w-7xl mx-auto px-6 mb-32 relative">
+                    <div className="pointer-events-none absolute inset-0">
+                        <div className="absolute -top-24 right-[20%] h-72 w-72 rounded-full bg-[#6366f118] blur-[120px]" />
+                        <div className="absolute bottom-10 left-[8%] h-80 w-80 rounded-full bg-[#2563eb14] blur-[130px]" />
+                    </div>
+
+                    <div className="relative mb-12">
                         <h2 className="text-3xl md:text-4xl font-bold text-white tracking-tight max-w-2xl">
                             Harness the power of AI to make the smartest financial decisions
                         </h2>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="relative grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {capabilities.map((feature, idx) => (
-                            <div key={idx} className="landing-cap-card p-8 rounded-2xl bg-[#0a0a0a] border border-[#222] hover:bg-[#111] hover:border-[#333] transition-all group">
+                            <div key={idx} className="landing-cap-card p-8 rounded-2xl bg-white/[0.035] border border-white/8 hover:bg-white/[0.06] hover:border-white/15 transition-all group">
                                 <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                                     {feature.icon}
                                 </div>
