@@ -5297,7 +5297,9 @@ input[type='number'] {
 }
 
 .light .dash-icon-bg {
-  background: #e0e3eb;
+  background: rgba(99, 102, 241, 0.12);
+  color: #6366f1;
+  border-color: rgba(99, 102, 241, 0.18);
 }
 
 .light .dash-section-header {
@@ -5349,7 +5351,7 @@ input[type='number'] {
 }
 .light .dash-nav-btn:hover {
   background: transparent;
-  color: #ffffff;
+  color: #0f172a;
 }
 
 .light .dash-footer {

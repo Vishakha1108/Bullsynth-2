@@ -51,39 +51,40 @@ export function Navbar() {
   }, []);
 
   return (
-    <nav className="dash-navbar w-full h-16 flex items-center justify-between px-6 z-50 shrink-0">
+    <nav className="dash-navbar w-full h-16 z-50 shrink-0">
+      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
       <div 
-        className="flex items-center gap-2 text-text-primary hover:text-accent transition-colors cursor-pointer" 
+        className="landing-brand flex items-center gap-2 text-text-primary hover:text-purple-400 transition-colors cursor-pointer" 
         onClick={() => navigate('/')}
       >
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center shadow-[0_0_15px_rgba(124,58,237,0.5)]">
+        <div className="w-8 h-8 rounded-lg bg-linear-to-br from-purple-600 to-blue-600 flex items-center justify-center">
             <TrendingUp size={18} className="text-white" />
         </div>
         <span className="font-bold text-lg tracking-tight">NEXTBULL</span>
       </div>
 
-      <div className="hidden md:flex items-center justify-center absolute left-1/2 -translate-x-1/2 gap-8 text-sm font-medium text-text-secondary">
+      <div className="landing-nav-links hidden md:flex items-center gap-8 text-sm font-medium text-text-secondary">
         <button 
           onClick={() => navigate('/terminal')} 
-          className={`dash-nav-btn transition-colors cursor-pointer ${isActive('/terminal') ? 'text-text-primary !font-bold' : ''}`}
+          className={`dash-nav-btn transition-colors cursor-pointer ${isActive('/terminal') ? 'text-text-primary font-bold!' : ''}`}
         >
           Terminal
         </button>
         <button 
           onClick={() => navigate('/user/dashboard')} 
-          className={`dash-nav-btn transition-colors cursor-pointer ${isActive('/user/dashboard') ? 'text-text-primary !font-bold' : ''}`}
+          className={`dash-nav-btn transition-colors cursor-pointer ${isActive('/user/dashboard') ? 'text-text-primary font-bold!' : ''}`}
         >
-          Dashboard
+          Workspace
         </button>
         <button 
           onClick={() => navigate('/admin/dashboard')} 
-          className={`dash-nav-btn transition-colors cursor-pointer ${isActive('/admin/dashboard') ? 'text-text-primary !font-bold' : ''}`}
+          className={`dash-nav-btn transition-colors cursor-pointer ${isActive('/admin/dashboard') ? 'text-text-primary font-bold!' : ''}`}
         >
-          Bots
+          Automation
         </button>
       </div>
 
-      <div className="flex items-center gap-4 relative z-10">
+      <div className="flex items-center gap-4">
         <ModeToggle />
         <div className="h-5 w-px bg-border-subtle" />
         <DropdownMenu>
@@ -158,6 +159,7 @@ export function Navbar() {
             )}
           </DropdownMenuContent>
         </DropdownMenu>
+      </div>
       </div>
     </nav>
   );
