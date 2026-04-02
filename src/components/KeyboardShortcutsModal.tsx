@@ -27,6 +27,8 @@ const SECTIONS = [
       { keys: ['Alt', 'R'], description: 'Horizontal Line' },
       { keys: ['Alt', 'V'], description: 'Vertical Line' },
       { keys: ['Alt', 'C'], description: 'Clear all drawings & Reset chart' },
+      { keys: ['Delete'], description: 'Delete last drawing' },
+      { keys: ['Backspace'], description: 'Delete last drawing' },
       { keys: ['Ctrl', 'H'], description: 'Hide / Show all drawings' },
       { keys: ['T'], description: 'Text tool' },
       { keys: ['M'], description: 'Measure tool' },
