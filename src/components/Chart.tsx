@@ -1007,6 +1007,8 @@ function Chart({ paneId }: { paneId?: string } = {}) {
     theme,
     chartType,
     formatCandleData,
+    layoutId,
+    paneId,
   ]);
 
   // Batch data sync — triggers only on history load/clear (historySequence), not individual candle updates

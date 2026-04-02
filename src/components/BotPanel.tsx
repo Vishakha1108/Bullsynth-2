@@ -242,7 +242,7 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
       label: 'Inside scheduled window. Starting lap...',
       toneClass: 'border-accent/30 bg-accent/10 text-accent',
     };
-  }, [runMode, scheduleArmed, scheduleStartMs, scheduleEndMs, running, clockTick]);
+  }, [runMode, scheduleArmed, scheduleStartMs, scheduleEndMs, running]);
 
   const startDisabledReason = useMemo(() => {
     if (runMode === 'scheduled' && scheduleArmed) return 'Schedule armed';

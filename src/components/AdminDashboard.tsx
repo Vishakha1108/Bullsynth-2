@@ -109,8 +109,8 @@ export default function AdminDashboard() {
         </div>
 
         <div className="relative mx-auto flex w-full max-w-[1760px] flex-col gap-5 px-4 pb-5 pt-4 sm:px-6 lg:px-8">
-          <section className="dash-card relative overflow-hidden border-white/12 bg-white/[0.045] px-5 py-5 sm:px-6">
-            <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-[#6366f1aa] to-transparent" />
+          <section className="dash-card relative overflow-hidden border-white/12 bg-white/4.5 px-5 py-5 sm:px-6">
+            <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-linear-to-r from-transparent via-[#6366f1aa] to-transparent" />
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.25fr_1fr]">
               <div>
                 <span className="inline-flex items-center gap-2 rounded-full border border-[#6366f14d] bg-[#6366f117] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#a5b4fc]">

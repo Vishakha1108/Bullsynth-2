@@ -36,7 +36,7 @@ function StatCard({ label, value, icon: Icon, change, subtitle, valueColor }: {
           background: 'radial-gradient(circle at top right, rgba(99,102,241,0.3) 0%, rgba(37,99,235,0.14) 42%, transparent 72%)',
         }}
       />
-      <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-[#6366f199] to-transparent" />
+      <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-linear-to-r from-transparent via-[#6366f199] to-transparent" />
       <div className="relative flex items-center justify-between">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">{label}</span>
         <div className="w-8 h-8 rounded-md dash-icon-bg flex items-center justify-center text-text-secondary border border-white/10">
@@ -125,8 +125,8 @@ export default function Dashboard() {
         <div className="relative h-full overflow-y-auto styling-scrollbar">
           <div className="mx-auto flex w-full max-w-[1760px] flex-col gap-5 px-4 pb-5 pt-4 sm:px-6 lg:px-8">
 
-            <section className="dash-card relative overflow-hidden border-white/12 bg-white/[0.045] px-5 py-5 sm:px-6">
-              <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-[#6366f1aa] to-transparent" />
+            <section className="dash-card relative overflow-hidden border-white/12 bg-white/4.5 px-5 py-5 sm:px-6">
+              <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-linear-to-r from-transparent via-[#6366f1aa] to-transparent" />
               <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.35fr_1fr]">
                 <div>
                   <span className="inline-flex items-center gap-2 rounded-full border border-[#6366f14d] bg-[#6366f117] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#a5b4fc]">
