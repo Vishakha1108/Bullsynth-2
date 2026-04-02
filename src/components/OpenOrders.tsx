@@ -12,7 +12,7 @@ export default function OpenOrders() {
     const visibleOrders = orders.filter((o) => o.symbol === currentSymbol);
 
     return (
-        <div className="tv-open-orders">
+        <div className="tv-open-orders tv-side-accent tv-side-accent-orderbook">
             <div className="tv-open-orders-header">
                 Open Orders ({visibleOrders.length})
             </div>

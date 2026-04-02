@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Activity, Monitor, UserCircle, ShieldAlert, ChevronDown, Cpu, LayoutList, Bot as BotIcon } from "lucide-react";
+import { UserCircle, ShieldAlert, ChevronDown, Cpu, LayoutList, TrendingUp } from "lucide-react";
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ModeToggle } from './mode-toggle';
 import { fetchBots, type Bot } from '../services/api';
@@ -51,68 +51,47 @@ export function Navbar() {
   }, []);
 
   return (
-    <nav className="dash-navbar w-full h-14 flex items-center justify-between px-8 z-50">
-      <div className="flex items-center gap-6">
-        <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => navigate('/')}>
-          <span className="inline-flex h-7 w-7 items-center justify-center">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              className="w-5 h-5 block"
-              aria-hidden="true"
-              focusable="false"
-            >
-              <rect x="2" y="2" width="20" height="20" rx="4" fill="#000000" />
-              <path d="M6 16 L10 12 L13 14 L18 9" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M15.5 9H18V11.5" fill="none" stroke="#2962FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </span>
-          <span className="mt-px text-base font-bold tracking-wider text-text-primary">NEXTBULL</span>
+    <nav className="dash-navbar w-full h-16 flex items-center justify-between px-6 z-50 shrink-0">
+      <div 
+        className="flex items-center gap-2 text-text-primary hover:text-accent transition-colors cursor-pointer" 
+        onClick={() => navigate('/')}
+      >
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center shadow-[0_0_15px_rgba(124,58,237,0.5)]">
+            <TrendingUp size={18} className="text-white" />
         </div>
-        <div className="h-5 w-px bg-border-subtle" />
-        <button
-          onClick={() => navigate('/terminal')}
-          className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider rounded transition-all cursor-pointer ${
-            isActive('/terminal')
-              ? 'bg-[#2962ff]/12 text-[#2962ff] border border-[#2962ff]/30'
-              : 'text-text-secondary hover:text-text-primary dash-nav-btn'
-          }`}
+        <span className="font-bold text-lg tracking-tight">NEXTBULL</span>
+      </div>
+
+      <div className="hidden md:flex items-center justify-center absolute left-1/2 -translate-x-1/2 gap-8 text-sm font-medium text-text-secondary">
+        <button 
+          onClick={() => navigate('/terminal')} 
+          className={`dash-nav-btn transition-colors cursor-pointer ${isActive('/terminal') ? 'text-text-primary !font-bold' : ''}`}
         >
-          <Monitor className="w-3.5 h-3.5" />
           Terminal
         </button>
-        <button
-          onClick={() => navigate('/user/dashboard')}
-          className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider rounded transition-all cursor-pointer ${
-            isActive('/user/dashboard')
-              ? 'bg-[#2962ff]/12 text-[#2962ff] border border-[#2962ff]/30'
-              : 'text-text-secondary hover:text-text-primary dash-nav-btn'
-          }`}
+        <button 
+          onClick={() => navigate('/user/dashboard')} 
+          className={`dash-nav-btn transition-colors cursor-pointer ${isActive('/user/dashboard') ? 'text-text-primary !font-bold' : ''}`}
         >
-          <Activity className="w-3.5 h-3.5" />
           Dashboard
         </button>
-        <button
-          onClick={() => navigate('/admin/dashboard')}
-          className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider rounded transition-all cursor-pointer ${
-            isActive('/admin/dashboard')
-              ? 'bg-[#2962ff]/12 text-[#2962ff] border border-[#2962ff]/30'
-              : 'text-text-secondary hover:text-text-primary dash-nav-btn'
-          }`}
+        <button 
+          onClick={() => navigate('/admin/dashboard')} 
+          className={`dash-nav-btn transition-colors cursor-pointer ${isActive('/admin/dashboard') ? 'text-text-primary !font-bold' : ''}`}
         >
-          <BotIcon className="w-3.5 h-3.5" />
           Bots
         </button>
       </div>
-      <div className="flex items-center gap-4">
+
+      <div className="flex items-center gap-4 relative z-10">
         <ModeToggle />
         <div className="h-5 w-px bg-border-subtle" />
         <DropdownMenu>
           <DropdownMenuTrigger
-            className="flex items-center gap-1.5 px-2 py-1.5 dash-nav-btn rounded transition-all cursor-pointer text-text-secondary hover:text-text-primary"
+            className="tv-glass-btn px-3 py-1.5 rounded-full text-text-secondary hover:text-text-primary cursor-pointer"
             title="Profile and bots"
           >
-            <UserCircle className="w-5 h-5" />
+            <UserCircle className="w-4 h-4" />
             <ChevronDown className="w-3.5 h-3.5" />
           </DropdownMenuTrigger>
           <DropdownMenuContent

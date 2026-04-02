@@ -147,20 +147,20 @@ export function KeyboardShortcutsModal() {
       <div 
         style={{ width: `${panelWidth}px` }}
         data-keyboard-shortcuts-modal="true"
-        className="fixed top-4 right-4 bottom-4 z-[100] bg-[#131722] border border-[#2a2e39] rounded-xl shadow-2xl flex flex-col overflow-hidden"
+        className="fixed top-4 right-4 bottom-4 z-[100] bg-[#000000] border border-[#222222] rounded-xl shadow-2xl flex flex-col overflow-hidden"
       >
         {/* Resize Handle on the left edge */}
         <div 
-          className="absolute top-0 left-0 w-2 h-full cursor-col-resize hover:bg-[#2962ff]/30 z-10 transition-colors"
+          className="absolute top-0 left-0 w-2 h-full cursor-col-resize hover:bg-[#6366f1]/30 z-10 transition-colors"
           onMouseDown={handleMouseDown}
         />
 
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-[#2a2e39] shrink-0">
+        <div className="flex items-center justify-between p-5 border-b border-[#222222] shrink-0">
           <h2 className="text-xl font-bold text-[#d1d4dc]">Keyboard shortcuts</h2>
           <button 
             onClick={() => setIsOpen(false)}
-            className="p-1.5 hover:bg-[#2a2e39] rounded-lg text-[#787b86] hover:text-[#d1d4dc] transition-colors"
+            className="p-1.5 hover:bg-[#222222] rounded-lg text-[#787b86] hover:text-[#d1d4dc] transition-colors"
           >
             <X size={20} />
           </button>
@@ -173,10 +173,10 @@ export function KeyboardShortcutsModal() {
             const Icon = section.icon;
 
             return (
-              <div key={section.id} className="border-b border-[#2a2e39]/50 last:border-0 ml-1">
+              <div key={section.id} className="border-b border-[#222222]/50 last:border-0 ml-1">
                 <button
                   onClick={() => setExpandedSection(isExpanded ? null : section.id)}
-                  className="w-full flex items-center justify-between p-4 hover:bg-[#2a2e39]/30 transition-colors"
+                  className="w-full flex items-center justify-between p-4 hover:bg-[#222222]/30 transition-colors"
                 >
                   <div className="flex items-center gap-4 text-[#d1d4dc]">
                     <Icon size={22} strokeWidth={1.5} className="text-[#787b86]" />
@@ -191,18 +191,18 @@ export function KeyboardShortcutsModal() {
 
                 {isExpanded && (
                   <div className="px-5 pb-5 pt-1">
-                    <div className="bg-[#1e222d] border border-[#2a2e39] rounded-lg p-2 shadow-inner">
+                    <div className="bg-[#111111] border border-[#222222] rounded-lg p-2 shadow-inner">
                       <div className="space-y-1">
                         {section.shortcuts.map((shortcut, idx) => (
                           <div 
                             key={idx} 
-                            className="flex items-center justify-between p-2 rounded hover:bg-[#2a2e39]/50 transition-colors"
+                            className="flex items-center justify-between p-2 rounded hover:bg-[#222222]/50 transition-colors"
                           >
                             <span className="text-sm text-[#d1d4dc] opacity-90">{shortcut.description}</span>
                             <div className="flex items-center gap-1.5">
                               {shortcut.keys.map((key, keyIdx) => (
                                 <div key={keyIdx} className="flex items-center">
-                                  <kbd className="px-2.5 py-1 bg-[#131722] border border-[#363a45] rounded-md shadow-sm text-xs text-[#d1d4dc] font-medium font-mono min-w-[28px] text-center">
+                                  <kbd className="px-2.5 py-1 bg-[#000000] border border-[#363a45] rounded-md shadow-sm text-xs text-[#d1d4dc] font-medium font-mono min-w-[28px] text-center">
                                     {formatModifierKey(key)}
                                   </kbd>
                                   {keyIdx < shortcut.keys.length - 1 && (

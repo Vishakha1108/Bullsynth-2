@@ -58,16 +58,42 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
 
     // Force re-render on chart moves (pan/zoom) so drawings stick to grid
     useEffect(() => {
-        if (!chartRef.current) return;
-        const chart = chartRef.current;
-        const updateTrigger = () => setTrigger(t => t + 1);
-        chart.timeScale().subscribeVisibleTimeRangeChange(updateTrigger);
-        chart.timeScale().subscribeVisibleLogicalRangeChange(updateTrigger);
-        return () => {
-            chart.timeScale().unsubscribeVisibleTimeRangeChange(updateTrigger);
-            chart.timeScale().unsubscribeVisibleLogicalRangeChange(updateTrigger);
+        if (!chartRef.current || !seriesRef.current) return;
+        
+        let rafId: number;
+        let lastHash = '';
+
+        const tick = () => {
+            if (!chartRef.current || !seriesRef.current) return;
+            // Poll chart scales precisely before each frame paint
+            const r = chartRef.current.timeScale().getVisibleLogicalRange();
+            const p = seriesRef.current.candle.priceScale().getVisiblePriceRange();
+            const hash = `${r?.from}-${r?.to}-${p?.top}-${p?.bottom}`;
+            
+            if (hash !== lastHash) {
+                lastHash = hash;
+                setTrigger(t => t + 1);
+            }
+            rafId = requestAnimationFrame(tick);
         };
-    }, [chartRef]);
+        
+        rafId = requestAnimationFrame(tick);
+        
+        return () => {
+            cancelAnimationFrame(rafId);
+        };
+    }, [chartRef, seriesRef]);
+
+    // Clear UI state when drawings are cleared globally or via Event
+    useEffect(() => {
+        const handleClear = () => {
+            setActiveDrawing(null);
+            setPencilPoints([]);
+            setTextEntry(null);
+        };
+        window.addEventListener('reset-chart-view', handleClear);
+        return () => window.removeEventListener('reset-chart-view', handleClear);
+    }, []);
 
     useEffect(() => {
         if (!chartRef.current) return;
@@ -196,18 +222,18 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
         setMousePos(pt);
 
         if (isDraggingPencil && activeTool === 'pencil') {
-            setPencilPoints(prev => [...prev.filter(p => Math.abs(p.time - pt.time) > 100), { time: pt.time, price: pt.price }]);
+            setPencilPoints(prev => [...prev, { time: pt.time, price: pt.price }]);
         }
     };
 
     const handlePointerUp = () => {
         if (isDraggingPencil && activeTool === 'pencil') {
             setIsDraggingPencil(false);
-            if (pencilPoints.length > 1) {
+            if (pencilPoints.length > 2) {
                 setDrawings([...drawings, { type: 'pencil', points: pencilPoints }]);
             }
             setPencilPoints([]);
-            setActiveTool('crosshair');
+            // Removed setActiveTool('crosshair') so the user can keep brushing without clicking the tool again
         }
     };
 
@@ -243,7 +269,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
         if (d.type === 'pencil') {
             if (pts.length < 2) return null;
             const polyPts = pts.map(p => { const pt = mapPoint(p.time, p.price); return `${pt.x},${pt.y}`; }).join(' ');
-            return <polyline key={i} points={polyPts} fill="none" stroke="#2962ff" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />;
+            return <polyline key={i} points={polyPts} fill="none" stroke="#6366f1" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />;
         }
 
         // --- Horizontal Line (1-point) ---
@@ -252,8 +278,8 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
             const p = mapPoint(pts[0].time, pts[0].price);
             return (
                 <g key={i}>
-                    <line x1={0} y1={p.y} x2={W} y2={p.y} stroke="#2962ff" strokeWidth="1.5" />
-                    <text x={W - 5} y={p.y - 4} fill="#2962ff" fontSize="10" textAnchor="end" fontFamily="monospace">{pts[0].price.toFixed(2)}</text>
+                    <line x1={0} y1={p.y} x2={W} y2={p.y} stroke="#6366f1" strokeWidth="1.5" />
+                    <text x={W - 5} y={p.y - 4} fill="#6366f1" fontSize="10" textAnchor="end" fontFamily="monospace">{pts[0].price.toFixed(2)}</text>
                 </g>
             );
         }
@@ -262,7 +288,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
         if (d.type === 'vertical_line') {
             if (pts.length < 1) return null;
             const p = mapPoint(pts[0].time, pts[0].price);
-            return <line key={i} x1={p.x} y1={0} x2={p.x} y2={H} stroke="#2962ff" strokeWidth="1.5" />;
+            return <line key={i} x1={p.x} y1={0} x2={p.x} y2={H} stroke="#6366f1" strokeWidth="1.5" />;
         }
 
         // --- Price Label (1-point) ---
@@ -283,8 +309,8 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
             const p = mapPoint(pts[0].time, pts[0].price);
             return (
                 <g key={i}>
-                    <polygon points={`${p.x},${p.y - 16} ${p.x - 8},${p.y} ${p.x + 8},${p.y}`} fill="#2962ff" />
-                    <line x1={p.x} y1={p.y} x2={p.x} y2={p.y + 12} stroke="#2962ff" strokeWidth="2" />
+                    <polygon points={`${p.x},${p.y - 16} ${p.x - 8},${p.y} ${p.x + 8},${p.y}`} fill="#6366f1" />
+                    <line x1={p.x} y1={p.y} x2={p.x} y2={p.y + 12} stroke="#6366f1" strokeWidth="2" />
                 </g>
             );
         }
@@ -326,9 +352,9 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
             const p2 = mapPoint(pts[1].time, pts[1].price);
             return (
                 <g key={i}>
-                    <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="#2962ff" strokeWidth="2" strokeDasharray={d.type === 'measure' ? "4 4" : "0"} />
-                    <circle cx={p1.x} cy={p1.y} r="3" fill="#2962ff" />
-                    <circle cx={p2.x} cy={p2.y} r="3" fill="#2962ff" />
+                    <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="#6366f1" strokeWidth="2" strokeDasharray={d.type === 'measure' ? "4 4" : "0"} />
+                    <circle cx={p1.x} cy={p1.y} r="3" fill="#6366f1" />
+                    <circle cx={p2.x} cy={p2.y} r="3" fill="#6366f1" />
                     {d.type === 'measure' && (
                         <>
                             <rect x={p2.x + 10} y={p2.y - 12} width="80" height="24" fill="rgba(30,34,45,0.8)" rx="4" stroke="#2a2e39" />
@@ -349,9 +375,9 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
             const ends = getExtendedLineEnds(p1.x, p1.y, p2.x, p2.y, W, H);
             return (
                 <g key={i}>
-                    <line x1={ends.start.x} y1={ends.start.y} x2={ends.end.x} y2={ends.end.y} stroke="#2962ff" strokeWidth="1.5" />
-                    <circle cx={p1.x} cy={p1.y} r="3" fill="#2962ff" />
-                    <circle cx={p2.x} cy={p2.y} r="3" fill="#2962ff" />
+                    <line x1={ends.start.x} y1={ends.start.y} x2={ends.end.x} y2={ends.end.y} stroke="#6366f1" strokeWidth="1.5" />
+                    <circle cx={p1.x} cy={p1.y} r="3" fill="#6366f1" />
+                    <circle cx={p2.x} cy={p2.y} r="3" fill="#6366f1" />
                 </g>
             );
         }
@@ -375,16 +401,16 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
                 return (
                     <g key={i}>
                         <line x1={regP1.x} y1={regP1.y} x2={regP2.x} y2={regP2.y} stroke="#ff9800" strokeWidth="2" />
-                        <circle cx={p1.x} cy={p1.y} r="3" fill="#2962ff" />
-                        <circle cx={p2.x} cy={p2.y} r="3" fill="#2962ff" />
+                        <circle cx={p1.x} cy={p1.y} r="3" fill="#6366f1" />
+                        <circle cx={p2.x} cy={p2.y} r="3" fill="#6366f1" />
                     </g>
                 );
             }
             return (
                 <g key={i}>
                     <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="#ff9800" strokeWidth="2" />
-                    <circle cx={p1.x} cy={p1.y} r="3" fill="#2962ff" />
-                    <circle cx={p2.x} cy={p2.y} r="3" fill="#2962ff" />
+                    <circle cx={p1.x} cy={p1.y} r="3" fill="#6366f1" />
+                    <circle cx={p2.x} cy={p2.y} r="3" fill="#6366f1" />
                 </g>
             );
         }
@@ -400,9 +426,9 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
             const h = Math.abs(p2.y - p1.y);
             return (
                 <g key={i}>
-                    <rect x={x} y={y} width={w} height={h} fill="rgba(41, 98, 255, 0.2)" stroke="#2962ff" strokeWidth="2" />
-                    <circle cx={p1.x} cy={p1.y} r="3" fill="#2962ff" />
-                    <circle cx={p2.x} cy={p2.y} r="3" fill="#2962ff" />
+                    <rect x={x} y={y} width={w} height={h} fill="rgba(41, 98, 255, 0.2)" stroke="#6366f1" strokeWidth="2" />
+                    <circle cx={p1.x} cy={p1.y} r="3" fill="#6366f1" />
+                    <circle cx={p2.x} cy={p2.y} r="3" fill="#6366f1" />
                 </g>
             );
         }
@@ -415,9 +441,9 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
             const r = Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
             return (
                 <g key={i}>
-                    <circle cx={p1.x} cy={p1.y} r={r} fill="rgba(41, 98, 255, 0.1)" stroke="#2962ff" strokeWidth="2" />
-                    <circle cx={p1.x} cy={p1.y} r="3" fill="#2962ff" />
-                    <circle cx={p2.x} cy={p2.y} r="3" fill="#2962ff" />
+                    <circle cx={p1.x} cy={p1.y} r={r} fill="rgba(41, 98, 255, 0.1)" stroke="#6366f1" strokeWidth="2" />
+                    <circle cx={p1.x} cy={p1.y} r="3" fill="#6366f1" />
+                    <circle cx={p2.x} cy={p2.y} r="3" fill="#6366f1" />
                 </g>
             );
         }
@@ -431,9 +457,9 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
             const ry = Math.abs(p2.y - p1.y);
             return (
                 <g key={i}>
-                    <ellipse cx={p1.x} cy={p1.y} rx={rx} ry={ry} fill="rgba(41, 98, 255, 0.1)" stroke="#2962ff" strokeWidth="2" />
-                    <circle cx={p1.x} cy={p1.y} r="3" fill="#2962ff" />
-                    <circle cx={p2.x} cy={p2.y} r="3" fill="#2962ff" />
+                    <ellipse cx={p1.x} cy={p1.y} rx={rx} ry={ry} fill="rgba(41, 98, 255, 0.1)" stroke="#6366f1" strokeWidth="2" />
+                    <circle cx={p1.x} cy={p1.y} r="3" fill="#6366f1" />
+                    <circle cx={p2.x} cy={p2.y} r="3" fill="#6366f1" />
                 </g>
             );
         }
@@ -446,10 +472,10 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
             const p3 = mapPoint(pts[2].time, pts[2].price);
             return (
                 <g key={i}>
-                    <polygon points={`${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y}`} fill="rgba(41, 98, 255, 0.15)" stroke="#2962ff" strokeWidth="2" />
-                    <circle cx={p1.x} cy={p1.y} r="3" fill="#2962ff" />
-                    <circle cx={p2.x} cy={p2.y} r="3" fill="#2962ff" />
-                    <circle cx={p3.x} cy={p3.y} r="3" fill="#2962ff" />
+                    <polygon points={`${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y}`} fill="rgba(41, 98, 255, 0.15)" stroke="#6366f1" strokeWidth="2" />
+                    <circle cx={p1.x} cy={p1.y} r="3" fill="#6366f1" />
+                    <circle cx={p2.x} cy={p2.y} r="3" fill="#6366f1" />
+                    <circle cx={p3.x} cy={p3.y} r="3" fill="#6366f1" />
                 </g>
             );
         }
@@ -460,8 +486,8 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
             const polyPts = pts.map(p => { const pt = mapPoint(p.time, p.price); return `${pt.x},${pt.y}`; }).join(' ');
             return (
                 <g key={i}>
-                    <polyline points={polyPts} fill="none" stroke="#2962ff" strokeWidth="2" strokeLinejoin="round" />
-                    {pts.map((p, j) => { const pt = mapPoint(p.time, p.price); return <circle key={j} cx={pt.x} cy={pt.y} r="3" fill="#2962ff" />; })}
+                    <polyline points={polyPts} fill="none" stroke="#6366f1" strokeWidth="2" strokeLinejoin="round" />
+                    {pts.map((p, j) => { const pt = mapPoint(p.time, p.price); return <circle key={j} cx={pt.x} cy={pt.y} r="3" fill="#6366f1" />; })}
                 </g>
             );
         }
@@ -474,9 +500,9 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
             const rayEnd = getRayExtension(p1.x, p1.y, p2.x, p2.y, W, H);
             return (
                 <g key={i}>
-                    <line x1={p1.x} y1={p1.y} x2={rayEnd.x} y2={rayEnd.y} stroke="#2962ff" strokeWidth="2" />
-                    <circle cx={p1.x} cy={p1.y} r="3" fill="#2962ff" />
-                    <circle cx={p2.x} cy={p2.y} r="3" fill="#2962ff" />
+                    <line x1={p1.x} y1={p1.y} x2={rayEnd.x} y2={rayEnd.y} stroke="#6366f1" strokeWidth="2" />
+                    <circle cx={p1.x} cy={p1.y} r="3" fill="#6366f1" />
+                    <circle cx={p2.x} cy={p2.y} r="3" fill="#6366f1" />
                 </g>
             );
         }
@@ -489,9 +515,9 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
             const targetY = p2.y >= p1.y ? H : 0;
             return (
                 <g key={i}>
-                    <line x1={p1.x} y1={p1.y} x2={p1.x} y2={targetY} stroke="#2962ff" strokeWidth="2" />
-                    <circle cx={p1.x} cy={p1.y} r="3" fill="#2962ff" />
-                    <circle cx={p2.x} cy={p2.y} r="3" fill="#2962ff" />
+                    <line x1={p1.x} y1={p1.y} x2={p1.x} y2={targetY} stroke="#6366f1" strokeWidth="2" />
+                    <circle cx={p1.x} cy={p1.y} r="3" fill="#6366f1" />
+                    <circle cx={p2.x} cy={p2.y} r="3" fill="#6366f1" />
                 </g>
             );
         }
@@ -502,7 +528,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
             const p1 = mapPoint(pts[0].time, pts[0].price);
             const p2 = mapPoint(pts[1].time, pts[1].price);
             const levels = calculateFibonacciLevels(pts[0].price, pts[1].price);
-            const colors = ['#787b86', '#ef5350', '#ff9800', '#4caf50', '#089981', '#2962ff', '#787b86', '#2a2e39'];
+            const colors = ['#787b86', '#ef5350', '#ff9800', '#4caf50', '#089981', '#6366f1', '#787b86', '#2a2e39'];
             return (
                 <g key={i}>
                     <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="#787b86" strokeWidth="1" strokeDasharray="4 4" />
@@ -531,7 +557,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
             const p2 = mapPoint(pts[1].time, pts[1].price);
             const p3 = mapPoint(pts[2].time, pts[2].price);
             const levels = calculateFibonacciExtension(pts[0].price, pts[1].price, pts[2].price);
-            const colors = ['#787b86', '#ef5350', '#ff9800', '#4caf50', '#2962ff', '#9c27b0'];
+            const colors = ['#787b86', '#ef5350', '#ff9800', '#4caf50', '#6366f1', '#9c27b0'];
             return (
                 <g key={i}>
                     <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="#787b86" strokeWidth="1" strokeDasharray="4 4" />
@@ -561,7 +587,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
             const p1 = mapPoint(pts[0].time, pts[0].price);
             const p2 = mapPoint(pts[1].time, pts[1].price);
             const fanLevels = [0.236, 0.382, 0.5, 0.618, 0.786];
-            const colors = ['#ef5350', '#ff9800', '#4caf50', '#2962ff', '#9c27b0'];
+            const colors = ['#ef5350', '#ff9800', '#4caf50', '#6366f1', '#9c27b0'];
             return (
                 <g key={i}>
                     <circle cx={p1.x} cy={p1.y} r="3" fill="#787b86" />
@@ -589,11 +615,11 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
             const fibs = [1, 2, 3, 5, 8, 13, 21];
             return (
                 <g key={i}>
-                    <circle cx={p1.x} cy={p1.y} r="3" fill="#2962ff" />
-                    <circle cx={p2.x} cy={p2.y} r="3" fill="#2962ff" />
+                    <circle cx={p1.x} cy={p1.y} r="3" fill="#6366f1" />
+                    <circle cx={p2.x} cy={p2.y} r="3" fill="#6366f1" />
                     {fibs.map((f, idx) => {
                         const x = p1.x + dx * f;
-                        return <line key={idx} x1={x} y1={0} x2={x} y2={H} stroke="#2962ff" strokeWidth="1" opacity="0.5" strokeDasharray="4 4" />;
+                        return <line key={idx} x1={x} y1={0} x2={x} y2={H} stroke="#6366f1" strokeWidth="1" opacity="0.5" strokeDasharray="4 4" />;
                     })}
                 </g>
             );
@@ -613,8 +639,8 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
             const ny = len === 0 ? 0 : dx / len;
             return (
                 <g key={i}>
-                    <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="#2962ff" strokeWidth="2" />
-                    <line x1={p1.x + nx * offset} y1={p1.y + ny * offset} x2={p2.x + nx * offset} y2={p2.y + ny * offset} stroke="#2962ff" strokeWidth="2" />
+                    <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="#6366f1" strokeWidth="2" />
+                    <line x1={p1.x + nx * offset} y1={p1.y + ny * offset} x2={p2.x + nx * offset} y2={p2.y + ny * offset} stroke="#6366f1" strokeWidth="2" />
                     <rect
                         x={Math.min(p1.x, p2.x, p1.x + nx * offset, p2.x + nx * offset)}
                         y={Math.min(p1.y, p2.y, p1.y + ny * offset, p2.y + ny * offset)}
@@ -622,9 +648,9 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
                         height={Math.abs(offset) || 2}
                         fill="rgba(41, 98, 255, 0.1)"
                     />
-                    <circle cx={p1.x} cy={p1.y} r="3" fill="#2962ff" />
-                    <circle cx={p2.x} cy={p2.y} r="3" fill="#2962ff" />
-                    <circle cx={p3.x} cy={p3.y} r="3" fill="#2962ff" />
+                    <circle cx={p1.x} cy={p1.y} r="3" fill="#6366f1" />
+                    <circle cx={p2.x} cy={p2.y} r="3" fill="#6366f1" />
+                    <circle cx={p3.x} cy={p3.y} r="3" fill="#6366f1" />
                 </g>
             );
         }
@@ -642,12 +668,12 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
             const lowerEnd = getRayExtension(p1.x, p1.y, p3.x, p3.y, W, H);
             return (
                 <g key={i}>
-                    <line x1={p1.x} y1={p1.y} x2={medianEnd.x} y2={medianEnd.y} stroke="#2962ff" strokeWidth="2" />
-                    <line x1={p2.x} y1={p2.y} x2={upperEnd.x} y2={upperEnd.y} stroke="#2962ff" strokeWidth="1" strokeDasharray="4 4" />
-                    <line x1={p3.x} y1={p3.y} x2={lowerEnd.x} y2={lowerEnd.y} stroke="#2962ff" strokeWidth="1" strokeDasharray="4 4" />
-                    <circle cx={p1.x} cy={p1.y} r="3" fill="#2962ff" />
-                    <circle cx={p2.x} cy={p2.y} r="3" fill="#2962ff" />
-                    <circle cx={p3.x} cy={p3.y} r="3" fill="#2962ff" />
+                    <line x1={p1.x} y1={p1.y} x2={medianEnd.x} y2={medianEnd.y} stroke="#6366f1" strokeWidth="2" />
+                    <line x1={p2.x} y1={p2.y} x2={upperEnd.x} y2={upperEnd.y} stroke="#6366f1" strokeWidth="1" strokeDasharray="4 4" />
+                    <line x1={p3.x} y1={p3.y} x2={lowerEnd.x} y2={lowerEnd.y} stroke="#6366f1" strokeWidth="1" strokeDasharray="4 4" />
+                    <circle cx={p1.x} cy={p1.y} r="3" fill="#6366f1" />
+                    <circle cx={p2.x} cy={p2.y} r="3" fill="#6366f1" />
+                    <circle cx={p3.x} cy={p3.y} r="3" fill="#6366f1" />
                 </g>
             );
         }
@@ -664,7 +690,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
             const divs = [0, 0.25, 0.333, 0.5, 0.667, 0.75, 1];
             return (
                 <g key={i}>
-                    <rect x={x} y={y} width={w} height={h} fill="none" stroke="#2962ff" strokeWidth="1.5" />
+                    <rect x={x} y={y} width={w} height={h} fill="none" stroke="#6366f1" strokeWidth="1.5" />
                     {divs.map((d, idx) => (
                         <g key={`gann-${idx}`}>
                             <line x1={x} y1={y + h * d} x2={x + w} y2={y + h * d} stroke="#787b86" strokeWidth="0.5" opacity="0.5" />
@@ -673,8 +699,8 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
                     ))}
                     <line x1={x} y1={y} x2={x + w} y2={y + h} stroke="#ef5350" strokeWidth="1" />
                     <line x1={x + w} y1={y} x2={x} y2={y + h} stroke="#4caf50" strokeWidth="1" />
-                    <circle cx={p1.x} cy={p1.y} r="3" fill="#2962ff" />
-                    <circle cx={p2.x} cy={p2.y} r="3" fill="#2962ff" />
+                    <circle cx={p1.x} cy={p1.y} r="3" fill="#6366f1" />
+                    <circle cx={p2.x} cy={p2.y} r="3" fill="#6366f1" />
                 </g>
             );
         }
@@ -690,7 +716,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
             const divs = [0.25, 0.5, 0.75];
             return (
                 <g key={i}>
-                    <rect x={x} y={y} width={side} height={side} fill="none" stroke="#2962ff" strokeWidth="1.5" />
+                    <rect x={x} y={y} width={side} height={side} fill="none" stroke="#6366f1" strokeWidth="1.5" />
                     {divs.map((d, idx) => (
                         <g key={`gs-${idx}`}>
                             <line x1={x} y1={y + side * d} x2={x + side} y2={y + side * d} stroke="#787b86" strokeWidth="0.5" opacity="0.6" />
@@ -699,8 +725,8 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
                     ))}
                     <line x1={x} y1={y} x2={x + side} y2={y + side} stroke="#ef5350" strokeWidth="1" />
                     <line x1={x + side} y1={y} x2={x} y2={y + side} stroke="#4caf50" strokeWidth="1" />
-                    <circle cx={p1.x} cy={p1.y} r="3" fill="#2962ff" />
-                    <circle cx={p2.x} cy={p2.y} r="3" fill="#2962ff" />
+                    <circle cx={p1.x} cy={p1.y} r="3" fill="#6366f1" />
+                    <circle cx={p2.x} cy={p2.y} r="3" fill="#6366f1" />
                 </g>
             );
         }
@@ -711,11 +737,11 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
             const p1 = mapPoint(pts[0].time, pts[0].price);
             const p2 = mapPoint(pts[1].time, pts[1].price);
             const lines = getGannFanLines(p1.x, p1.y, p2.x, p2.y, W, H);
-            const colors = ['#ef5350', '#ff9800', '#ff9800', '#4caf50', '#2962ff', '#4caf50', '#ff9800', '#ff9800', '#ef5350'];
+            const colors = ['#ef5350', '#ff9800', '#ff9800', '#4caf50', '#6366f1', '#4caf50', '#ff9800', '#ff9800', '#ef5350'];
             return (
                 <g key={i}>
-                    <circle cx={p1.x} cy={p1.y} r="3" fill="#2962ff" />
-                    <circle cx={p2.x} cy={p2.y} r="3" fill="#2962ff" />
+                    <circle cx={p1.x} cy={p1.y} r="3" fill="#6366f1" />
+                    <circle cx={p2.x} cy={p2.y} r="3" fill="#6366f1" />
                     {lines.map((line, idx) => (
                         <g key={idx}>
                             <line x1={p1.x} y1={p1.y} x2={line.endX} y2={line.endY} stroke={colors[idx] || '#787b86'} strokeWidth="1" opacity="0.7" />
@@ -745,7 +771,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
                     <rect x={left} y={Math.min(entryY, tpY)} width={width} height={Math.abs(entryY - tpY)} fill={isLong ? "rgba(38, 166, 154, 0.2)" : "rgba(239, 83, 80, 0.2)"} stroke={isLong ? "rgba(38, 166, 154, 1)" : "rgba(239, 83, 80, 1)"} strokeWidth="1" />
                     <rect x={left} y={Math.min(entryY, slY)} width={width} height={Math.abs(entryY - slY)} fill={isLong ? "rgba(239, 83, 80, 0.2)" : "rgba(38, 166, 154, 0.2)"} stroke={isLong ? "rgba(239, 83, 80, 1)" : "rgba(38, 166, 154, 1)"} strokeWidth="1" />
                     <line x1={left} y1={entryY} x2={right} y2={entryY} stroke="#787b86" strokeWidth="2" />
-                    <circle cx={entryPt.x} cy={entryY} r="4" fill="#2962ff" />
+                    <circle cx={entryPt.x} cy={entryY} r="4" fill="#6366f1" />
                 </g>
             );
         }
@@ -759,9 +785,9 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
             const pct = ((diff / pts[0].price) * 100).toFixed(2);
             return (
                 <g key={i}>
-                    <line x1={p1.x} y1={p1.y} x2={p1.x} y2={p2.y} stroke="#2962ff" strokeWidth="2" strokeDasharray="4 4" />
-                    <line x1={p1.x - 10} y1={p1.y} x2={p1.x + 10} y2={p1.y} stroke="#2962ff" strokeWidth="2" />
-                    <line x1={p1.x - 10} y1={p2.y} x2={p1.x + 10} y2={p2.y} stroke="#2962ff" strokeWidth="2" />
+                    <line x1={p1.x} y1={p1.y} x2={p1.x} y2={p2.y} stroke="#6366f1" strokeWidth="2" strokeDasharray="4 4" />
+                    <line x1={p1.x - 10} y1={p1.y} x2={p1.x + 10} y2={p1.y} stroke="#6366f1" strokeWidth="2" />
+                    <line x1={p1.x - 10} y1={p2.y} x2={p1.x + 10} y2={p2.y} stroke="#6366f1" strokeWidth="2" />
                     <rect x={p1.x + 14} y={(p1.y + p2.y) / 2 - 12} width="90" height="24" fill="rgba(30,34,45,0.8)" rx="4" stroke="#2a2e39" />
                     <text x={p1.x + 20} y={(p1.y + p2.y) / 2 + 4} fill="#d1d4dc" fontSize="11" fontFamily="monospace">{diff.toFixed(2)} ({pct}%)</text>
                 </g>
@@ -776,9 +802,9 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
             const bars = Math.abs(pts[1].time - pts[0].time);
             return (
                 <g key={i}>
-                    <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p1.y} stroke="#2962ff" strokeWidth="2" strokeDasharray="4 4" />
-                    <line x1={p1.x} y1={p1.y - 10} x2={p1.x} y2={p1.y + 10} stroke="#2962ff" strokeWidth="2" />
-                    <line x1={p2.x} y1={p1.y - 10} x2={p2.x} y2={p1.y + 10} stroke="#2962ff" strokeWidth="2" />
+                    <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p1.y} stroke="#6366f1" strokeWidth="2" strokeDasharray="4 4" />
+                    <line x1={p1.x} y1={p1.y - 10} x2={p1.x} y2={p1.y + 10} stroke="#6366f1" strokeWidth="2" />
+                    <line x1={p2.x} y1={p1.y - 10} x2={p2.x} y2={p1.y + 10} stroke="#6366f1" strokeWidth="2" />
                     <rect x={(p1.x + p2.x) / 2 - 30} y={p1.y + 14} width="60" height="20" fill="rgba(30,34,45,0.8)" rx="4" stroke="#2a2e39" />
                     <text x={(p1.x + p2.x) / 2} y={p1.y + 28} fill="#d1d4dc" fontSize="11" textAnchor="middle" fontFamily="monospace">{bars}s</text>
                 </g>
@@ -801,9 +827,9 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
 
             return (
                 <g key={i}>
-                    <rect x={x} y={y} width={w} height={h} fill="rgba(41, 98, 255, 0.12)" stroke="#2962ff" strokeWidth="1.5" strokeDasharray="4 4" />
-                    <circle cx={p1.x} cy={p1.y} r="3" fill="#2962ff" />
-                    <circle cx={p2.x} cy={p2.y} r="3" fill="#2962ff" />
+                    <rect x={x} y={y} width={w} height={h} fill="rgba(41, 98, 255, 0.12)" stroke="#6366f1" strokeWidth="1.5" strokeDasharray="4 4" />
+                    <circle cx={p1.x} cy={p1.y} r="3" fill="#6366f1" />
+                    <circle cx={p2.x} cy={p2.y} r="3" fill="#6366f1" />
                     <rect x={x + 8} y={y + 8} width="148" height="38" fill="rgba(30,34,45,0.86)" rx="4" stroke="#2a2e39" />
                     <text x={x + 14} y={y + 23} fill="#d1d4dc" fontSize="11" fontFamily="monospace">
                         {priceDiff.toFixed(2)} ({pct.toFixed(2)}%)
@@ -824,9 +850,9 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
             const boxW = Math.max(80, calloutText.length * 7 + 20);
             return (
                 <g key={i}>
-                    <line x1={anchor.x} y1={anchor.y} x2={textPt.x} y2={textPt.y} stroke="#2962ff" strokeWidth="1" />
-                    <circle cx={anchor.x} cy={anchor.y} r="3" fill="#2962ff" />
-                    <rect x={textPt.x} y={textPt.y - 20} width={boxW} height="24" fill="rgba(30,34,45,0.9)" rx="4" stroke="#2962ff" strokeWidth="1" />
+                    <line x1={anchor.x} y1={anchor.y} x2={textPt.x} y2={textPt.y} stroke="#6366f1" strokeWidth="1" />
+                    <circle cx={anchor.x} cy={anchor.y} r="3" fill="#6366f1" />
+                    <rect x={textPt.x} y={textPt.y - 20} width={boxW} height="24" fill="rgba(30,34,45,0.9)" rx="4" stroke="#6366f1" strokeWidth="1" />
                     <text x={textPt.x + 10} y={textPt.y - 3} fill="#d1d4dc" fontSize="12" fontFamily="sans-serif">{calloutText}</text>
                 </g>
             );
@@ -859,10 +885,10 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
             const waveLabels = ['1', '2', '3', '4', '5', 'A', 'B', 'C'];
             return (
                 <g key={i}>
-                    {mapped.map((p, j) => j > 0 ? <line key={`l${j}`} x1={mapped[j - 1].x} y1={mapped[j - 1].y} x2={p.x} y2={p.y} stroke="#2962ff" strokeWidth="2" /> : null)}
+                    {mapped.map((p, j) => j > 0 ? <line key={`l${j}`} x1={mapped[j - 1].x} y1={mapped[j - 1].y} x2={p.x} y2={p.y} stroke="#6366f1" strokeWidth="2" /> : null)}
                     {mapped.map((p, j) => (
                         <g key={`p${j}`}>
-                            <circle cx={p.x} cy={p.y} r="4" fill="#2962ff" />
+                            <circle cx={p.x} cy={p.y} r="4" fill="#6366f1" />
                             <text x={p.x + 6} y={p.y - 6} fill="#d1d4dc" fontSize="11" fontWeight="bold" fontFamily="sans-serif">{waveLabels[j] || j + 1}</text>
                         </g>
                     ))}
@@ -959,7 +985,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
                             y1={0}
                             x2={mapPoint(mousePos.time!, mousePos.price!).x}
                             y2={H}
-                            stroke="#2962ff"
+                            stroke="#6366f1"
                             strokeWidth="2"
                         />
                         <rect
@@ -973,7 +999,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
                 )}
 
                 {mousePos && isInteractive && magnetMode !== 'off' && activeTool !== 'replay' && (
-                    <circle cx={mapPoint(mousePos.time!, mousePos.price!).x} cy={mapPoint(mousePos.time!, mousePos.price!).y} r="4" fill="none" stroke="#2962ff" strokeWidth="2" />
+                    <circle cx={mapPoint(mousePos.time!, mousePos.price!).x} cy={mapPoint(mousePos.time!, mousePos.price!).y} r="4" fill="none" stroke="#6366f1" strokeWidth="2" />
                 )}
             </svg>
 
@@ -991,7 +1017,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
                     <input
                         autoFocus
                         ref={textInputRef}
-                        className="bg-[#131722] border border-[#363a45] text-[#d1d4dc] text-sm px-2 py-1.5 rounded outline-none focus:border-[#2962ff]"
+                        className="bg-[#131722] border border-[#363a45] text-[#d1d4dc] text-sm px-2 py-1.5 rounded outline-none focus:border-[#6366f1]"
                         placeholder={(textEntry.type === 'anchored_note' || textEntry.type === 'note') ? 'Enter note...' : 'Enter label text...'}
                         onKeyDown={(e) => {
                             if (e.key === 'Enter') handleTextSubmit(e.currentTarget.value);
@@ -1001,7 +1027,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
                     <div className="flex justify-end gap-2 px-1">
                         <button className="text-[10px] text-[#787b86] hover:text-white" onClick={() => { setTextEntry(null); setActiveDrawing(null); setActiveTool('crosshair'); }}>Cancel</button>
                         <button
-                            className="text-[10px] text-[#2962ff] font-bold"
+                            className="text-[10px] text-[#6366f1] font-bold"
                             onClick={() => handleTextSubmit(textInputRef.current?.value || '')}
                         >
                             OK
