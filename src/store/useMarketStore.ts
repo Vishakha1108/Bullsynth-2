@@ -56,6 +56,14 @@ export interface Portfolio {
     totalValue: number;
 }
 
+export interface ShortSellingConfig {
+    enabled: boolean;
+    maxShortQtyPerSymbol: number;
+    maxTotalShortNotional: number;
+    minEquity: number;
+    maxShortNotionalToEquity: number;
+}
+
 export interface CrosshairData {
     open: number;
     high: number;
@@ -279,6 +287,7 @@ interface MarketState {
     portfolio: Portfolio;
     openOrders: Order[];
     wsConnected: boolean;
+    shortSellingConfig: ShortSellingConfig | null;
 
     // Replay State
     isReplayMode: boolean;
@@ -300,6 +309,7 @@ interface MarketState {
     setSymbols: (symbols: string[]) => void;
     setTickers: (tickers: { symbol: string; name: string; category: string }[]) => void;
     setUserId: (uid: string | null) => void;
+    setShortSellingConfig: (cfg: ShortSellingConfig | null) => void;
     resetSymbolData: () => void;
     setCrosshairData: (data: CrosshairData | null) => void;
     setCandlesData: (candles: Candle[], latestCandle?: Candle | null) => void;
@@ -457,6 +467,7 @@ const useMarketStore = create<MarketState>((set) => ({
     portfolio: initialPortfolio,
     openOrders: [],
     wsConnected: false,
+    shortSellingConfig: null,
 
     isReplayMode: false,
     replayCandles: [],
@@ -489,6 +500,7 @@ const useMarketStore = create<MarketState>((set) => ({
     setSymbols: (symbols) => set({ symbols }),
     setTickers: (tickers) => set({ tickers }),
     setUserId: (uid) => set({ userId: uid }),
+    setShortSellingConfig: (cfg) => set({ shortSellingConfig: cfg }),
     resetSymbolData: () => set((state) => ({
         candles: [],
         latestCandle: null,

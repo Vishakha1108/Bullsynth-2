@@ -11,9 +11,12 @@ export default function TradePanel() {
     const lastPrice = useMarketStore(state => state.lastPrice);
     const currentSymbol = useMarketStore(state => state.currentSymbol);
     const holdings = useMarketStore(state => state.portfolio.holdings);
+    const portfolio = useMarketStore(state => state.portfolio);
     const openOrders = useMarketStore(state => state.openOrders);
+    const pricesBySymbol = useMarketStore(state => state.prices);
     const userId = useMarketStore(state => state.userId);
     const wsConnected = useMarketStore(state => state.wsConnected);
+    const shortSellingConfig = useMarketStore(state => state.shortSellingConfig);
 
     const heldQty = useMemo(() => {
         const h = holdings.find(item => item.asset === currentSymbol);
@@ -48,9 +51,119 @@ export default function TradePanel() {
     const numericQty = parseFloat(qty);
     const numericPrice = parseFloat(price);
     const canSubmit = wsConnected
+        && Boolean(userId)
         && Number.isFinite(numericQty)
         && numericQty > 0
         && (type === 'market' || (Number.isFinite(numericPrice) && numericPrice > 0));
+
+    const riskPreview = useMemo(() => {
+        if (side !== 'SELL') return null;
+        if (!Number.isFinite(numericQty) || numericQty <= 0) return null;
+
+        const holdingsBySymbol: Record<string, number> = {};
+        const markBySymbol: Record<string, number> = {};
+        for (const h of portfolio.holdings) {
+            holdingsBySymbol[h.asset] = h.qty;
+            const fromStore = pricesBySymbol[h.asset];
+            const mark = Number.isFinite(fromStore) && fromStore > 0
+                ? fromStore
+                : (Number.isFinite(h.currentPrice) && h.currentPrice > 0 ? h.currentPrice : 0);
+            if (mark > 0) {
+                markBySymbol[h.asset] = mark;
+            }
+        }
+
+        if (!markBySymbol[currentSymbol] || markBySymbol[currentSymbol] <= 0) {
+            const fallback = pricesBySymbol[currentSymbol];
+            if (Number.isFinite(fallback) && fallback > 0) {
+                markBySymbol[currentSymbol] = fallback;
+            } else if (Number.isFinite(lastPrice) && lastPrice > 0) {
+                markBySymbol[currentSymbol] = lastPrice;
+            }
+        }
+
+        const reservedBySymbol: Record<string, number> = {};
+        for (const order of openOrders) {
+            if (order.side !== 'SELL' || order.remainingQty <= 0) continue;
+            reservedBySymbol[order.symbol] = (reservedBySymbol[order.symbol] || 0) + order.remainingQty;
+        }
+
+        const currentHoldings = holdingsBySymbol[currentSymbol] || 0;
+        const currentReserved = reservedBySymbol[currentSymbol] || 0;
+        const projectedEffectiveHoldings = currentHoldings - currentReserved - numericQty;
+        const projectedShortQty = Math.max(0, -projectedEffectiveHoldings);
+
+        const symbols = new Set<string>([
+            ...Object.keys(holdingsBySymbol),
+            ...Object.keys(reservedBySymbol),
+            currentSymbol,
+        ]);
+
+        let projectedShortNotional = 0;
+        for (const symbol of symbols) {
+            let effective = (holdingsBySymbol[symbol] || 0) - (reservedBySymbol[symbol] || 0);
+            if (symbol === currentSymbol) {
+                effective -= numericQty;
+            }
+            if (effective >= -1e-12) continue;
+
+            const fromStore = pricesBySymbol[symbol];
+            const mark = (Number.isFinite(fromStore) && fromStore > 0) ? fromStore : (markBySymbol[symbol] || 0);
+            if (mark <= 0) continue;
+
+            projectedShortNotional += (-effective) * mark;
+        }
+
+        const equity = portfolio.totalValue;
+        const maxShortByEquity = equity > 1e-12 && shortSellingConfig
+            ? equity * shortSellingConfig.maxShortNotionalToEquity
+            : 0;
+        const leverageRatio = equity > 1e-12
+            ? projectedShortNotional / equity
+            : Number.POSITIVE_INFINITY;
+
+        return {
+            currentHoldings,
+            currentReserved,
+            projectedEffectiveHoldings,
+            projectedShortQty,
+            projectedShortNotional,
+            equity,
+            maxShortByEquity,
+            leverageRatio,
+        };
+    }, [
+        side,
+        numericQty,
+        portfolio.holdings,
+        portfolio.totalValue,
+        openOrders,
+        pricesBySymbol,
+        currentSymbol,
+        lastPrice,
+        shortSellingConfig,
+    ]);
+
+    const riskChecks = useMemo(() => {
+        if (side !== 'SELL' || !riskPreview || !shortSellingConfig) return null;
+
+        if (!shortSellingConfig.enabled) {
+            const available = riskPreview.currentHoldings - riskPreview.currentReserved;
+            return {
+                mode: 'no-short' as const,
+                available,
+                passAvailable: available + 1e-12 >= numericQty,
+            };
+        }
+
+        return {
+            mode: 'short-enabled' as const,
+            passQty: riskPreview.projectedShortQty <= shortSellingConfig.maxShortQtyPerSymbol + 1e-12,
+            passEquity: riskPreview.equity + 1e-12 >= shortSellingConfig.minEquity,
+            passTotalNotional: riskPreview.projectedShortNotional <= shortSellingConfig.maxTotalShortNotional + 1e-12,
+            passLeverage: riskPreview.projectedShortNotional <= riskPreview.maxShortByEquity + 1e-12,
+        };
+    }, [side, riskPreview, shortSellingConfig, numericQty]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -176,8 +289,50 @@ export default function TradePanel() {
                         SELL can exceed held quantity and open a short. Validation happens on the exchange.
                     </div>
                     <div className="text-text-secondary">
-                        Limits enforced server-side: per-symbol short qty, total short notional, minimum equity, and short leverage ratio.
+                        {shortSellingConfig
+                            ? `Engine short config: ${shortSellingConfig.enabled ? 'ENABLED' : 'DISABLED'} | max qty/symbol ${shortSellingConfig.maxShortQtyPerSymbol.toFixed(5)} | max total notional $${shortSellingConfig.maxTotalShortNotional.toFixed(2)} | min equity $${shortSellingConfig.minEquity.toFixed(2)} | max ratio ${shortSellingConfig.maxShortNotionalToEquity.toFixed(2)}x`
+                            : 'Engine short config: waiting for server...'}
                     </div>
+
+                    {side === 'SELL' && riskPreview && (
+                        <div className="mt-2 border-t border-border-subtle pt-2 text-[10px] text-text-secondary">
+                            <div>
+                                Projected effective holdings: {riskPreview.projectedEffectiveHoldings.toFixed(5)}
+                                {' | '}Projected short qty: {riskPreview.projectedShortQty.toFixed(5)}
+                            </div>
+                            <div>
+                                Projected short notional: ${riskPreview.projectedShortNotional.toFixed(2)}
+                                {' | '}Equity: ${riskPreview.equity.toFixed(2)}
+                                {' | '}Projected ratio: {Number.isFinite(riskPreview.leverageRatio) ? riskPreview.leverageRatio.toFixed(3) : 'INF'}x
+                            </div>
+
+                            {riskChecks?.mode === 'no-short' && (
+                                <div className={riskChecks.passAvailable ? 'text-bull' : 'text-bear'}>
+                                    No-short mode check (available = holdings - reserved): {riskChecks.passAvailable ? 'PASS' : 'FAIL'}
+                                </div>
+                            )}
+
+                            {riskChecks?.mode === 'short-enabled' && (
+                                <div>
+                                    <span className={riskChecks.passQty ? 'text-bull' : 'text-bear'}>
+                                        Qty limit {riskChecks.passQty ? 'PASS' : 'FAIL'}
+                                    </span>
+                                    {' | '}
+                                    <span className={riskChecks.passEquity ? 'text-bull' : 'text-bear'}>
+                                        Min equity {riskChecks.passEquity ? 'PASS' : 'FAIL'}
+                                    </span>
+                                    {' | '}
+                                    <span className={riskChecks.passTotalNotional ? 'text-bull' : 'text-bear'}>
+                                        Total notional {riskChecks.passTotalNotional ? 'PASS' : 'FAIL'}
+                                    </span>
+                                    {' | '}
+                                    <span className={riskChecks.passLeverage ? 'text-bull' : 'text-bear'}>
+                                        Leverage {riskChecks.passLeverage ? 'PASS' : 'FAIL'}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </form>
         </div>

@@ -169,6 +169,25 @@ class WSManager {
                         category: typeof item === 'string' ? 'Stocks' : (item.category || item.asset_type || 'Stocks'),
                     })).filter((t: { symbol?: string }) => t.symbol);
 
+                    const rawShortCfg = (msg && typeof msg.short_selling === 'object')
+                        ? msg.short_selling as Record<string, unknown>
+                        : null;
+
+                    if (rawShortCfg) {
+                        const maxShortQtyPerSymbol = Number(rawShortCfg.max_short_qty_per_symbol ?? 0);
+                        const maxTotalShortNotional = Number(rawShortCfg.max_total_short_notional ?? 0);
+                        const minEquity = Number(rawShortCfg.min_equity ?? 0);
+                        const maxShortNotionalToEquity = Number(rawShortCfg.max_short_notional_to_equity ?? 0);
+
+                        state.setShortSellingConfig({
+                            enabled: Boolean(rawShortCfg.enabled),
+                            maxShortQtyPerSymbol: Number.isFinite(maxShortQtyPerSymbol) ? maxShortQtyPerSymbol : 0,
+                            maxTotalShortNotional: Number.isFinite(maxTotalShortNotional) ? maxTotalShortNotional : 0,
+                            minEquity: Number.isFinite(minEquity) ? minEquity : 0,
+                            maxShortNotionalToEquity: Number.isFinite(maxShortNotionalToEquity) ? maxShortNotionalToEquity : 0,
+                        });
+                    }
+
                     if (symbols.length > 0) {
                         state.setSymbols(symbols);
                         state.setTickers(tickers);
