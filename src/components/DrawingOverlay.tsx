@@ -24,9 +24,11 @@ const NON_DRAWING_TOOLS = ['crosshair', 'dot', 'arrow', 'zoom'];
 export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: DrawingOverlayProps) {
     const drawings = useMarketStore(s => s.drawings);
     const setDrawings = useMarketStore(s => s.setDrawings);
+    const clearDrawings = useMarketStore(s => s.clearDrawings);
     const activeTool = useMarketStore(s => s.activeTool);
     const setActiveTool = useMarketStore(s => s.setActiveTool);
     const magnetMode = useMarketStore(s => s.magnetMode);
+    const timeframe = useMarketStore(s => s.timeframe);
 
     const [, setTrigger] = useState(0);
     const svgRef = useRef<SVGSVGElement>(null);
@@ -42,6 +44,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
     // Text entry state for text-like tools
     const [textEntry, setTextEntry] = useState<{ x: number, y: number, time: number, price: number, type: string } | null>(null);
     const textInputRef = useRef<HTMLInputElement>(null);
+    const previousTimeframeRef = useRef<number | null>(null);
 
     // Sync dimensions
     useEffect(() => {
@@ -56,33 +59,84 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
         return () => resizeObserver.disconnect();
     }, []);
 
-    // Force re-render on chart moves (pan/zoom) so drawings stick to grid
+    // Keep drawings locked to chart transforms (pan/zoom/resize/price-scale changes).
     useEffect(() => {
-        if (!chartRef.current || !seriesRef.current) return;
-        
-        let rafId: number;
-        let lastHash = '';
+        const chart = chartRef.current;
+        const candleSeries = seriesRef.current?.candle;
+        if (!chart || !candleSeries) return;
+
+        let frameId: number | null = null;
+        let lastSignature = '';
+
+        const forceRerender = () => {
+            setTrigger((t) => t + 1);
+        };
+
+        const getSignature = () => {
+            const logicalRange = chart.timeScale().getVisibleLogicalRange();
+            const priceRange = candleSeries.priceScale().getVisiblePriceRange();
+
+            // Keep raw precision so tiny pans/zoom deltas repaint immediately.
+            const logicalFrom = logicalRange?.from ?? 0;
+            const logicalX0 = chart.timeScale().logicalToCoordinate(logicalFrom as any);
+            const logicalX1 = chart.timeScale().logicalToCoordinate((logicalFrom + 1) as any);
+            const barSpacing = logicalX0 != null && logicalX1 != null
+                ? (logicalX1 - logicalX0)
+                : null;
+
+            return [
+                logicalRange?.from ?? 'na',
+                logicalRange?.to ?? 'na',
+                priceRange?.top ?? 'na',
+                priceRange?.bottom ?? 'na',
+                barSpacing ?? 'na',
+                dimensions.w,
+                dimensions.h,
+            ].join('|');
+        };
 
         const tick = () => {
-            if (!chartRef.current || !seriesRef.current) return;
-            // Poll chart scales precisely before each frame paint
-            const r = chartRef.current.timeScale().getVisibleLogicalRange();
-            const p = seriesRef.current.candle.priceScale().getVisiblePriceRange();
-            const hash = `${r?.from}-${r?.to}-${p?.top}-${p?.bottom}`;
-            
-            if (hash !== lastHash) {
-                lastHash = hash;
-                setTrigger(t => t + 1);
+            const signature = getSignature();
+            if (signature !== lastSignature) {
+                lastSignature = signature;
+                forceRerender();
             }
-            rafId = requestAnimationFrame(tick);
+            frameId = window.requestAnimationFrame(tick);
         };
-        
-        rafId = requestAnimationFrame(tick);
-        
+
+        chart.timeScale().subscribeVisibleLogicalRangeChange(forceRerender);
+        chart.timeScale().subscribeVisibleTimeRangeChange(forceRerender);
+        window.addEventListener('resize', forceRerender);
+
+        frameId = window.requestAnimationFrame(tick);
+
         return () => {
-            cancelAnimationFrame(rafId);
+            chart.timeScale().unsubscribeVisibleLogicalRangeChange(forceRerender);
+            chart.timeScale().unsubscribeVisibleTimeRangeChange(forceRerender);
+            window.removeEventListener('resize', forceRerender);
+            if (frameId !== null) {
+                window.cancelAnimationFrame(frameId);
+            }
         };
-    }, [chartRef, seriesRef]);
+    }, [chartRef, seriesRef, dimensions.w, dimensions.h]);
+
+    // Clear drawings when timeframe changes (e.g. 1s -> 5s).
+    useEffect(() => {
+        if (previousTimeframeRef.current === null) {
+            previousTimeframeRef.current = timeframe;
+            return;
+        }
+
+        if (previousTimeframeRef.current !== timeframe) {
+            clearDrawings();
+            setActiveDrawing(null);
+            setPencilPoints([]);
+            setTextEntry(null);
+            setMousePos(null);
+        }
+
+        previousTimeframeRef.current = timeframe;
+    }, [timeframe, clearDrawings]);
 
     // Clear UI state when drawings are cleared globally or via Event
     useEffect(() => {
