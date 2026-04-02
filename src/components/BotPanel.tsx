@@ -83,7 +83,7 @@ function findActiveLapSession(sessions: BotSession[]): BotSession | null {
 function Metric({ label, value, positive }: { label: string; value: string; positive?: boolean }) {
   const color = positive === undefined ? 'text-text-primary' : positive ? 'text-bull' : 'text-bear';
   return (
-    <div className="rounded-lg border border-border-subtle bg-linear-to-br from-bg-elevated/80 via-bg-elevated/65 to-[#090d19]/80 p-2.5 shadow-[inset_0_0_0_1px_rgba(99,102,241,0.08)]">
+    <div className="bot-kpi-metric rounded-lg border border-border-subtle bg-linear-to-br from-bg-elevated/80 via-bg-elevated/65 to-[#090d19]/80 p-2.5 shadow-[inset_0_0_0_1px_rgba(99,102,241,0.08)]">
       <div className="text-[9px] text-text-secondary uppercase font-bold tracking-tight">{label}</div>
       <div className={`text-sm font-mono font-bold mt-0.5 ${color}`}>{value}</div>
     </div>

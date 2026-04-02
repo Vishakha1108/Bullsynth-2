@@ -2,8 +2,10 @@ import { useMemo } from 'react';
 import { TrendingDown, Plus, ExternalLink, Info, X } from 'lucide-react';
 import useMarketStore from '../store/useMarketStore';
 import { candleWorker, requestHistory, isSymbolCached } from '../services/websocket';
+import { useTheme } from '../store/ThemeContext';
 
 export default function Watchlist({ onClose }: { onClose?: () => void }) {
+    const { theme } = useTheme();
     const watchlist = useMarketStore(s => s.watchlist);
     const currentSymbol = useMarketStore(s => s.currentSymbol);
     const setCurrentSymbol = useMarketStore(s => s.setCurrentSymbol);
@@ -111,7 +113,7 @@ export default function Watchlist({ onClose }: { onClose?: () => void }) {
             </div>
 
             {/* Symbol Detail Section (Bottom) */}
-            <div className="border-t border-border-subtle bg-linear-to-b from-bg-terminal via-bg-terminal to-[#04050b] p-4 flex flex-col gap-3 min-h-80">
+            <div className={`border-t border-border-subtle p-4 flex flex-col gap-3 min-h-80 ${theme === 'light' ? 'bg-bg-terminal' : 'bg-linear-to-b from-bg-terminal via-bg-terminal to-[#04050b]'}`}>
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white ${currentSymbol === 'BTC' ? 'bg-[#f7931a]' : 'bg-[#6366f1]'}`}>
@@ -144,7 +146,7 @@ export default function Watchlist({ onClose }: { onClose?: () => void }) {
                 </div>
 
                 {/* News/Action mock bar */}
-                <div className="bg-linear-to-r from-bg-elevated via-bg-elevated/95 to-[#0a1020] rounded-md p-2 flex items-center gap-3 cursor-pointer hover:bg-border-subtle transition-colors border border-[#6366f116] hover:border-[#6366f130]">
+                <div className={`rounded-md p-2 flex items-center gap-3 cursor-pointer hover:bg-border-subtle transition-colors border border-[#6366f116] hover:border-[#6366f130] ${theme === 'light' ? 'bg-bg-elevated' : 'bg-linear-to-r from-bg-elevated via-bg-elevated/95 to-[#0a1020]'}`}>
                     <div className="w-8 h-8 rounded bg-bear/20 flex items-center justify-center text-bear">
                         <Info size={16} />
                     </div>
