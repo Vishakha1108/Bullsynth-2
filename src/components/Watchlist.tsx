@@ -42,7 +42,7 @@ export default function Watchlist({ onClose }: { onClose?: () => void }) {
     }, [currentSymbol]);
 
     return (
-        <div className="tv-side-accent tv-side-accent-watchlist flex flex-col h-full bg-bg-terminal text-text-primary font-sans border-l border-border-subtle">
+        <div className="tv-side-accent tv-side-accent-watchlist flex flex-col h-full bg-bg-terminal text-text-primary font-sans">
             {/* Watchlist Header */}
             <div className="flex items-center justify-between px-3 py-2 border-b border-border-subtle bg-linear-to-r from-bg-elevated via-bg-elevated/85 to-bg-terminal">
                 <div className="flex items-center gap-2 cursor-pointer hover:bg-border-subtle px-1.5 py-0.5 rounded transition-colors">

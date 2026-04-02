@@ -135,7 +135,7 @@ export default function Terminal() {
                 </div>
 
                 {/* Collapsible Right Area Container */}
-                <div className={`overflow-hidden transition-[width] duration-300 ease-in-out border-l border-border-subtle bg-bg-terminal flex ${panelLayout === 2 ? 'flex-row' : 'flex-col'} ${isRightPanelOpen ? (panelLayout === 2 ? 'w-160' : 'w-[320px]') : 'w-0 border-none'}`}>
+                <div className={`overflow-hidden transition-[width] duration-300 ease-in-out border-l border-border-subtle bg-bg-terminal flex flex-none ${panelLayout === 2 ? 'flex-row p-0 w-[640px]' : 'flex-col'} ${isRightPanelOpen ? (panelLayout === 2 ? '' : 'w-[320px]') : 'w-0 border-none'}`}>
                     {panelLayout === 1 && (
                         <>
                             {/* Top Section: Information View */}
@@ -258,7 +258,7 @@ export default function Terminal() {
                     </button>
 
                     <button
-                        className="mt-auto w-12 h-12 rounded flex items-center justify-center transition-all cursor-pointer text-text-secondary hover:text-text-primary hover:bg-bg-elevated"
+                        className="mt-auto w-10 h-10 p-0 rounded-lg flex items-center justify-center transition-all cursor-pointer text-text-secondary hover:text-text-primary hover:bg-bg-elevated"
                         onClick={handlePanelLayoutToggle}
                         title={`Switch to ${panelLayout === 1 ? '2' : '1'} Panel Layout`}
                     >

@@ -7,7 +7,7 @@ export default function Portfolio({ onClose }: { onClose?: () => void }) {
     const isPnlPositive = portfolio.unrealizedPnl > 0;
 
     return (
-        <div className="tv-side-accent tv-side-accent-portfolio flex flex-col h-full bg-bg-terminal text-text-primary font-sans border-l border-border-subtle">
+        <div className="tv-side-accent tv-side-accent-portfolio flex flex-col h-full bg-bg-terminal text-text-primary font-sans">
             {/* Portfolio Header */}
             <div className="flex items-center justify-between px-3 py-2 border-b border-border-subtle bg-linear-to-r from-bg-elevated via-bg-elevated/90 to-bg-terminal">
                 <div className="flex items-center gap-2">

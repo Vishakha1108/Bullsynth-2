@@ -814,7 +814,7 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
   }, [runMode, scheduleArmed, scheduleStartMs, scheduleEndMs, selectedBotIds.length, running, actionLoading, clockTick]);
 
   return (
-    <div className="tv-side-accent tv-side-accent-bot flex h-full flex-col border-l border-border-subtle bg-bg-terminal text-text-primary font-sans">
+    <div className="tv-side-accent tv-side-accent-bot flex h-full flex-col bg-bg-terminal text-text-primary font-sans">
       <div className="flex items-start justify-between border-b border-border-subtle bg-linear-to-r from-[#6366f112] via-bg-elevated to-bg-terminal px-3 py-2.5">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-accent/25 bg-accent/10">
@@ -1014,8 +1014,8 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
                 disabled={running || actionLoading}
                 className={`rounded-md border px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] transition-colors disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer ${
                   runMode === 'manual'
-                    ? 'border-accent/40 bg-accent/10 text-accent'
-                    : 'border-border-subtle/70 bg-bg-terminal/40 text-text-secondary hover:text-text-primary'
+                    ? 'lap-mode-btn-inactive lap-mode-btn-active'
+                    : 'lap-mode-btn-inactive border-border-subtle/70 bg-bg-terminal/40 hover:border-accent/35 hover:text-accent'
                 }`}
               >
                 Manual
@@ -1026,8 +1026,8 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
                 disabled={running || actionLoading}
                 className={`rounded-md border px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] transition-colors disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer ${
                   runMode === 'scheduled'
-                    ? 'border-accent/40 bg-accent/10 text-accent'
-                    : 'border-border-subtle/70 bg-bg-terminal/40 text-text-secondary hover:text-text-primary'
+                    ? 'lap-mode-btn-inactive lap-mode-btn-active'
+                    : 'lap-mode-btn-inactive border-border-subtle/70 bg-bg-terminal/40 hover:border-accent/35 hover:text-accent'
                 }`}
               >
                 Scheduled
