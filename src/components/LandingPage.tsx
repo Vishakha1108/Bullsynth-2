@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import useMarketStore from '../store/useMarketStore';
 import { wsManager } from '../services/websocket';
+import { ModeToggle } from './mode-toggle';
 
 export default function LandingPage() {
     const tickers = useMarketStore((state) => state.tickers);
@@ -105,8 +106,9 @@ export default function LandingPage() {
                         <Link to="/user/dashboard" className="hover:text-white transition-colors">Workspace</Link>
                         <Link to="/admin/dashboard" className="hover:text-white transition-colors">Automation</Link>
                     </div>
-                    <div className="flex flex-col items-end sm:block hidden">
-                        <Link to="/terminal" className="landing-launch-btn px-5 py-2.5 rounded-full bg-white text-black font-semibold text-sm hover:bg-gray-200 transition-colors">
+                    <div className="flex items-center gap-4 mr-2">
+                        <ModeToggle />
+                        <Link to="/terminal" className="landing-launch-btn px-5 py-2.5 rounded-full bg-white text-black font-semibold text-sm hover:bg-gray-200 transition-colors hidden sm:block">
                             Launch Terminal
                         </Link>
                     </div>
