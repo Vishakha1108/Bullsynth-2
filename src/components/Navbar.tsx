@@ -65,19 +65,19 @@ export function Navbar() {
       <div className="hidden md:flex items-center justify-center absolute left-1/2 -translate-x-1/2 gap-8 text-sm font-medium text-text-secondary">
         <button 
           onClick={() => navigate('/terminal')} 
-          className={`dash-nav-btn hover:text-text-primary transition-colors cursor-pointer ${isActive('/terminal') ? 'text-text-primary !font-bold' : ''}`}
+          className={`dash-nav-btn transition-colors cursor-pointer ${isActive('/terminal') ? 'text-text-primary !font-bold' : ''}`}
         >
           Terminal
         </button>
         <button 
           onClick={() => navigate('/user/dashboard')} 
-          className={`dash-nav-btn hover:text-text-primary transition-colors cursor-pointer ${isActive('/user/dashboard') ? 'text-text-primary !font-bold' : ''}`}
+          className={`dash-nav-btn transition-colors cursor-pointer ${isActive('/user/dashboard') ? 'text-text-primary !font-bold' : ''}`}
         >
           Dashboard
         </button>
         <button 
           onClick={() => navigate('/admin/dashboard')} 
-          className={`dash-nav-btn hover:text-text-primary transition-colors cursor-pointer ${isActive('/admin/dashboard') ? 'text-text-primary !font-bold' : ''}`}
+          className={`dash-nav-btn transition-colors cursor-pointer ${isActive('/admin/dashboard') ? 'text-text-primary !font-bold' : ''}`}
         >
           Bots
         </button>

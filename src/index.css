@@ -4127,7 +4127,8 @@ input[type='number'] {
   @apply bg-black/60 backdrop-blur-xl border-b border-white/5;
 }
 .dash-nav-btn:hover {
-  @apply bg-white/10;
+  background: transparent;
+  color: #ffffff;
 }
 
 /* ── Dashboard footer ────────────────────────────────────────────────────── */
@@ -5342,7 +5343,8 @@ input[type='number'] {
   border-bottom-color: #d1d4dc;
 }
 .light .dash-nav-btn:hover {
-  background: #e0e3eb;
+  background: transparent;
+  color: #ffffff;
 }
 
 .light .dash-footer {
