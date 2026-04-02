@@ -3,6 +3,7 @@ import useMarketStore from '../store/useMarketStore';
 import { wsManager } from '../services/websocket';
 
 export default function TradePanel() {
+    const SELL_EPSILON = 1e-8;
     const [side, setSide] = useState<'BUY' | 'SELL'>('BUY');
     const [type, setType] = useState<'limit' | 'market'>('limit');
     const [price, setPrice] = useState('');
@@ -31,11 +32,13 @@ export default function TradePanel() {
         return '0.00';
     }, [price, qty, lastPrice, type]);
 
+    const parsedQty = Number.isFinite(Number(qty)) ? Number(qty) : 0;
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const numericQty = parseFloat(qty);
         if (!qty || numericQty <= 0) return;
-        if (side === 'SELL' && numericQty > availableQty) return;
+        if (side === 'SELL' && numericQty > availableQty + SELL_EPSILON) return;
         if (type === 'limit' && (!price || parseFloat(price) <= 0)) return;
 
         wsManager.send({
@@ -113,15 +116,15 @@ export default function TradePanel() {
                         <label className="m-0">Quantity</label>
                         {side === 'SELL' && (
                             <span className="text-[10px] text-text-secondary">
-                                Available: <span className="text-text-primary font-mono">{availableQty}</span>
+                                Available: <span className="text-text-primary font-mono">{availableQty.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 5 })}</span>
                             </span>
                         )}
                     </div>
                     <div className="tv-trade-input-wrap">
                         <input
                             type="number"
-                            step="1"
-                            min="0"
+                            step="0.00001"
+                            min="0.00001"
                             value={qty}
                             onChange={e => setQty(e.target.value)}
                             placeholder="0"
@@ -139,7 +142,7 @@ export default function TradePanel() {
                 <button
                     type="submit"
                     className={`tv-trade-submit ${side === 'BUY' ? 'buy' : 'sell'}`}
-                    disabled={side === 'SELL' && (parseFloat(qty) > availableQty || !qty || parseFloat(qty) <= 0)}
+                    disabled={side === 'SELL' && (parsedQty > availableQty + SELL_EPSILON || parsedQty <= 0)}
                 >
                     {side} {currentSymbol}
                 </button>

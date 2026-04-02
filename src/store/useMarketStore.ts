@@ -649,20 +649,51 @@ const useMarketStore = create<MarketState>((set) => ({
         const previousPrice = state.prices[symbol] || price;
         useMarketStore.getState().checkAlerts(symbol, price, previousPrice);
 
+        const hasHolding = state.portfolio.holdings.some((h) => h.asset === symbol);
+        const nextPortfolio = hasHolding
+            ? (() => {
+                const holdings = state.portfolio.holdings.map((h) => {
+                    if (h.asset !== symbol) return h;
+                    const currentPrice = price;
+                    const marketValue = h.qty * currentPrice;
+                    const unrealizedPnl = h.qty * (currentPrice - h.avgPrice);
+                    return {
+                        ...h,
+                        currentPrice,
+                        marketValue,
+                        unrealizedPnl,
+                    };
+                });
+
+                const totalMarketValue = holdings.reduce((sum, h) => sum + h.marketValue, 0);
+                const totalUnrealizedPnl = holdings.reduce((sum, h) => sum + h.unrealizedPnl, 0);
+
+                return {
+                    ...state.portfolio,
+                    holdings,
+                    unrealizedPnl: totalUnrealizedPnl,
+                    totalValue: state.portfolio.cash + totalMarketValue,
+                };
+            })()
+            : null;
+
         if (symbol === state.currentSymbol) {
-            return {
+            const nextState = {
                 prices: nextPrices,
                 priceBaselines: nextPriceBaselines,
                 priceChanges: nextChanges,
                 lastPrice: price,
                 priceChange24h: liveChange,
             };
+            return nextPortfolio ? { ...nextState, portfolio: nextPortfolio } : nextState;
         }
-        return {
+
+        const nextState = {
             prices: nextPrices,
             priceBaselines: nextPriceBaselines,
             priceChanges: nextChanges,
         };
+        return nextPortfolio ? { ...nextState, portfolio: nextPortfolio } : nextState;
     }),
 
     setActiveTool: (tool) => set({ activeTool: tool }),

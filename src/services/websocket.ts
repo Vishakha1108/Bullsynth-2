@@ -301,14 +301,17 @@ class WSManager {
                 if (msgType === 'candle') {
                     const price = Number(msg.c || 0);
                     const sym = msg.symbol;
+                    const candleTimeSec = normalizeToSec(msg.t ?? msg.ts ?? msg.time);
+                    const nowSec = Math.floor(Date.now() / 1000);
+                    const isNearRealtime = candleTimeSec >= (nowSec - 2);
 
-                    if (sym) {
+                    if (sym && (isNearRealtime || state.prices[sym] == null)) {
                         state.setPrice(sym, price);
                     }
 
                     const next = {
                         symbol: sym,
-                        time: normalizeToSec(msg.t ?? msg.ts ?? msg.time),
+                        time: candleTimeSec,
                         open: Number(msg.o || 0),
                         high: Number(msg.h || 0),
                         low: Number(msg.l || 0),
