@@ -1,0 +1,27 @@
+--- src/components/Header.tsx
++++ src/components/Header.tsx
+@@ -44,6 +45,7 @@
+   Zap,
+   Keyboard,
+   Globe,
++  Grid3x3,
+   Trash2,
+ } from "lucide-react";
+ 
+@@ -272,12 +277,16 @@
+       if (!timeframeRef.current?.contains(event.target as Node)) {
+         setIsTimeframeOpen(false);
+       }
++      if (!layoutRef.current?.contains(event.target as Node)) {
++        setIsLayoutOpen(false);
++      }
+     };
+ 
+     const handleShortcuts = (event: KeyboardEvent) => {
+       if (event.key === "Escape") {
+         setIsIndicatorsOpen(false);
+         setIsChartTypeOpen(false);
++        setIsLayoutOpen(false);
+       }
+ 
+       // Toggle indicators menu with '/'

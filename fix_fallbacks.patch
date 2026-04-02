@@ -1,0 +1,27 @@
+--- src/components/Chart.tsx
++++ src/components/Chart.tsx
+@@ -484,8 +484,8 @@
+   ));
+   const latestCandle = useMarketStore((s) => (
+-    layoutId !== 'l1' && paneId && s.paneCandles[paneId]?.length > 0
+-      ? s.paneCandles[paneId][s.paneCandles[paneId].length - 1]
+-      : s.latestCandle
++    layoutId !== 'l1' && paneId
++      ? (s.paneCandles[paneId]?.length > 0 ? s.paneCandles[paneId][s.paneCandles[paneId].length - 1] : null)
++      : s.latestCandle
+   ));
+ 
+@@ -649,3 +649,3 @@
+   const layoutId = useMarketStore((s) => s.layoutId);
+-  const candles = useMarketStore((s) => (layoutId !== "l1" && paneId && s.paneCandles[paneId]?.length ? s.paneCandles[paneId] : s.candles));
++  const candles = useMarketStore((s) => (layoutId !== "l1" && paneId ? s.paneCandles[paneId] || [] : s.candles));
+   const historySequence = useMarketStore((s) => (layoutId !== "l1" && paneId ? s.paneHistorySequence[paneId] || 0 : s.historySequence));
+@@ -1392,5 +1392,5 @@
+   const latestCandle = useMarketStore((s) => (
+-    layoutId !== "l1" && paneId && s.paneCandles[paneId]?.length > 0
+-      ? s.paneCandles[paneId][s.paneCandles[paneId].length - 1]
+-      : s.latestCandle
++    layoutId !== "l1" && paneId
++      ? (s.paneCandles[paneId]?.length > 0 ? s.paneCandles[paneId][s.paneCandles[paneId].length - 1] : null)
++      : s.latestCandle
+   ));

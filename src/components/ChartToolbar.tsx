@@ -5,14 +5,13 @@ import {
     Plus, Circle, MousePointer2,
     MoveHorizontal, Minus, ArrowDown,
     Type, Ruler,
-    Trash2,
+    Eraser,
     Waves, Pentagon, ArrowUpRight, Magnet, X,
     ArrowDownRight, Triangle, Pencil,
     Tag, MessageSquare, StickyNote,
     TrendingUp, ArrowUp, MoveVertical,
     Spline, Grid3X3, Fan
 } from 'lucide-react';
-import { formatShortcutLabel } from '../lib/platform';
 
 const TrendLineIcon = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
     <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -69,7 +68,6 @@ const HeadShouldersIcon = ({ size = 24, className = "" }: { size?: number, class
 export function ChartToolbar() {
     const activeTool = useMarketStore(s => s.activeTool);
     const setActiveTool = useMarketStore(s => s.setActiveTool);
-    const clearDrawings = useMarketStore(s => s.clearDrawings);
     const magnetMode = useMarketStore(s => s.magnetMode);
     const setMagnetMode = useMarketStore(s => s.setMagnetMode);
 
@@ -80,8 +78,8 @@ export function ChartToolbar() {
     ];
 
     const lineTools: ToolOption[] = [
-        { id: 'trendline', icon: TrendLineIcon, label: `Trend Line (${formatShortcutLabel('Alt+T')})` },
-        { id: 'ray', icon: MoveHorizontal, label: `Ray (${formatShortcutLabel('Alt+H')})` },
+        { id: 'trendline', icon: TrendLineIcon, label: 'Trend Line' },
+        { id: 'ray', icon: MoveHorizontal, label: 'Ray' },
         { id: 'vertical_ray', icon: MoveVertical, label: 'Vertical Ray' },
         { id: 'horizontal_line', icon: Minus, label: 'Horizontal Line' },
         { id: 'vertical_line', icon: ArrowDown, label: 'Vertical Line' },
@@ -172,11 +170,11 @@ export function ChartToolbar() {
                 />
 
                 <button
-                    className="tv-toolbar-clear-btn"
-                    onClick={() => { clearDrawings(); window.dispatchEvent(new CustomEvent('reset-chart-view')); }}
-                    title={`Clear All Drawings (${formatShortcutLabel('Alt+C')})`}
+                    className={`tv-toolbar-clear-btn ${activeTool === 'eraser' ? 'active' : ''}`}
+                    onClick={() => setActiveTool(activeTool === 'eraser' ? 'crosshair' : 'eraser')}
+                    title="Eraser — click drawings to remove them"
                 >
-                    <Trash2 size={18} />
+                    <Eraser size={18} />
                 </button>
             </div>
         </div>
