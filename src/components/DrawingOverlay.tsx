@@ -587,20 +587,51 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
             if (pts.length < 2) return null;
             const p1 = mapPoint(pts[0].time, pts[0].price);
             const p2 = mapPoint(pts[1].time, pts[1].price);
-            const levels = calculateFibonacciLevels(pts[0].price, pts[1].price);
-            const colors = ['#787b86', '#ef5350', '#ff9800', '#4caf50', '#089981', '#6366f1', '#787b86', '#2a2e39'];
+            
+            // Reverse logic: first click is treated as 1, second as 0
+            const price1 = pts[0].price; // Will be treated as level 1 (high)
+            const price2 = pts[1].price; // Will be treated as level 0 (low)
+            
+            // Calculate fibonacci levels from price2 to price1 (reversed order)
+            const allLevels = calculateFibonacciLevels(price2, price1);
+            // Filter to only standard retracement levels (0 to 1, excluding 1.618)
+            const levels = allLevels.filter(lvl => lvl.level <= 1).reverse(); // Reverse to go from 1 to 0
+            
+            const colors = ['#00d7ff', '#009688', '#4caf50', '#ff9800', '#ef5350', '#616161'];
+            const bgColors = ['rgba(0, 139, 123, 0.25)', 'rgba(0, 150, 136, 0.25)', 'rgba(120, 168, 60, 0.25)', 'rgba(183, 76, 44, 0.25)', 'rgba(71, 40, 40, 0.25)'];
+            
             return (
                 <g key={i}>
+                    {/* Draw background rectangles between levels */}
+                    {levels.map((lvl, idx) => {
+                        if (idx === levels.length - 1) return null; // Skip last level for bg
+                        const y1 = seriesRef.current?.candle.priceToCoordinate(lvl.price) ?? -1000;
+                        const y2 = seriesRef.current?.candle.priceToCoordinate(levels[idx + 1].price) ?? -1000;
+                        const bgColor = bgColors[idx % bgColors.length];
+                        return (
+                            <rect
+                                key={`bg-${idx}`}
+                                x={Math.min(p1.x, p2.x)}
+                                y={Math.min(y1, y2)}
+                                width={Math.abs(Math.max(p1.x, p2.x) - Math.min(p1.x, p2.x))}
+                                height={Math.abs(y1 - y2)}
+                                fill={bgColor}
+                            />
+                        );
+                    })}
+                    
                     <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="#787b86" strokeWidth="1" strokeDasharray="4 4" />
                     <circle cx={p1.x} cy={p1.y} r="3" fill="#787b86" />
                     <circle cx={p2.x} cy={p2.y} r="3" fill="#787b86" />
+                    
                     {levels.map((lvl, idx) => {
                         const y = seriesRef.current?.candle.priceToCoordinate(lvl.price) ?? -1000;
                         const color = colors[idx] || '#787b86';
                         return (
                             <g key={idx}>
-                                <line x1={0} y1={y} x2={W} y2={y} stroke={color} strokeWidth="1" opacity="0.6" />
-                                <text x={W - 5} y={y - 4} fill={color} fontSize="10" textAnchor="end" fontFamily="'JetBrains Mono', monospace">
+                                {/* Only draw line between the two points' x-coordinates */}
+                                <line x1={Math.min(p1.x, p2.x)} y1={y} x2={Math.max(p1.x, p2.x)} y2={y} stroke={color} strokeWidth="2" opacity="1" />
+                                <text x={Math.max(p1.x, p2.x) + 5} y={y - 4} fill={color} fontSize="12" textAnchor="start" fontFamily="'JetBrains Mono', monospace">
                                     {lvl.level} ({lvl.price.toFixed(2)})
                                 </text>
                             </g>
