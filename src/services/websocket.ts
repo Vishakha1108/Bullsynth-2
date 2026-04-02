@@ -146,6 +146,9 @@ class WSManager {
 
             initState.compareSymbols.forEach((sym) => requestCompareHistory(sym));
 
+            // Frontend session uses guest_login (no API key required).
+            this.send({ type: 'guest_login' });
+
             // Ask for symbol list in case welcome arrives before UI is ready.
             this.send({ type: 'get_symbols' });
         };
