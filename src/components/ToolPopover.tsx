@@ -59,7 +59,7 @@ export function ToolPopover({ options, activeToolId, onSelect }: ToolPopoverProp
             </div>
 
             {isOpen && (
-                <div className="tv-dropdown-surface tv-toolbar-dropdown absolute left-[46px] top-0 z-[200] w-max animate-in fade-in slide-in-from-left-1 duration-200 bg-bg-elevated border border-border-subtle rounded shadow-xl py-1">
+                <div className="tv-dropdown-surface tv-toolbar-dropdown absolute left-[100%] top-0 z-[200] w-max animate-in fade-in slide-in-from-left-1 duration-200 bg-bg-elevated border border-border-subtle rounded shadow-xl py-1">
                     {options.map((opt) => (
                         <button
                             key={opt.id}
