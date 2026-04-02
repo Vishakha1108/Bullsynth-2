@@ -170,9 +170,6 @@ export default function LandingPage() {
                         <div>
                             <h2 className="text-3xl font-bold text-white tracking-tight">Top Analysis Picks</h2>
                         </div>
-                        <Link to="#" className="landing-analysis-link text-purple-400 hover:text-purple-300 font-medium flex items-center gap-1">
-                            View all <ArrowRight size={16} />
-                        </Link>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
