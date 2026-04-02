@@ -10,7 +10,8 @@ import {
     ArrowDownRight, Triangle, Pencil,
     Tag, MessageSquare, StickyNote,
     TrendingUp, ArrowUp, MoveVertical,
-    Spline, Grid3X3, Fan
+    Spline, Grid3X3, Fan,
+    Undo2
 } from 'lucide-react';
 import { formatShortcutLabel } from '../lib/platform';
 
@@ -69,6 +70,8 @@ const HeadShouldersIcon = ({ size = 24, className = "" }: { size?: number, class
 export function ChartToolbar() {
     const activeTool = useMarketStore(s => s.activeTool);
     const setActiveTool = useMarketStore(s => s.setActiveTool);
+    const drawings = useMarketStore(s => s.drawings);
+    const setDrawings = useMarketStore(s => s.setDrawings);
     const clearDrawings = useMarketStore(s => s.clearDrawings);
     const magnetMode = useMarketStore(s => s.magnetMode);
     const setMagnetMode = useMarketStore(s => s.setMagnetMode);
@@ -171,12 +174,21 @@ export function ChartToolbar() {
                     onSelect={(_, action) => action && action()}
                 />
 
+
                 <button
                     className="tv-toolbar-clear-btn"
                     onClick={() => { clearDrawings(); window.dispatchEvent(new CustomEvent('reset-chart-view')); }}
                     title={`Clear All Drawings (${formatShortcutLabel('Alt+C')})`}
                 >
                     <Trash2 size={18} />
+                </button>
+                <button
+                    className="tv-toolbar-clear-btn"
+                    onClick={() => setDrawings(drawings.slice(0, -1))}
+                    title={`Delete Last Drawing (${formatShortcutLabel('Delete')})`}
+                    disabled={drawings.length === 0}
+                >
+                    <Undo2 size={18} />
                 </button>
             </div>
         </div>
