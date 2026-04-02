@@ -928,10 +928,10 @@ export default function BotPanel({ onClose }: { onClose?: () => void }) {
       </div>
 
       <div className="flex items-center justify-between border-t border-border-subtle bg-bg-elevated/70 p-3">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.09em] text-text-secondary">API Source</div>
+        <div className="text-[10px] font-semibold uppercase tracking-[0.09em] bot-panel-api-source">API Source</div>
         <div className="flex items-center gap-2">
           <span className={`h-1.5 w-1.5 rounded-full ${apiConnected === false ? 'bg-bear' : apiConnected ? 'bg-bull' : 'bg-text-secondary'}`} />
-          <div className="text-[10px] font-mono text-accent">
+          <div className="text-[10px] font-mono bot-panel-api-status">
             Admin API {apiConnected === false ? '(disconnected)' : apiConnected ? '(connected)' : '(unknown)'}
           </div>
         </div>

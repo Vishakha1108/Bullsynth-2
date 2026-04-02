@@ -333,10 +333,13 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
         if (d.type === 'horizontal_line') {
             if (pts.length < 1) return null;
             const p = mapPoint(pts[0].time, pts[0].price);
+            const priceText = pts[0].price.toFixed(2);
+            const boxWidth = priceText.length * 6 + 10;
             return (
                 <g key={i}>
                     <line x1={0} y1={p.y} x2={W} y2={p.y} stroke="#6366f1" strokeWidth="1.5" />
-                    <text x={W - 5} y={p.y - 4} fill="#6366f1" fontSize="10" textAnchor="end" fontFamily="monospace">{pts[0].price.toFixed(2)}</text>
+                    <rect x={W - boxWidth - 4} y={p.y - 10} width={boxWidth} height="20" fill="rgba(99, 102, 241, 0.92)" rx="3" />
+                    <text x={W - boxWidth/2 - 4} y={p.y + 3} fill="#fff" fontSize="10" textAnchor="middle" fontFamily="monospace" fontWeight="600">{priceText}</text>
                 </g>
             );
         }
