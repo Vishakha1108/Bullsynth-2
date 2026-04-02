@@ -290,7 +290,8 @@ export function TickerSearch() {
         closeSearch();
         if (symbol === currentSymbol) return;
         setCurrentSymbol(symbol);
-        useMarketStore.getState().clearCandles();
+        const marketState = useMarketStore.getState();
+        marketState.clearCandles(marketState.layoutId !== "l1" ? marketState.activePaneId : undefined);
         if (!isSymbolCached(symbol)) {
           requestHistory(symbol);
         }
@@ -413,7 +414,6 @@ export function TickerSearch() {
                         className={`tv-modal-item flex-1 ${isActive ? "active" : ""}`}
                         onClick={() => handleSelect(t.symbol)}
                         onMouseEnter={() => setActiveIndex(index)}
-                        onClick={() => handleSelect(t.symbol)}
                       >
                         <div className="tv-modal-item-left">
                           <div className="tv-modal-item-symbol">
@@ -625,16 +625,16 @@ class ChartErrorBoundary extends React.Component<
   }
 }
 
-export default function ChartContainer() {
+export default function ChartContainer({ paneId }: { paneId?: string } = {}) {
   return (
     <ChartErrorBoundary>
-      <Chart />
+      <Chart paneId={paneId} />
     </ChartErrorBoundary>
   );
 }
 
 // ─── Main Chart Component ───────────────────────────────────────────────────
-function Chart() {
+function Chart({ paneId }: { paneId?: string } = {}) {
   const { theme } = useTheme();
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -647,18 +647,19 @@ function Chart() {
     volume: ISeriesApi<"Histogram">;
   } | null>(null);
 
-  const candles = useMarketStore((s) => s.candles);
-  const historySequence = useMarketStore((s) => s.historySequence);
-  const enabledIndicators = useMarketStore((s) => s.enabledIndicators);
+  const layoutId = useMarketStore((s) => s.layoutId);
+  const candles = useMarketStore((s) => (layoutId !== "l1" && paneId && s.paneCandles[paneId]?.length ? s.paneCandles[paneId] : s.candles));
+  const historySequence = useMarketStore((s) => (layoutId !== "l1" && paneId ? s.paneHistorySequence[paneId] || 0 : s.historySequence));
+  const enabledIndicators = useMarketStore((s) => (layoutId !== "l1" && paneId ? s.paneConfigs[paneId]?.enabledIndicators || s.enabledIndicators : s.enabledIndicators));
   const customIndicatorScripts = useMarketStore(
     (s) => s.customIndicatorScripts,
   );
-  const chartType = useMarketStore((s) => s.chartType);
-  const currentSymbol = useMarketStore((s) => s.currentSymbol);
+  const chartType = useMarketStore((s) => (layoutId !== "l1" && paneId ? s.paneConfigs[paneId]?.chartType || s.chartType : s.chartType));
+  const currentSymbol = useMarketStore((s) => (layoutId !== "l1" && paneId ? s.paneConfigs[paneId]?.symbol || s.currentSymbol : s.currentSymbol));
   const setCrosshairData = useMarketStore((s) => s.setCrosshairData);
   const activeTool = useMarketStore((s) => s.activeTool);
   const setActiveTool = useMarketStore((s) => s.setActiveTool);
-  const drawings = useMarketStore((s) => s.drawings);
+  const drawings = useMarketStore((s) => (layoutId !== "l1" && paneId ? s.paneDrawings[paneId] || [] : s.drawings));
   const setDrawings = useMarketStore((s) => s.setDrawings);
   const clearDrawings = useMarketStore((s) => s.clearDrawings);
 

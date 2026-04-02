@@ -20,18 +20,38 @@ interface DrawingOverlayProps {
         volume: ISeriesApi<"Histogram">;
     } | null>;
     hideDrawings?: boolean;
+    paneId?: string;
 }
 
 const NON_DRAWING_TOOLS = ['crosshair', 'dot', 'arrow', 'zoom'];
 
-export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: DrawingOverlayProps) {
-    const drawings = useMarketStore(s => s.drawings);
-    const setDrawings = useMarketStore(s => s.setDrawings);
-    const clearDrawings = useMarketStore(s => s.clearDrawings);
+export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false, paneId }: DrawingOverlayProps) {
+    const layoutId = useMarketStore(s => s.layoutId);
+    const drawings = useMarketStore(s => (layoutId !== 'l1' && paneId ? s.paneDrawings[paneId] || [] : s.drawings));
+    const setGlobalDrawings = useMarketStore(s => s.setDrawings);
+    const clearGlobalDrawings = useMarketStore(s => s.clearDrawings);
+    const setPaneDrawings = useMarketStore(s => s.setPaneDrawings);
+    const clearPaneDrawings = useMarketStore(s => s.clearPaneDrawings);
     const activeTool = useMarketStore(s => s.activeTool);
     const setActiveTool = useMarketStore(s => s.setActiveTool);
     const magnetMode = useMarketStore(s => s.magnetMode);
     const timeframe = useMarketStore(s => s.timeframe);
+
+    const writeDrawings = (nextDrawings: typeof drawings | ((prev: typeof drawings) => typeof drawings)) => {
+        if (layoutId !== 'l1' && paneId) {
+            setPaneDrawings(paneId, nextDrawings as any);
+            return;
+        }
+        setGlobalDrawings(nextDrawings as any);
+    };
+
+    const removeDrawings = () => {
+        if (layoutId !== 'l1' && paneId) {
+            clearPaneDrawings(paneId);
+            return;
+        }
+        clearGlobalDrawings();
+    };
 
     const [, setTrigger] = useState(0);
     const svgRef = useRef<SVGSVGElement>(null);
@@ -77,7 +97,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
 
         const getSignature = () => {
             const logicalRange = chart.timeScale().getVisibleLogicalRange();
-            const priceRange = candleSeries.priceScale().getVisiblePriceRange();
+            const priceRange = candleSeries.priceScale().getVisibleRange();
 
             // Keep raw precision so tiny pans/zoom deltas repaint immediately.
             const logicalFrom = logicalRange?.from ?? 0;
@@ -90,8 +110,8 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
             return [
                 logicalRange?.from ?? 'na',
                 logicalRange?.to ?? 'na',
-                priceRange?.top ?? 'na',
-                priceRange?.bottom ?? 'na',
+                priceRange?.from ?? 'na',
+                priceRange?.to ?? 'na',
                 barSpacing ?? 'na',
                 dimensions.w,
                 dimensions.h,
@@ -131,7 +151,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
         }
 
         if (previousTimeframeRef.current !== timeframe) {
-            clearDrawings();
+            removeDrawings();
             setActiveDrawing(null);
             setPencilPoints([]);
             setTextEntry(null);
@@ -139,7 +159,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
         }
 
         previousTimeframeRef.current = timeframe;
-    }, [timeframe, clearDrawings]);
+    }, [timeframe, removeDrawings]);
 
     // Clear UI state when drawings are cleared globally or via Event
     useEffect(() => {
@@ -187,7 +207,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
     const requiredPoints = TOOL_POINT_COUNTS[activeTool] ?? 2;
 
     const finishDrawing = (type: string, points: { time: number, price: number }[], text?: string, data?: Record<string, unknown>) => {
-        setDrawings([...drawings, { type, points, text, data }]);
+        writeDrawings([...drawings, { type, points, text, data }]);
         setActiveDrawing(null);
         setActiveTool('crosshair');
     };
@@ -287,7 +307,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
         if (isDraggingPencil && activeTool === 'pencil') {
             setIsDraggingPencil(false);
             if (pencilPoints.length > 2) {
-                setDrawings([...drawings, { type: 'pencil', points: pencilPoints }]);
+                writeDrawings([...drawings, { type: 'pencil', points: pencilPoints }]);
             }
             setPencilPoints([]);
             // Removed setActiveTool('crosshair') so the user can keep brushing without clicking the tool again
@@ -297,7 +317,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
     // Map logic
     const mapPoint = (time: number, price: number) => {
         if (!chartRef.current || !seriesRef.current) return { x: -1000, y: -1000 };
-        const x = chartRef.current.timeScale().timeToCoordinate(time as number) ?? -1000;
+        const x = chartRef.current.timeScale().timeToCoordinate(time as any) ?? -1000;
         const y = seriesRef.current.candle.priceToCoordinate(price) ?? -1000;
         return { x, y };
     };
@@ -996,7 +1016,7 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
         if (!textEntry) return;
         if (text) {
             if (textEntry.type === 'callout' && activeDrawing) {
-                setDrawings([
+                writeDrawings([
                     ...drawings,
                     {
                         type: 'callout',
@@ -1006,11 +1026,11 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false }: Dr
                 ]);
                 setActiveDrawing(null);
             } else if (textEntry.type === 'anchored_note') {
-                setDrawings([...drawings, { type: 'anchored_note', text, points: [{ time: textEntry.time, price: textEntry.price }] }]);
+                writeDrawings([...drawings, { type: 'anchored_note', text, points: [{ time: textEntry.time, price: textEntry.price }] }]);
             } else if (textEntry.type === 'note') {
-                setDrawings([...drawings, { type: 'note', text, points: [{ time: textEntry.time, price: textEntry.price }] }]);
+                writeDrawings([...drawings, { type: 'note', text, points: [{ time: textEntry.time, price: textEntry.price }] }]);
             } else {
-                setDrawings([...drawings, { type: 'text', text, points: [{ time: textEntry.time, price: textEntry.price }] }]);
+                writeDrawings([...drawings, { type: 'text', text, points: [{ time: textEntry.time, price: textEntry.price }] }]);
             }
         }
         setTextEntry(null);

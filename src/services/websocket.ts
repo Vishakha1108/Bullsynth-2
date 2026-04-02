@@ -5,20 +5,20 @@ export const candleWorker = new Worker(new URL('../workers/candleWorker.ts', imp
 });
 
 candleWorker.onmessage = (e) => {
-    const { type, candle, candles } = e.data;
+    const { type, candle, candles, symbol, timeframeSec } = e.data;
 
     if (type === 'CANDLE_UPDATE') {
-        useMarketStore.getState().setLatestCandle(candle);
+        useMarketStore.getState().setLatestCandle(candle, symbol, timeframeSec);
     }
     else if (type === 'HISTORY_UPDATE') {
-        useMarketStore.getState().setCandlesData(candles);
+        useMarketStore.getState().setCandlesData(candles, null, symbol, timeframeSec);
     }
     else if (type === 'CLEAR') {
         // Worker reset — clear all chart data
         useMarketStore.getState().clearCandles();
     }
     else if (type === 'COMPARE_HISTORY_UPDATE') {
-        useMarketStore.getState().setCompareCandles(e.data.symbol, e.data.candles);
+        useMarketStore.getState().setCompareCandles(symbol, candles);
     }
 };
 
@@ -31,11 +31,11 @@ export function isSymbolCached(symbol: string): boolean {
 // ── Initial candle batching ──────────────────────────────────────────────────
 // The backend sends candle history as individual 'candle' messages on connect.
 // We batch them per-symbol and flush to the worker as HISTORY after a short pause.
-const pendingCandles: Record<string, Array<{time: number; open: number; high: number; low: number; close: number; volume: number}>> = {};
+const pendingCandles: Record<string, Array<{ time: number; open: number; high: number; low: number; close: number; volume: number }>> = {};
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 const FLUSH_DELAY = 300; // ms — wait for the initial burst to finish
 
-function queueInitialCandle(symbol: string, candle: {time: number; open: number; high: number; low: number; close: number; volume: number}) {
+function queueInitialCandle(symbol: string, candle: { time: number; open: number; high: number; low: number; close: number; volume: number }) {
     if (!pendingCandles[symbol]) pendingCandles[symbol] = [];
     pendingCandles[symbol].push(candle);
 
@@ -83,21 +83,52 @@ export function requestCompareHistory(symbol: string) {
 }
 
 useMarketStore.subscribe((state, prevState) => {
-    if (state.currentSymbol !== prevState.currentSymbol || state.timeframe !== prevState.timeframe) {
-        candleWorker.postMessage({
-            type: 'INIT',
-            payload: { timeframeSec: state.timeframe, symbol: state.currentSymbol }
+    // 1. Handle layout changes or full re-initialization
+    if (state.layoutId !== prevState.layoutId) {
+        // Initialize all panes in the worker
+        Object.values(state.paneConfigs).forEach(config => {
+            candleWorker.postMessage({
+                type: 'INIT',
+                payload: { timeframeSec: config.timeframe, symbol: config.symbol }
+            });
         });
-
-        // Rebuild compare candles at the new timeframe or after symbol switches.
-        state.compareSymbols.forEach((sym) => requestCompareHistory(sym));
     }
 
+    // 2. Handle current symbol/timeframe changes
+    if (state.layoutId === 'l1') {
+        // Single-pane: react to global state changes
+        if (state.currentSymbol !== prevState.currentSymbol || state.timeframe !== prevState.timeframe) {
+            candleWorker.postMessage({
+                type: 'INIT',
+                payload: { timeframeSec: state.timeframe, symbol: state.currentSymbol }
+            });
+            state.compareSymbols.forEach((sym) => requestCompareHistory(sym));
+        }
+    } else {
+        // Multi-pane: react to individual paneConfig changes, not global timeframe
+        for (const [paneId, config] of Object.entries(state.paneConfigs)) {
+            const prevConfig = prevState.paneConfigs[paneId];
+            if (!prevConfig || config.symbol !== prevConfig.symbol || config.timeframe !== prevConfig.timeframe) {
+                candleWorker.postMessage({
+                    type: 'INIT',
+                    payload: { timeframeSec: config.timeframe, symbol: config.symbol }
+                });
+            }
+        }
+        // Rebuild compare candles when active pane's context changes
+        if (state.currentSymbol !== prevState.currentSymbol) {
+            state.compareSymbols.forEach((sym) => requestCompareHistory(sym));
+        }
+    }
+
+    // 3. Handle replay mode transitions
     if (prevState.isReplayMode && !state.isReplayMode) {
-        // Re-init worker to rebuild from rawCache after replay ends
-        candleWorker.postMessage({
-            type: 'INIT',
-            payload: { timeframeSec: state.timeframe, symbol: state.currentSymbol }
+        // Re-init worker for all panes to rebuild from rawCache after replay ends
+        Object.values(state.paneConfigs).forEach(config => {
+            candleWorker.postMessage({
+                type: 'INIT',
+                payload: { timeframeSec: config.timeframe, symbol: config.symbol }
+            });
         });
 
         state.compareSymbols.forEach((sym) => requestCompareHistory(sym));
@@ -291,8 +322,6 @@ class WSManager {
                 }
 
                 if (msgType === 'history') {
-                    // if (msg.symbol !== state.currentSymbol) return; // This line moves down
-
                     const candles = msg.candles.map((c: Record<string, unknown>) => ({
                         time: normalizeToSec(c.t ?? c.ts ?? c.time),
                         open: Number(c.o || 0),
@@ -309,14 +338,17 @@ class WSManager {
                         state.setPrice(msg.symbol, closePrice, change);
                     }
 
-                    if (msg.symbol !== state.currentSymbol) {
+                    if (msg.symbol === state.currentSymbol) {
+                        fetchedSymbols.add(msg.symbol);
+                        candleWorker.postMessage({ type: 'HISTORY', payload: { symbol: msg.symbol, candles } });
+                    } else {
                         if (state.compareSymbols.includes(msg.symbol)) {
                             state.setCompareCandles(msg.symbol, candles);
                         }
-                        return;
+                        // Store non-current symbol data directly in paneCandles
+                        fetchedSymbols.add(msg.symbol);
+                        state.setCandlesData(candles, null, msg.symbol);
                     }
-                    fetchedSymbols.add(msg.symbol);
-                    candleWorker.postMessage({ type: 'HISTORY', payload: { symbol: msg.symbol, candles } });
                     return;
                 }
 
