@@ -34,13 +34,17 @@ export default function Terminal() {
         wsManager.connect();
     }, []);
 
+    const urlSymbol = searchParams.get('symbol')?.trim().toUpperCase() || '';
+
     useEffect(() => {
-        const symbol = searchParams.get('symbol');
-        if (symbol) {
-            setCurrentSymbol(symbol.toUpperCase());
-            resetSymbolData();
-        }
-    }, [searchParams, setCurrentSymbol, resetSymbolData]);
+        if (!urlSymbol) return;
+
+        const { currentSymbol } = useMarketStore.getState();
+        if (currentSymbol === urlSymbol) return;
+
+        setCurrentSymbol(urlSymbol);
+        resetSymbolData();
+    }, [urlSymbol, setCurrentSymbol, resetSymbolData]);
 
     const renderTabContent = (tab: SidebarTab) => {
         if (tab === 'portfolio') return <Portfolio onClose={() => setIsRightPanelOpen(false)} />;

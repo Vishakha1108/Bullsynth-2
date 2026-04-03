@@ -984,6 +984,10 @@ const useMarketStore = create<MarketState>((set) => ({
     })),
 
     setActivePaneId: (paneId) => set((state) => {
+        if (state.layoutId === 'l1') {
+            return { activePaneId: paneId };
+        }
+
         const targetPane = state.paneConfigs[paneId];
         if (!targetPane) return { activePaneId: paneId };
 

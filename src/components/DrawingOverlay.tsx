@@ -196,6 +196,17 @@ export function DrawingOverlay({ chartRef, seriesRef, hideDrawings = false, pane
     // Handle Delete key to remove the latest drawing quickly
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            const activeEl = document.activeElement as HTMLElement | null;
+            const isTypingTarget =
+                activeEl?.tagName === 'INPUT' ||
+                activeEl?.tagName === 'TEXTAREA' ||
+                activeEl?.tagName === 'SELECT' ||
+                activeEl?.isContentEditable;
+
+            if (isTypingTarget) {
+                return;
+            }
+
             if ((e.key === 'Delete' || e.key === 'Backspace') && !textEntry && !activeDrawing) {
                 e.preventDefault();
                 deleteLastDrawing();
